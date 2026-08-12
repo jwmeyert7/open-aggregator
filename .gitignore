@@ -1,0 +1,11 @@
+node_modules
+.data
+out
+.env
+*.log
+
+# A user's private tuned configs stay local. Only the .example files are tracked.
+config/feeds.json
+config/sections.json
+config/prompts/*.md
+!config/prompts/*.example.md

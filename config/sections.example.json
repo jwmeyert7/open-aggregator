@@ -1,0 +1,25 @@
+{
+  "$comment": "Sections and tuning. Copy this file to sections.json and edit it, or run as-is to use these examples. Sections are yours to name: add, remove, or rename them and point your feeds and prompt at the ids you choose. All ranking and ingest knobs live here, not in code.",
+  "sections": [
+    { "id": "tech", "title": "Technology", "description": "Software, hardware, the internet, and the companies building them." },
+    { "id": "science", "title": "Science", "description": "Research, space, health, and the natural world." },
+    { "id": "world", "title": "World", "description": "Politics, business, and events shaping the wider world." }
+  ],
+  "ranking": {
+    "$comment": "score = source weight (decayed per link) plus a velocity boost, scaled by importance. Higher importanceFactorPerPoint widens the gap between a routine item and a big one. decayHalfLifeHours sets how fast a story fades.",
+    "importanceFactorPerPoint": 0.15,
+    "decayHalfLifeHours": 24,
+    "velocityWindowHours": 6,
+    "velocityBoostPerLink": 0.25,
+    "minTopScore": 0.35,
+    "maxTopStories": 10,
+    "maxSectionStories": 15
+  },
+  "ingest": {
+    "$comment": "maxItemAgeHours drops anything older than this at fetch time so history never backfills. maxItems caps how many raw items state retains. seenHashRetentionDays is how long a URL stays deduped and how long an idle cluster survives. feedTimeoutMs bounds each feed fetch.",
+    "maxItemAgeHours": 48,
+    "maxItems": 2000,
+    "seenHashRetentionDays": 30,
+    "feedTimeoutMs": 15000
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "open-aggregator",
+  "version": "0.1.0",
+  "description": "A topic-agnostic news aggregator engine that curates handpicked feeds into a ranked single front page.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "run": "tsx src/cli.ts run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.0",
+    "ai": "^6.0.0",
+    "rss-parser": "^3.13.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
