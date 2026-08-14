@@ -211,6 +211,15 @@ const SCRIPT = `
       } catch (err) {}
     }, true);
 
+    var clock = document.getElementById("clock");
+    function tick() {
+      var now = new Date();
+      clock.textContent = " · " + now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) +
+        " " + now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+    tick();
+    setInterval(tick, 30000);
+
     var search = document.getElementById("search");
     search.addEventListener("input", function () {
       var q = search.value.trim().toLowerCase();
@@ -232,19 +241,19 @@ const SCRIPT = `
  */
 function shell(opts: {
   title: string;
-  tagline: string;
   content: string;
   prefix: string;
   sections: Array<{ id: string; title: string }>;
   active?: string;
 }): string {
-  const { title, tagline, content, prefix, sections, active } = opts;
-  const nav = sections
-    .map(
+  const { title, content, prefix, sections, active } = opts;
+  const nav = [
+    `<a href="${prefix}index.html"${active === "top" ? ' class="here"' : ""}>Top stories</a>`,
+    ...sections.map(
       (s) =>
         `<a href="${prefix}${escapeHtml(s.id)}.html"${active === s.id ? ' class="here"' : ""}>${escapeHtml(s.title)}</a>`
-    )
-    .join("");
+    ),
+  ].join("");
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -257,9 +266,9 @@ function shell(opts: {
   <div class="wrap">
     <header class="site">
       <h1><a href="${prefix}index.html">Open Aggregator</a></h1>
-      <p class="tagline">${escapeHtml(tagline)}</p>
+      <p class="tagline">A ranked front page built from handpicked feeds<span id="clock"></span></p>
       <div class="tools">
-        <input id="search" type="search" placeholder="Filter stories" aria-label="Filter stories">
+        <input id="search" type="search" placeholder="Search" aria-label="Search">
         <button id="theme" type="button" aria-label="Toggle color theme">☾</button>
       </div>
     </header>
@@ -312,9 +321,9 @@ export function renderHtml(cfg: EngineConfig, state = loadState()): string {
 
   return shell({
     title: "Open Aggregator",
-    tagline: `A ranked front page built from handpicked feeds. Updated ${timeAgo(state.updatedAt)}.`,
     prefix: "",
     sections: cfg.sections,
+    active: "top",
     content: `<div class="cols"><main>${body}</main>${renderNewest(state, now)}</div>`,
   });
 }
@@ -329,7 +338,6 @@ export function renderStreamHtml(cfg: EngineConfig, state: EngineState): string 
       : `<p class="empty">Nothing ingested yet.</p>`;
   return shell({
     title: "Stream · Open Aggregator",
-    tagline: "Every ingested item, newest first.",
     prefix: "",
     sections: cfg.sections,
     content: `<main class="stream"><h2>Stream</h2>${list}</main>`,
@@ -349,7 +357,6 @@ export function renderSectionHtml(cfg: EngineConfig, state: EngineState, section
       : `<p class="empty">No ${escapeHtml(section.title)} stories yet.</p>`;
   return shell({
     title: `${section.title} · Open Aggregator`,
-    tagline: section.description,
     prefix: "",
     sections: cfg.sections,
     active: sectionId,
@@ -364,7 +371,6 @@ export function renderArchiveHtml(cfg: EngineConfig, state: EngineState): string
     .join("");
   return shell({
     title: "Archive · Open Aggregator",
-    tagline: "One page per covered day, UTC.",
     prefix: "",
     sections: cfg.sections,
     content: `<main class="stream"><h2>Daily archive</h2>${
@@ -391,7 +397,6 @@ export function renderDayHtml(cfg: EngineConfig, state: EngineState, day: string
       : `<p class="empty">No stories recorded for this day.</p>`;
   return shell({
     title: `${day} · Open Aggregator`,
-    tagline: `Stories that gained coverage on ${day} UTC.`,
     prefix: "../",
     sections: cfg.sections,
     content: `<main><p class="archive-note">Daily archive for ${escapeHtml(
