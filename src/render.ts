@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { loadEngineConfig } from "./config";
+import { loadEngineConfig, loadFeeds } from "./config";
 import { leadLink, liveClusters, rankClusters, sectionStories, topStories } from "./rank";
 import { loadState } from "./state";
-import type { Cluster, EngineConfig, EngineState } from "./types";
+import type { Cluster, EngineConfig, EngineState, FeedConfig } from "./types";
 import { escapeHtml, timeAgo } from "./util";
 
 const REPO_URL = "https://github.com/jwmeyert7/open-aggregator";
@@ -161,6 +161,14 @@ const STYLE = `
   .days a { color: var(--link); text-decoration: none; margin-right: 0.6rem; }
   .archive-note { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.4rem; }
   .section-lead { color: var(--muted); font-size: 0.85rem; margin: -0.7rem 0 0.9rem; }
+  table.sources { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  table.sources th {
+    text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent);
+    border-bottom: 1px solid var(--line); padding: 0.3rem 0.6rem 0.3rem 0; cursor: pointer; user-select: none;
+  }
+  table.sources td { border-bottom: 1px solid var(--line); padding: 0.35rem 0.6rem 0.35rem 0; }
+  table.sources td a { color: var(--fg); text-decoration: none; }
+  table.sources td a:hover { color: var(--link); }
   .hidden { display: none; }
   footer.site {
     margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.8rem;
@@ -234,6 +242,24 @@ const SCRIPT = `
     tick();
     setInterval(tick, 30000);
 
+    var srcTable = document.querySelector("table.sources");
+    if (srcTable) {
+      srcTable.querySelectorAll("th").forEach(function (th, col) {
+        var asc = col === 0;
+        th.addEventListener("click", function () {
+          var body = srcTable.tBodies[0];
+          var rows = Array.prototype.slice.call(body.rows);
+          rows.sort(function (a, b) {
+            var av = a.cells[col].textContent, bv = b.cells[col].textContent;
+            var d = th.dataset.sort === "num" ? Number(av) - Number(bv) : av.localeCompare(bv);
+            return asc ? d : -d;
+          });
+          asc = !asc;
+          rows.forEach(function (r) { body.appendChild(r); });
+        });
+      });
+    }
+
     var search = document.getElementById("search");
     search.addEventListener("input", function () {
       var q = search.value.trim().toLowerCase();
@@ -291,7 +317,7 @@ function shell(opts: {
     ${content}
     <footer class="site">
       <span>Built with <a href="${REPO_URL}" rel="noopener noreferrer">open-aggregator</a>.</span>
-      <span class="footer-links"><a href="${prefix}stream.html">stream</a> · <a href="${prefix}archive.html">archive</a></span>
+      <span class="footer-links"><a href="${prefix}sources.html">sources</a> · <a href="${prefix}stream.html">stream</a> · <a href="${prefix}archive.html">archive</a></span>
       <label class="footer-pref"><input id="newtab" type="checkbox"> open links in new tab</label>
     </footer>
   </div>
@@ -370,6 +396,46 @@ export function renderSectionHtml(cfg: EngineConfig, state: EngineState, section
   });
 }
 
+/** A reader-facing link for a source: its site, never its feed machinery. */
+function sourceSiteLink(feed: FeedConfig): string {
+  try {
+    return new URL(feed.url).origin;
+  } catch {
+    return feed.url;
+  }
+}
+
+/**
+ * The public source list: the whole whitelist, one row per display name, with
+ * how many of each source's items are currently in the stream. Click a header
+ * to sort.
+ */
+export function renderSourcesHtml(cfg: EngineConfig, state: EngineState, feeds: FeedConfig[]): string {
+  const counts = new Map<string, number>();
+  for (const i of state.items) counts.set(i.sourceName, (counts.get(i.sourceName) ?? 0) + 1);
+  const rows = new Map<string, { url: string; count: number }>();
+  for (const f of feeds) {
+    if (!rows.has(f.name)) rows.set(f.name, { url: sourceSiteLink(f), count: counts.get(f.name) ?? 0 });
+  }
+  const sorted = [...rows.entries()].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]));
+  const trs = sorted
+    .map(
+      ([name, r]) =>
+        `<tr><td><a href="${escapeHtml(r.url)}" rel="noopener noreferrer">${escapeHtml(name)}</a></td><td>${r.count}</td></tr>`
+    )
+    .join("");
+  const table =
+    sorted.length > 0
+      ? `<table class="sources"><thead><tr><th data-sort="text">Source</th><th data-sort="num">Items in stream</th></tr></thead><tbody>${trs}</tbody></table>`
+      : `<p class="empty">No feeds configured.</p>`;
+  return shell({
+    title: "Sources · Open Aggregator",
+    prefix: "",
+    sections: cfg.sections,
+    content: `<main class="stream"><h2>Sources</h2><p class="archive-note">Every source this page reads. The number is how many of each source's items are in the current stream.</p>${table}</main>`,
+  });
+}
+
 /** The archive index: one link per covered UTC day, newest first. */
 export function renderArchiveHtml(cfg: EngineConfig, state: EngineState): string {
   const days = archiveDays(state)
@@ -422,6 +488,7 @@ export function renderToFile(): string {
   fs.writeFileSync(outFile, renderHtml(cfg, state));
   fs.writeFileSync(path.join(outDir, "stream.html"), renderStreamHtml(cfg, state));
   fs.writeFileSync(path.join(outDir, "archive.html"), renderArchiveHtml(cfg, state));
+  fs.writeFileSync(path.join(outDir, "sources.html"), renderSourcesHtml(cfg, state, loadFeeds()));
   for (const s of cfg.sections) {
     fs.writeFileSync(path.join(outDir, `${s.id}.html`), renderSectionHtml(cfg, state, s.id));
   }
