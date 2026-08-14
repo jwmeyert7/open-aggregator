@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { loadEngineConfig } from "./config";
-import { leadLink, liveClusters, sectionStories, topStories } from "./rank";
+import { leadLink, liveClusters, rankClusters, sectionStories, topStories } from "./rank";
 import { loadState } from "./state";
 import type { Cluster, EngineConfig, EngineState } from "./types";
 import { escapeHtml, timeAgo } from "./util";
@@ -30,10 +30,10 @@ function renderCluster(cluster: Cluster): string {
     </article>`;
 }
 
-function renderSection(title: string, description: string, stories: Cluster[]): string {
+function renderSection(id: string, title: string, description: string, stories: Cluster[]): string {
   if (stories.length === 0) return "";
   return `
-    <section class="block">
+    <section class="block" id="${escapeHtml(id)}">
       <header class="block-head">
         <h2>${escapeHtml(title)}</h2>
         <p class="block-desc">${escapeHtml(description)}</p>
@@ -111,7 +111,7 @@ const STYLE = `
   }
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 2.2rem; }
   @media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
-  .block { margin: 0 0 2.4rem; }
+  .block { margin: 0 0 2.4rem; scroll-margin-top: 4.5rem; }
   .block-head { border-bottom: 1px solid var(--line); margin-bottom: 1rem; }
   .block-head h2 {
     margin: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent);
@@ -150,6 +150,7 @@ const STYLE = `
     display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
   }
   footer.site a { color: var(--link); }
+  .footer-links a { text-decoration: none; }
   .footer-pref { cursor: pointer; user-select: none; }
 `;
 
@@ -229,16 +230,13 @@ const SCRIPT = `
 function shell(opts: {
   title: string;
   tagline: string;
-  active: "front" | "stream" | "archive";
   content: string;
   prefix: string;
+  sections: Array<{ id: string; title: string }>;
 }): string {
-  const { title, tagline, active, content, prefix } = opts;
-  const nav = [
-    ["front", `${prefix}index.html`, "Front"],
-    ["stream", `${prefix}stream.html`, "Stream"],
-  ]
-    .map(([id, href, label]) => `<a href="${href}"${active === id ? ' class="here"' : ""}>${label}</a>`)
+  const { title, tagline, content, prefix, sections } = opts;
+  const nav = sections
+    .map((s) => `<a href="${prefix}index.html#${escapeHtml(s.id)}">${escapeHtml(s.title)}</a>`)
     .join("");
   return `<!doctype html>
 <html lang="en">
@@ -262,6 +260,7 @@ function shell(opts: {
     ${content}
     <footer class="site">
       <span>Built with <a href="${REPO_URL}" rel="noopener noreferrer">open-aggregator</a>.</span>
+      <span class="footer-links"><a href="${prefix}stream.html">stream</a> · <a href="${prefix}archive.html">archive</a></span>
       <label class="footer-pref"><input id="newtab" type="checkbox"> open links in new tab</label>
     </footer>
   </div>
@@ -272,10 +271,24 @@ function shell(opts: {
 
 export function renderHtml(cfg: EngineConfig, state = loadState()): string {
   const now = new Date();
-  const top = topStories(state, cfg.ranking, now);
+  // Top Stories mixes every section. When nothing clears the score bar (the
+  // keyless first run), the best-ranked clusters overall fill it instead so
+  // the page never opens with an empty lead block.
+  let top = topStories(state, cfg.ranking, now);
+  if (top.length === 0) {
+    top = rankClusters(liveClusters(state), cfg.ranking, now).slice(0, cfg.ranking.maxTopStories);
+  }
+  const topIds = new Set(top.map((c) => c.id));
 
   const sections = cfg.sections
-    .map((s) => renderSection(s.title, s.description, sectionStories(state, s.id, cfg.ranking, now)))
+    .map((s) =>
+      renderSection(
+        s.id,
+        s.title,
+        s.description,
+        sectionStories(state, s.id, cfg.ranking, now).filter((c) => !topIds.has(c.id))
+      )
+    )
     .join("");
 
   const topBlock =
@@ -293,30 +306,41 @@ export function renderHtml(cfg: EngineConfig, state = loadState()): string {
   return shell({
     title: "Open Aggregator",
     tagline: `A ranked front page built from handpicked feeds. Updated ${timeAgo(state.updatedAt)}.`,
-    active: "front",
     prefix: "",
+    sections: cfg.sections,
     content: `<div class="cols"><main>${body}</main>${renderNewest(state, now)}</div>`,
   });
 }
 
-/** Every ingested item in reverse chronological order, plus the archive day list. */
-export function renderStreamHtml(state: EngineState): string {
+/** Every ingested item in reverse chronological order. */
+export function renderStreamHtml(cfg: EngineConfig, state: EngineState): string {
   const now = new Date();
   const items = [...state.items].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, STREAM_COUNT);
   const list =
     items.length > 0
       ? `<ul>${items.map((i) => renderItemLi(i, now)).join("")}</ul>`
       : `<p class="empty">Nothing ingested yet.</p>`;
+  return shell({
+    title: "Stream · Open Aggregator",
+    tagline: "Every ingested item, newest first.",
+    prefix: "",
+    sections: cfg.sections,
+    content: `<main class="stream"><h2>Stream</h2>${list}</main>`,
+  });
+}
+
+/** The archive index: one link per covered UTC day, newest first. */
+export function renderArchiveHtml(cfg: EngineConfig, state: EngineState): string {
   const days = archiveDays(state)
     .map((d) => `<a href="day/${d}.html">${d}</a>`)
     .join("");
   return shell({
-    title: "Stream · Open Aggregator",
-    tagline: "Every ingested item, newest first.",
-    active: "stream",
+    title: "Archive · Open Aggregator",
+    tagline: "One page per covered day, UTC.",
     prefix: "",
-    content: `<main class="stream"><h2>Stream</h2>${list}${
-      days ? `<p class="days">Daily archive: ${days}</p>` : ""
+    sections: cfg.sections,
+    content: `<main class="stream"><h2>Daily archive</h2>${
+      days ? `<p class="days">${days}</p>` : `<p class="empty">No covered days yet.</p>`
     }</main>`,
   });
 }
@@ -329,7 +353,7 @@ function archiveDays(state: EngineState): string[] {
 }
 
 /** One UTC day's stories: every cluster that gained coverage that day, importance first. */
-export function renderDayHtml(state: EngineState, day: string): string {
+export function renderDayHtml(cfg: EngineConfig, state: EngineState, day: string): string {
   const clusters = liveClusters(state)
     .filter((c) => c.links.some((l) => l.addedAt.slice(0, 10) === day))
     .sort((a, b) => b.importance - a.importance || b.updatedAt.localeCompare(a.updatedAt));
@@ -340,8 +364,8 @@ export function renderDayHtml(state: EngineState, day: string): string {
   return shell({
     title: `${day} · Open Aggregator`,
     tagline: `Stories that gained coverage on ${day} UTC.`,
-    active: "archive",
     prefix: "../",
+    sections: cfg.sections,
     content: `<main><p class="archive-note">Daily archive for ${escapeHtml(
       day
     )} UTC, regenerated from current data on every run.</p>${body}</main>`,
@@ -356,9 +380,10 @@ export function renderToFile(): string {
   fs.mkdirSync(path.join(outDir, "day"), { recursive: true });
   const outFile = path.join(outDir, "index.html");
   fs.writeFileSync(outFile, renderHtml(cfg, state));
-  fs.writeFileSync(path.join(outDir, "stream.html"), renderStreamHtml(state));
+  fs.writeFileSync(path.join(outDir, "stream.html"), renderStreamHtml(cfg, state));
+  fs.writeFileSync(path.join(outDir, "archive.html"), renderArchiveHtml(cfg, state));
   for (const day of archiveDays(state)) {
-    fs.writeFileSync(path.join(outDir, "day", `${day}.html`), renderDayHtml(state, day));
+    fs.writeFileSync(path.join(outDir, "day", `${day}.html`), renderDayHtml(cfg, state, day));
   }
   return outFile;
 }

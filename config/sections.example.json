@@ -12,8 +12,8 @@
     "velocityWindowHours": 6,
     "velocityBoostPerLink": 0.25,
     "minTopScore": 0.35,
-    "maxTopStories": 10,
-    "maxSectionStories": 15
+    "maxTopStories": 11,
+    "maxSectionStories": 11
   },
   "ingest": {
     "$comment": "maxItemAgeHours drops anything older than this at fetch time so history never backfills. maxItems caps how many raw items state retains. seenHashRetentionDays is how long a URL stays deduped and how long an idle cluster survives. feedTimeoutMs bounds each feed fetch.",
