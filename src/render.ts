@@ -35,7 +35,7 @@ function renderSection(id: string, title: string, description: string, stories: 
   return `
     <section class="block" id="${escapeHtml(id)}">
       <header class="block-head">
-        <h2>${escapeHtml(title)}</h2>
+        <h2><a href="${escapeHtml(id)}.html">${escapeHtml(title)}</a></h2>
         <p class="block-desc">${escapeHtml(description)}</p>
       </header>
       ${stories.map(renderCluster).join("")}
@@ -96,9 +96,12 @@ const STYLE = `
   }
   header.site h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; }
   header.site h1 a { color: var(--fg); text-decoration: none; }
-  nav.nav { display: flex; gap: 0.8rem; font-size: 0.85rem; }
-  nav.nav a { color: var(--muted); text-decoration: none; text-transform: uppercase; letter-spacing: 0.06em; }
-  nav.nav a:hover, nav.nav a.here { color: var(--accent); }
+  nav.mainnav {
+    display: flex; gap: 1.2rem; font-size: 0.85rem; padding: 0.55rem 0; margin-bottom: 1.6rem;
+    border-bottom: 1px solid var(--line); text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  nav.mainnav a { color: var(--muted); text-decoration: none; }
+  nav.mainnav a:hover, nav.mainnav a.here { color: var(--accent); }
   header.site .tagline { margin: 0; color: var(--muted); font-size: 0.85rem; flex: 1 1 auto; }
   .tools { display: flex; align-items: center; gap: 0.5rem; }
   #search {
@@ -233,10 +236,14 @@ function shell(opts: {
   content: string;
   prefix: string;
   sections: Array<{ id: string; title: string }>;
+  active?: string;
 }): string {
-  const { title, tagline, content, prefix, sections } = opts;
+  const { title, tagline, content, prefix, sections, active } = opts;
   const nav = sections
-    .map((s) => `<a href="${prefix}index.html#${escapeHtml(s.id)}">${escapeHtml(s.title)}</a>`)
+    .map(
+      (s) =>
+        `<a href="${prefix}${escapeHtml(s.id)}.html"${active === s.id ? ' class="here"' : ""}>${escapeHtml(s.title)}</a>`
+    )
     .join("");
   return `<!doctype html>
 <html lang="en">
@@ -250,13 +257,13 @@ function shell(opts: {
   <div class="wrap">
     <header class="site">
       <h1><a href="${prefix}index.html">Open Aggregator</a></h1>
-      <nav class="nav">${nav}</nav>
       <p class="tagline">${escapeHtml(tagline)}</p>
       <div class="tools">
         <input id="search" type="search" placeholder="Filter stories" aria-label="Filter stories">
         <button id="theme" type="button" aria-label="Toggle color theme">☾</button>
       </div>
     </header>
+    <nav class="mainnav">${nav}</nav>
     ${content}
     <footer class="site">
       <span>Built with <a href="${REPO_URL}" rel="noopener noreferrer">open-aggregator</a>.</span>
@@ -329,6 +336,27 @@ export function renderStreamHtml(cfg: EngineConfig, state: EngineState): string 
   });
 }
 
+/** One section's page: only that section's stories, with the Newest rail. */
+export function renderSectionHtml(cfg: EngineConfig, state: EngineState, sectionId: string): string {
+  const now = new Date();
+  const section = cfg.sections.find((s) => s.id === sectionId)!;
+  const stories = sectionStories(state, sectionId, cfg.ranking, now);
+  const body =
+    stories.length > 0
+      ? `<section class="block"><header class="block-head"><h2>${escapeHtml(section.title)}</h2><p class="block-desc">${escapeHtml(
+          section.description
+        )}</p></header>${stories.map(renderCluster).join("")}</section>`
+      : `<p class="empty">No ${escapeHtml(section.title)} stories yet.</p>`;
+  return shell({
+    title: `${section.title} · Open Aggregator`,
+    tagline: section.description,
+    prefix: "",
+    sections: cfg.sections,
+    active: sectionId,
+    content: `<div class="cols"><main>${body}</main>${renderNewest(state, now)}</div>`,
+  });
+}
+
 /** The archive index: one link per covered UTC day, newest first. */
 export function renderArchiveHtml(cfg: EngineConfig, state: EngineState): string {
   const days = archiveDays(state)
@@ -382,6 +410,9 @@ export function renderToFile(): string {
   fs.writeFileSync(outFile, renderHtml(cfg, state));
   fs.writeFileSync(path.join(outDir, "stream.html"), renderStreamHtml(cfg, state));
   fs.writeFileSync(path.join(outDir, "archive.html"), renderArchiveHtml(cfg, state));
+  for (const s of cfg.sections) {
+    fs.writeFileSync(path.join(outDir, `${s.id}.html`), renderSectionHtml(cfg, state, s.id));
+  }
   for (const day of archiveDays(state)) {
     fs.writeFileSync(path.join(outDir, "day", `${day}.html`), renderDayHtml(cfg, state, day));
   }
