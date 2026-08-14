@@ -103,7 +103,7 @@ const STYLE = `
   }
   #theme {
     background: var(--card); color: var(--fg); border: 1px solid var(--line);
-    border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.85rem; cursor: pointer;
+    border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.9rem; cursor: pointer; line-height: 1;
   }
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 2.2rem; }
   @media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
@@ -162,7 +162,10 @@ const SCRIPT = `
       return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
     function label() {
-      btn.textContent = current() === "dark" ? "light" : "dark";
+      var dark = current() === "dark";
+      btn.textContent = dark ? "\\u2600" : "\\u263E";
+      btn.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+      btn.setAttribute("title", dark ? "Switch to light mode" : "Switch to dark mode");
     }
     label();
     btn.addEventListener("click", function () {
@@ -244,7 +247,7 @@ export function renderHtml(cfg: EngineConfig, state = loadState()): string {
       <p class="tagline">A ranked front page built from handpicked feeds. Updated ${escapeHtml(timeAgo(state.updatedAt))}.</p>
       <div class="tools">
         <input id="search" type="search" placeholder="Filter stories" aria-label="Filter stories">
-        <button id="theme" type="button" aria-label="Toggle color theme">dark</button>
+        <button id="theme" type="button" aria-label="Toggle color theme">☾</button>
       </div>
     </header>
     <div class="cols">
