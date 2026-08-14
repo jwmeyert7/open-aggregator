@@ -49,7 +49,7 @@ State lives in `.data/state.json` as a single local file, written atomically. De
 
 ## Commands
 
-- `npm run` runs the pipeline (fetch, edit, cluster, save) and then renders the front page to `out/index.html`, the chronological stream to `out/stream.html`, and a daily archive page per covered day under `out/day/`.
+- `npm run` runs the pipeline (fetch, edit, cluster, save) and then renders the whole site into `out/`: the front page (`index.html`), one page per section (`tech.html` and so on, named after your section ids), the chronological stream (`stream.html`), an archive index (`archive.html`), and one page per covered day under `out/day/`. Open any of them straight from disk or host the `out/` folder anywhere static.
 - `npm run typecheck` runs the TypeScript compiler with no emit.
 
 ## Not included
