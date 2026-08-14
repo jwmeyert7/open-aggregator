@@ -147,6 +147,7 @@ const STYLE = `
   .days { margin: 2rem 0 0; color: var(--muted); font-size: 0.82rem; line-height: 2; }
   .days a { color: var(--link); text-decoration: none; margin-right: 0.6rem; }
   .archive-note { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.4rem; }
+  .section-lead { color: var(--muted); font-size: 0.85rem; margin: -0.7rem 0 0.9rem; }
   .hidden { display: none; }
   footer.site {
     margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.8rem;
@@ -351,9 +352,9 @@ export function renderSectionHtml(cfg: EngineConfig, state: EngineState, section
   const stories = sectionStories(state, sectionId, cfg.ranking, now);
   const body =
     stories.length > 0
-      ? `<section class="block"><header class="block-head"><h2>${escapeHtml(section.title)}</h2><p class="block-desc">${escapeHtml(
-          section.description
-        )}</p></header>${stories.map(renderCluster).join("")}</section>`
+      ? `<section class="block"><p class="section-lead">${escapeHtml(section.description)}</p>${stories
+          .map(renderCluster)
+          .join("")}</section>`
       : `<p class="empty">No ${escapeHtml(section.title)} stories yet.</p>`;
   return shell({
     title: `${section.title} · Open Aggregator`,
