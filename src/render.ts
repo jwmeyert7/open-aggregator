@@ -18,28 +18,18 @@ function renderLink(link: Cluster["links"][number]): string {
   )}</span></li>`;
 }
 
-function renderCluster(cluster: Cluster): string {
+function renderCluster(cluster: Cluster, sectionTitle?: string): string {
   const lead = leadLink(cluster);
   const links = [...cluster.links].sort((a, b) => a.tier - b.tier || b.weight - a.weight);
+  const pill = sectionTitle ? `<span class="pill">${escapeHtml(sectionTitle)}</span>` : "";
   return `
     <article class="story">
+      <div class="kicker"><span class="org">${escapeHtml(lead.sourceName)}</span>${pill}</div>
       <h3 class="headline"><a href="${escapeHtml(lead.url)}" rel="noopener noreferrer">${escapeHtml(cluster.headline)}</a></h3>
       ${cluster.explainer ? `<p class="explainer">${escapeHtml(cluster.explainer)}</p>` : ""}
       <ul class="links">${links.map(renderLink).join("")}</ul>
       <p class="meta">${links.length} source${links.length === 1 ? "" : "s"} · updated ${escapeHtml(timeAgo(cluster.updatedAt))}</p>
     </article>`;
-}
-
-function renderSection(id: string, title: string, description: string, stories: Cluster[]): string {
-  if (stories.length === 0) return "";
-  return `
-    <section class="block" id="${escapeHtml(id)}">
-      <header class="block-head">
-        <h2><a href="${escapeHtml(id)}.html">${escapeHtml(title)}</a></h2>
-        <p class="block-desc">${escapeHtml(description)}</p>
-      </header>
-      ${stories.map(renderCluster).join("")}
-    </section>`;
 }
 
 /** Age bucket for the freshness hue: warm when very fresh, faded once a day old. */
@@ -121,6 +111,12 @@ const STYLE = `
   }
   .block-desc { margin: 0.2rem 0 0.7rem; color: var(--muted); font-size: 0.85rem; }
   .story { padding: 0.9rem 0; border-bottom: 1px solid var(--line); }
+  .kicker { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin: 0 0 0.15rem; }
+  .kicker .org { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .pill {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 999px; padding: 0.06rem 0.55rem; white-space: nowrap;
+  }
   .headline { margin: 0 0 0.35rem; font-size: 1.16rem; line-height: 1.35; }
   .headline a { color: var(--fg); text-decoration: none; }
   .headline a:hover { color: var(--link); }
@@ -286,39 +282,28 @@ function shell(opts: {
 </html>`;
 }
 
+/** The newest coverage moment a cluster has, for recency ordering. */
+function latestCoverage(cluster: Cluster): string {
+  return cluster.links.reduce((max, l) => (l.publishedAt > max ? l.publishedAt : max), "");
+}
+
 export function renderHtml(cfg: EngineConfig, state = loadState()): string {
   const now = new Date();
-  // Top Stories mixes every section. When nothing clears the score bar (the
-  // keyless first run), the best-ranked clusters overall fill it instead so
-  // the page never opens with an empty lead block.
+  // Top Stories mixes every section: the best-ranked clusters win the slots,
+  // then the page orders them by freshest coverage. When nothing clears the
+  // score bar (the keyless first run), the best-ranked clusters overall fill
+  // it instead so the page never opens empty.
   let top = topStories(state, cfg.ranking, now);
   if (top.length === 0) {
-    top = rankClusters(liveClusters(state), cfg.ranking, now).slice(0, cfg.ranking.maxTopStories);
+    top = rankClusters(liveClusters(state), cfg.ranking, now);
   }
-  const topIds = new Set(top.map((c) => c.id));
+  top = top.slice(0, cfg.ranking.maxTopStories).sort((a, b) => latestCoverage(b).localeCompare(latestCoverage(a)));
+  const titleById = new Map(cfg.sections.map((s) => [s.id, s.title]));
 
-  const sections = cfg.sections
-    .map((s) =>
-      renderSection(
-        s.id,
-        s.title,
-        s.description,
-        sectionStories(state, s.id, cfg.ranking, now).filter((c) => !topIds.has(c.id))
-      )
-    )
-    .join("");
-
-  const topBlock =
+  const body =
     top.length > 0
-      ? `<section class="block"><header class="block-head"><h2>Top Stories</h2></header>${top
-          .map(renderCluster)
-          .join("")}</section>`
-      : "";
-
-  const anyContent = top.length > 0 || sections.length > 0;
-  const body = anyContent
-    ? topBlock + sections
-    : `<p class="empty">No stories yet. Run the pipeline with feeds configured and an LLM key set, then render again.</p>`;
+      ? `<section class="block">${top.map((c) => renderCluster(c, titleById.get(c.section) ?? c.section)).join("")}</section>`
+      : `<p class="empty">No stories yet. Run the pipeline with feeds configured and an LLM key set, then render again.</p>`;
 
   return shell({
     title: "Open Aggregator",
@@ -353,7 +338,7 @@ export function renderSectionHtml(cfg: EngineConfig, state: EngineState, section
   const body =
     stories.length > 0
       ? `<section class="block"><p class="section-lead">${escapeHtml(section.description)}</p>${stories
-          .map(renderCluster)
+          .map((c) => renderCluster(c))
           .join("")}</section>`
       : `<p class="empty">No ${escapeHtml(section.title)} stories yet.</p>`;
   return shell({
@@ -392,9 +377,10 @@ export function renderDayHtml(cfg: EngineConfig, state: EngineState, day: string
   const clusters = liveClusters(state)
     .filter((c) => c.links.some((l) => l.addedAt.slice(0, 10) === day))
     .sort((a, b) => b.importance - a.importance || b.updatedAt.localeCompare(a.updatedAt));
+  const titleById = new Map(cfg.sections.map((s) => [s.id, s.title]));
   const body =
     clusters.length > 0
-      ? clusters.map(renderCluster).join("")
+      ? clusters.map((c) => renderCluster(c, titleById.get(c.section) ?? c.section)).join("")
       : `<p class="empty">No stories recorded for this day.</p>`;
   return shell({
     title: `${day} · Open Aggregator`,
