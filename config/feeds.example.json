@@ -1,12 +1,12 @@
 {
-  "$comment": "Your source whitelist. Copy this file to feeds.json and edit it, or run as-is to use these examples. tier 1 = primary or trusted sources (pass the gate automatically), tier 2 = broader sources held to a stricter LLM gate. weight feeds the ranking score. type: rss | discourse (a Discourse forum latest.json) | listing (a scraped index page, needs linkPattern). sectionHint is a default section id the editor may override. category is your own grouping label and is never shown to readers.",
+  "$comment": "Your source whitelist. Copy this file to feeds.json and edit it, or run as-is to use these examples. tier 1 = primary or trusted sources (pass the editorial gate automatically), tier 2 = broader sources held to a stricter LLM gate. weight feeds the ranking score. type: rss | discourse (a Discourse forum latest.json) | reddit (a subreddit .json listing) | listing (a scraped index page for blogs with no feed, needs linkPattern) | gnews (a Google News query feed scoped to one outlet with no usable RSS, and give every gnews feed an includePattern or Google's padding reaches the gate) | farcaster (link discovery from a channel, url 'channel:<id>', needs NEYNAR_API_KEY). sectionHint is a default section id the editor may override. category is admin-only grouping ('forum' additionally caps the importance of single-source forum stories). Admin state can disable feeds or override tier/weight/category.",
   "feeds": [
-    { "id": "bbc-world", "name": "BBC News (World)", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "type": "rss", "tier": 1, "weight": 2.5, "sectionHint": "world", "category": "wire" },
-    { "id": "npr-news", "name": "NPR News", "url": "https://feeds.npr.org/1001/rss.xml", "type": "rss", "tier": 1, "weight": 2, "sectionHint": "world", "category": "wire" },
-    { "id": "ars-technica", "name": "Ars Technica", "url": "https://feeds.arstechnica.com/arstechnica/index", "type": "rss", "tier": 1, "weight": 2.5, "sectionHint": "tech", "category": "outlet" },
-    { "id": "the-verge", "name": "The Verge", "url": "https://www.theverge.com/rss/index.xml", "type": "rss", "tier": 2, "weight": 1.8, "sectionHint": "tech", "category": "outlet" },
-    { "id": "hacker-news", "name": "Hacker News", "url": "https://news.ycombinator.com/rss", "type": "rss", "tier": 2, "weight": 1.5, "sectionHint": "tech", "category": "community" },
-    { "id": "nasa", "name": "NASA Breaking News", "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss", "type": "rss", "tier": 1, "weight": 2.5, "sectionHint": "science", "category": "institution" },
+    { "id": "bbc-world", "name": "BBC News (World)", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "type": "rss", "tier": 1, "weight": 2.5, "sectionHint": "world", "category": "news" },
+    { "id": "npr-news", "name": "NPR News", "url": "https://feeds.npr.org/1001/rss.xml", "type": "rss", "tier": 1, "weight": 2, "sectionHint": "world", "category": "news" },
+    { "id": "ars-technica", "name": "Ars Technica", "url": "https://feeds.arstechnica.com/arstechnica/index", "type": "rss", "tier": 1, "weight": 2.5, "sectionHint": "tech", "category": "news" },
+    { "id": "the-verge", "name": "The Verge", "url": "https://www.theverge.com/rss/index.xml", "type": "rss", "tier": 2, "weight": 1.8, "sectionHint": "tech", "category": "news" },
+    { "id": "hacker-news", "name": "Hacker News", "url": "https://news.ycombinator.com/rss", "type": "rss", "tier": 2, "weight": 1.5, "sectionHint": "tech", "category": "forum" },
+    { "id": "nasa", "name": "NASA Breaking News", "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss", "type": "rss", "tier": 1, "weight": 2.5, "sectionHint": "science", "category": "team" },
     { "id": "rust-forum", "name": "Rust Users Forum", "url": "https://users.rust-lang.org/latest.json", "type": "discourse", "tier": 2, "weight": 1.5, "sectionHint": "tech", "category": "forum" }
   ]
 }
