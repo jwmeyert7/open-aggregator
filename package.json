@@ -1,22 +1,32 @@
 {
   "name": "open-aggregator",
   "version": "0.1.0",
-  "description": "A topic-agnostic news aggregator engine that curates handpicked feeds into a ranked single front page.",
+  "description": "An open source, self-hostable news aggregation platform: a curated single front page with an LLM editor, an admin panel, and a cron pipeline, deployable on Vercel.",
   "license": "MIT",
-  "type": "module",
   "scripts": {
-    "run": "tsx src/cli.ts run",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.0",
+    "@ai-sdk/anthropic": "^3.0.97",
+    "@next/third-parties": "^16.2.10",
+    "@vercel/blob": "^2.0.0",
     "ai": "^6.0.0",
+    "next": "^16.0.0",
+    "nodemailer": "^9.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "rss-parser": "^3.13.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "tsx": "^4.0.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vercel/config": "^0.5.5",
     "typescript": "^5.0.0"
   }
 }

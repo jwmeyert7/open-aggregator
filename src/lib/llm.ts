@@ -1,0 +1,268 @@
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateObject, type LanguageModel } from "ai";
+import { z } from "zod";
+import { loadPrompt, navSections, sectionIds } from "./config";
+import type { CandidateItem, Cluster, SourceCandidate } from "./types";
+import { truncate } from "./util";
+
+/**
+ * Two supported auth paths:
+ *  - AI_GATEWAY_API_KEY → Vercel AI Gateway ("anthropic/claude-haiku-4-5" model strings)
+ *  - ANTHROPIC_API_KEY  → direct Anthropic API
+ * The gateway wins when both are set.
+ */
+function editorModel(): LanguageModel {
+  const configured = process.env.LLM_MODEL;
+  if (process.env.AI_GATEWAY_API_KEY) return configured || "anthropic/claude-haiku-4-5";
+  return anthropic(configured?.replace(/^anthropic\//, "") || "claude-haiku-4-5");
+}
+
+/**
+ * Section ids come from config at runtime, so every z.enum below is built
+ * per call instead of hardcoded. z.enum needs a non-empty tuple type.
+ */
+function enumOf(ids: string[]) {
+  return z.enum(ids as [string, ...string[]]);
+}
+
+/** One summary bullet, tagged with the section it belongs under so the UI can group them. */
+function summaryBulletSchema(navIds: string[]) {
+  return z.object({
+    text: z.string().describe("ONE short standalone plain-language line under 120 characters"),
+    section: enumOf(navIds).describe(
+      "the section this bullet's story belongs to; for a cross-section thread pick where its weight sits"
+    ),
+    ref: z
+      .string()
+      .optional()
+      .describe(
+        "the id of the ONE story this line leans on most (an activeClusters/frontPageTop id, or the new:N ref of a cluster in this reply), so the site can link the line to it; omit when no single story anchors the line"
+      ),
+  });
+}
+
+export interface SummaryBullet {
+  text: string;
+  section: string;
+  ref?: string;
+}
+
+export interface EditorOutput {
+  items: Array<{ id: string; pass: boolean; rejectReason?: string; clusterRef?: string }>;
+  clusters: Array<{
+    ref: string;
+    headline: string;
+    explainer: string;
+    section: string;
+    importance: number;
+    centrality?: number;
+    keywords: string[];
+    opinion?: boolean;
+  }>;
+  frontSummary?: SummaryBullet[];
+}
+
+function editorSchema(navIds: string[], allIds: string[]) {
+  return z.object({
+    items: z.array(
+      z.object({
+        id: z.string(),
+        pass: z.boolean(),
+        rejectReason: z.string().optional(),
+        clusterRef: z.string().optional().describe("existing cluster id, or new:N for a new cluster; required when pass=true"),
+      })
+    ),
+    clusters: z.array(
+      z.object({
+        ref: z.string().describe("new:N for new clusters, or an existing cluster id being updated"),
+        headline: z.string(),
+        explainer: z.string().describe("one standalone capitalized plain-language sentence on why the story matters"),
+        section: enumOf(allIds),
+        importance: z.number().min(1).max(5),
+        centrality: z
+          .number()
+          .min(1)
+          .max(5)
+          .describe(
+            "how specifically about the site's topic: 5 = the topic is the subject, 3 = an ecosystem actor, 1 = tangential angle"
+          ),
+        keywords: z.array(z.string()).max(8),
+        opinion: z
+          .boolean()
+          .optional()
+          .describe("true ONLY when the story is an opinion essay admitted under the opinion exception; never for factual reporting"),
+      })
+    ),
+    frontSummary: z
+      .array(summaryBulletSchema(navIds))
+      .max(4)
+      .optional()
+      .describe(
+        "3 bullets (4 at the most) describing what the front page is leading with right now, top ranked story first; empty array if nothing substantial is active"
+      ),
+  });
+}
+
+export function llmAvailable(): boolean {
+  return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.ANTHROPIC_API_KEY);
+}
+
+/** Compact digest of active clusters so new items can join existing stories cheaply. */
+export function clusterDigest(clusters: Cluster[]): Array<Record<string, unknown>> {
+  return clusters.map((c) => ({
+    id: c.id,
+    headline: c.headline,
+    section: c.section,
+    keywords: c.keywords,
+  }));
+}
+
+function itemPayload(items: Array<CandidateItem & { id: string }>) {
+  return items.map((i) => ({
+    id: i.id,
+    title: i.title,
+    excerpt: i.excerpt ? truncate(i.excerpt, 300) : undefined,
+    engagement: i.engagement
+      ? `${i.engagement.replies} replies, ${i.engagement.likes} likes, ${i.engagement.views} views`
+      : undefined,
+    url: i.url,
+    source: i.sourceName,
+    tier: i.tier,
+    sectionHint: i.sectionHint,
+    publishedAt: i.publishedAt,
+  }));
+}
+
+export async function classifyAndCluster(
+  newItems: Array<CandidateItem & { id: string }>,
+  activeClusters: Cluster[],
+  prompt: "cluster" | "add-by-url" = "cluster",
+  /**
+   * What the front page is currently leading with, so the summary describes the
+   * real page. In weekend mode the page leads with the week, so the summary is
+   * written about weekTop instead.
+   */
+  ctx: { frontPageTop?: Cluster[]; weekTop?: Cluster[]; weekendMode?: boolean } = {}
+): Promise<EditorOutput> {
+  const sections = navSections();
+  const headlines = (list?: Cluster[]) => (list ?? []).map((c) => ({ id: c.id, headline: c.headline, section: c.section }));
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: editorSchema(
+      sections.map((s) => s.id),
+      sectionIds()
+    ),
+    system: loadPrompt(prompt),
+    prompt: JSON.stringify({
+      todayUtc: new Date().toISOString().slice(0, 10),
+      // the valid section ids with their meanings, so the prompt can stay generic
+      sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+      weekendMode: Boolean(ctx.weekendMode),
+      frontPageTop: headlines(ctx.frontPageTop),
+      weekTop: headlines(ctx.weekTop),
+      activeClusters: clusterDigest(activeClusters),
+      newItems: itemPayload(newItems),
+    }),
+  });
+  return object as EditorOutput;
+}
+
+/** Day-in-review bullets for a frozen daily digest: one small call, best-effort at the call site. */
+export async function dayInReview(date: string, clusters: Cluster[]): Promise<SummaryBullet[]> {
+  const sections = navSections();
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: z.object({
+      summary: z
+        .array(summaryBulletSchema(sections.map((s) => s.id)))
+        .max(4)
+        .describe("3 bullets (4 at the most) reviewing the day, each ONE short past-tense plain-language line under 120 characters"),
+    }),
+    system: loadPrompt("day-summary"),
+    prompt: JSON.stringify({
+      date,
+      sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+      stories: clusters.map((c) => ({
+        headline: c.headline,
+        explainer: c.explainer,
+        section: c.section,
+        importance: c.importance,
+      })),
+    }),
+  });
+  return object.summary as SummaryBullet[];
+}
+
+/**
+ * One editor read per source candidate: what the domain publishes, why the
+ * discovery channel keeps linking it, and where its stories would land. One
+ * batched call, best-effort at the call site, written once and kept on the
+ * candidate.
+ */
+export async function assessSourceCandidates(
+  candidates: SourceCandidate[]
+): Promise<Record<string, { why: string; sections: string[] }>> {
+  const sections = navSections();
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: z.object({
+      reads: z.array(
+        z.object({
+          host: z.string(),
+          why: z
+            .string()
+            .describe(
+              "ONE standalone sentence under 160 characters: what this domain publishes and why the channel is linking it, grounded in the example casts"
+            ),
+          sections: z
+            .array(enumOf(sections.map((s) => s.id)))
+            .min(1)
+            .max(2)
+            .describe("the section(s) this domain's stories would mostly land in"),
+        })
+      ),
+    }),
+    system: loadPrompt("source-candidate"),
+    prompt: JSON.stringify({
+      sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+      candidates: candidates.map((c) => ({
+        host: c.host,
+        casts: c.casts,
+        engagement: c.engagement,
+        examples: c.examples.slice(0, 3).map((e) => ({ url: e.url, author: e.author, text: truncate(e.text, 240) })),
+      })),
+    }),
+  });
+  return Object.fromEntries(object.reads.map((r) => [r.host, { why: r.why, sections: r.sections as string[] }]));
+}
+
+/**
+ * No-LLM fallback (missing key or API failure): tier-1 items become their own
+ * single-link clusters flagged needsReview; tier-2 items are skipped because
+ * the editorial gate can't run. Keeps the site alive, degrades honestly.
+ */
+export function heuristicFallback(newItems: Array<CandidateItem & { id: string }>): EditorOutput {
+  const fallbackSection = navSections()[0]?.id ?? "general";
+  const items: EditorOutput["items"] = [];
+  const clusters: EditorOutput["clusters"] = [];
+  let n = 0;
+  for (const item of newItems) {
+    if (item.tier !== 1) {
+      items.push({ id: item.id, pass: false, rejectReason: "tier-2 gate unavailable (LLM offline)" });
+      continue;
+    }
+    n += 1;
+    const ref = `new:${n}`;
+    items.push({ id: item.id, pass: true, clusterRef: ref });
+    clusters.push({
+      ref,
+      headline: truncate(item.title, 100),
+      explainer: "",
+      section: item.sectionHint ?? fallbackSection,
+      importance: 2,
+      centrality: 3,
+      keywords: [],
+    });
+  }
+  return { items, clusters };
+}

@@ -1,10 +1,15 @@
-node_modules
-.data
-out
-.env
+node_modules/
+.next/
+.vercel/
+.data/
+.env*
+!.env.example
 *.log
+*.tsbuildinfo
+next-env.d.ts
 
-# A user's private tuned configs stay local. Only the .example files are tracked.
+# Your private tuned configs stay local. Only the .example files are tracked.
+config/site.json
 config/feeds.json
 config/sections.json
 config/prompts/*.md

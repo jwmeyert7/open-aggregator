@@ -1,0 +1,1719 @@
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --fg: #1a1c20;
+  --fg-soft: #4a4e57;
+  --muted: #7a7f8a;
+  --border: #e4e4e0;
+  --border-soft: #eeeeea;
+  --link: #1a4a8a;
+  /* neutral hover accent palette (deepened for the light background) */
+  --hover-blue: #4a6fd4;
+  --hover-lavender: #7e62cf;
+  --hover-mint: #1e9c8f;
+  --hover-peach: #c9704e;
+  --hover-indigo: #5551c9;
+  --pill-bg: #f0f0ec;
+  --good: #2e7d4f;
+  --bad: #b3423a;
+  --warn: #9a6b1f;
+  --ad-bg: #faf4e6;
+  --ad-border: #e3d5ae;
+  /* announcement slot tint */
+  --announce-bg: #efeafb;
+  --announce-border: #cfc0f0;
+}
+
+/* No-JS / error-shell fallback: when the theme script couldn't run (e.g. the
+   404 error shell), follow the OS preference until hydration repairs it. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #15171b;
+    --surface: #1c1f24;
+    --fg: #e8e8e4;
+    --fg-soft: #b8bcc4;
+    --muted: #858b96;
+    --border: #2c3038;
+    --border-soft: #24272e;
+    --link: #8ab0e8;
+    --hover-blue: #88aaf1;
+    --hover-lavender: #c5b0f2;
+    --hover-mint: #b8f5ec;
+    --hover-peach: #efc3b2;
+    --hover-indigo: #8b8ff0;
+    --pill-bg: #24272e;
+    --good: #5cb884;
+    --bad: #e08078;
+    --warn: #d0a55a;
+    --ad-bg: #262217;
+    --ad-border: #4a4128;
+    --announce-bg: #272144;
+    --announce-border: #4e4380;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #15171b;
+  --surface: #1c1f24;
+  --fg: #e8e8e4;
+  --fg-soft: #b8bcc4;
+  --muted: #858b96;
+  --border: #2c3038;
+  --border-soft: #24272e;
+  --link: #8ab0e8;
+  /* neutral hover accent palette (pastels read well on dark) */
+  --hover-blue: #88aaf1;
+  --hover-lavender: #c5b0f2;
+  --hover-mint: #b8f5ec;
+  --hover-peach: #efc3b2;
+  --hover-indigo: #8b8ff0;
+  --pill-bg: #24272e;
+  --good: #5cb884;
+  --bad: #e08078;
+  --warn: #d0a55a;
+  --ad-bg: #262217;
+  --ad-border: #4a4128;
+  --announce-bg: #272144;
+  --announce-border: #4e4380;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  /* in-page jumps (summary bullet -> story card) glide instead of teleporting */
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--hover-lavender);
+  text-decoration: underline;
+}
+
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 36px;
+}
+@media (max-width: 760px) {
+  .wrap {
+    padding: 0 20px;
+  }
+}
+
+/* ---------- header ---------- */
+.site-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.site-header .wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.logo {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.logo:hover {
+  /* wordmark: clickable but visually inert on hover */
+  text-decoration: none;
+  color: var(--fg);
+}
+.tagline {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.search-box input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.82rem;
+  padding: 5px 10px;
+  width: 130px;
+  transition: width 0.15s ease;
+}
+.search-box input:focus {
+  width: 190px;
+  outline: none;
+  border-color: var(--muted);
+}
+@media (max-width: 900px) {
+  .search-box input {
+    width: 90px;
+  }
+  .search-box input:focus {
+    width: 130px;
+  }
+}
+.search-form-page {
+  display: flex;
+  gap: 8px;
+  max-width: 420px;
+  margin-top: 10px;
+}
+.search-group {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 22px 0 4px;
+}
+.search-items {
+  list-style: none;
+}
+.search-items li {
+  padding: 7px 0;
+  border-top: 1px solid var(--border-soft);
+}
+/* narrower windows: drop the tagline first so it can't collide with the
+   centered clock strip */
+@media (max-width: 1150px) {
+  .tagline {
+    display: none;
+  }
+}
+.main-nav {
+  margin-top: 26px;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+}
+.nav-new {
+  display: none;
+}
+@media (max-width: 760px) {
+  /* mobile: the nav rides inside .header-stack, which is the sticky element;
+     see the header-stack rules at the end of this file */
+  .main-nav {
+    z-index: 19;
+    background: var(--bg);
+    margin-top: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-new {
+    display: block;
+  }
+}
+.main-nav a:first-child {
+  padding-left: 0;
+}
+/* in-grid header row: tabs over stories, labels over their rails, one line */
+.main-nav.in-grid {
+  margin-top: 0;
+}
+.col-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  /* lives at the top of a rail column's flex stack: pull its 28px gap to 10px */
+  margin-bottom: -18px;
+}
+/* Desktop: the rails span the grid from the very top, beside the summary when
+   one is showing, so the space over Newest never sits empty. Their labels live
+   inside the asides; the nav cell holds only the tabs. */
+@media (min-width: 761px) {
+  /* the last row is flexible so the tall spanning rails pour their height into
+     it instead of inflating the summary and tabs rows above */
+  .page {
+    grid-template-rows: auto 1fr;
+  }
+  .page.has-summary {
+    grid-template-rows: auto auto 1fr;
+  }
+  .main-nav.in-grid {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .stories-col {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .page > .sidebar {
+    grid-row: 1 / 3;
+  }
+  .sidebar:not(.newest-col) {
+    grid-column: 2;
+  }
+  .newest-col {
+    grid-column: -2;
+  }
+  .page.has-summary .front-summary.above-nav {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .page.has-summary .main-nav.in-grid {
+    grid-row: 2;
+  }
+  .page.has-summary .stories-col {
+    grid-row: 3;
+  }
+  .page.has-summary > .sidebar {
+    grid-row: 1 / 4;
+  }
+}
+@media (max-width: 760px) {
+  .main-nav.in-grid,
+  .col-label {
+    display: none;
+  }
+}
+@media (min-width: 761px) {
+  /* the sticky MainNav and the rails' own labels are mobile furniture */
+  .main-nav.mobile-only {
+    display: none;
+  }
+  .sponsored-label {
+    display: none;
+  }
+  .newest-col .rail > h3 {
+    display: none;
+  }
+}
+.main-nav a {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--fg-soft);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.main-nav a:hover {
+  text-decoration: none;
+  color: var(--hover-peach);
+}
+.main-nav a.active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 3px 9px;
+}
+.theme-toggle:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+
+/* ---------- layout ---------- */
+.page {
+  display: grid;
+  /* stories | sponsor+jobs+events | newest — equal side rails */
+  grid-template-columns: minmax(0, 6fr) 2.5fr 2.5fr;
+  gap: 36px;
+  /* tight seam between the header row (tabs + column labels) and the columns */
+  row-gap: 10px;
+  align-items: start;
+  /* vertical only — horizontal padding comes from .wrap and must not be clobbered */
+  padding-top: 28px;
+  padding-bottom: 60px;
+}
+.page.single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+}
+/* middle column collapsed when there's no sponsored/jobs/events content;
+   the newest rail keeps the same width as in the three-column layout */
+.page.no-middle {
+  grid-template-columns: minmax(0, 8.5fr) 2.5fr;
+}
+/* three columns hold at narrow widths (proportions scale); tighten gaps first */
+@media (max-width: 1100px) {
+  .page {
+    gap: 22px;
+    row-gap: 10px;
+  }
+}
+@media (max-width: 760px) {
+  /* .page.no-middle included: its two-column rule outweighs .page alone, and
+     phones must always stack to one column */
+  .page,
+  .page.no-middle {
+    grid-template-columns: minmax(0, 1fr);
+    /* stacked columns: restore breathing room between sections */
+    row-gap: 22px;
+  }
+}
+
+.section-head {
+  margin-bottom: 18px;
+}
+.section-head h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.section-head p {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---------- clusters ---------- */
+.cluster {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cluster:first-child {
+  padding-top: 4px;
+}
+.cluster h2 {
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+}
+.cluster h2 a {
+  color: var(--fg);
+}
+.cluster h2 a:hover {
+  color: var(--hover-blue);
+  text-decoration: none;
+}
+.cluster .lead-source {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+/* the source line above the headline, Techmeme-style */
+.cluster .kicker {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+.explainer {
+  margin-top: 6px;
+  color: var(--fg-soft);
+  font-size: 0.92rem;
+  /* three lines is the hard ceiling, whatever the editor wrote */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.coverage {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.coverage a {
+  color: var(--fg-soft);
+}
+.coverage a:hover {
+  color: var(--hover-mint);
+}
+.coverage .src {
+  font-weight: 600;
+}
+.cluster-meta {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.cluster-meta a {
+  color: var(--muted);
+}
+/* age hues (AgeStamp): peach while breaking, present through the day, faded
+   once the story is carryover from an earlier day */
+.fresh-ago {
+  color: var(--hover-peach);
+  font-weight: 600;
+}
+.hours-ago {
+  color: var(--fg-soft);
+}
+.days-ago {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.pill {
+  background: var(--pill-bg);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.pill.pinned {
+  color: var(--warn);
+}
+/* section pills: one quiet neutral outline for every section, general included */
+.pill.section,
+.pill.general {
+  border-color: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+/* opinion label: amber outline so essays never read as reporting */
+.pill.opinion {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  color: var(--warn);
+}
+
+/* a summary bullet jump lands here: the offset clears the sticky header
+   (~52px desktop) with breathing room, then a soft periwinkle wash fades so
+   the reader sees what they hit */
+.cluster,
+.week-review li {
+  scroll-margin-top: 72px;
+}
+/* mobile stacks a sticky section nav (top: 89px) under the taller two-row
+   header, so jumps must clear both */
+@media (max-width: 760px) {
+  .cluster,
+  .week-review li {
+    scroll-margin-top: 144px;
+  }
+}
+.cluster:target,
+.week-review li:target {
+  animation: jump-flash 2.5s ease-out;
+  border-radius: 6px;
+}
+@keyframes jump-flash {
+  0%,
+  35% {
+    background: color-mix(in srgb, var(--hover-blue) 14%, transparent);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--hover-blue) 14%, transparent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* the editor model's gist: set off from the story list, never loud */
+.front-summary {
+  margin: 2px 0 14px;
+  padding: 8px 12px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--fg-soft);
+  background: var(--pill-bg);
+  border-radius: 6px;
+}
+.front-summary-head {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.front-summary ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.front-summary li {
+  margin: 2px 0;
+}
+/* a bullet tied to a story below: quiet dotted underline, never link-blue */
+.front-summary a.summary-jump {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.front-summary a.summary-jump:hover {
+  color: var(--hover-blue);
+  border-bottom-color: var(--hover-blue);
+}
+/* front page: the summary heads the story column, above the section tabs */
+.front-summary.above-nav {
+  margin: 0;
+}
+/* one fixed box per configured section, side by side on desktop */
+.front-summary-groups {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 761px) {
+  .front-summary-groups {
+    grid-template-columns: repeat(var(--summary-cols, 3), minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+.front-summary-group {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+/* a section the editor gave no bullet says so instead of disappearing */
+.front-summary-quiet {
+  color: var(--muted);
+}
+.front-summary-sec {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 1px;
+  color: var(--hover-indigo);
+}
+a.pill {
+  text-decoration: none;
+}
+a.pill:hover {
+  color: var(--fg-soft);
+}
+
+/* revealed only while hovering the story card; touch users have the permalink page */
+.suggest-link {
+  visibility: hidden;
+  color: var(--muted);
+}
+.cluster:hover .suggest-link {
+  visibility: visible;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 30px 0;
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  font-size: 0.85rem;
+}
+.rail {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+.rail h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.rail ul {
+  list-style: none;
+}
+.rail li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.rail li:first-child {
+  border-top: none;
+}
+.rail .org {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.rail li.featured {
+  background: var(--pill-bg);
+  margin: 0 -8px;
+  padding: 8px;
+  border-radius: 6px;
+  border-top: none;
+}
+.rail .featured-tag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--warn);
+  font-weight: 600;
+}
+.rail .newest-item a {
+  color: var(--fg-soft);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  display: inline-block;
+}
+.rail .newest-item .org {
+  font-size: 0.72rem;
+}
+.rail-more {
+  margin-top: 10px;
+  font-size: 0.78rem;
+}
+.sponsor-slot {
+  border: 1px solid var(--announce-border);
+  background: var(--announce-bg);
+  border-radius: 8px;
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--fg-soft);
+  font-size: 0.82rem;
+}
+.sponsor-slot a {
+  color: var(--fg-soft);
+  font-weight: 500;
+}
+/* mirrors .rail h3 geometry (1px border + 14px padding) so "Sponsored" sits on
+   the same baseline as the Newest column's header */
+.sponsored-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 15px 16px 0;
+  margin-bottom: -18px;
+}
+.cluster.sponsored {
+  background: var(--ad-bg);
+  border: none;
+  border-radius: 8px;
+  /* text stays on the column's shared left line; a 6px sliver of tint leads
+     in (the old bleed was 16px, which crossed the margin too far) */
+  padding: 12px 16px 14px 6px;
+  margin: 14px 0 14px -6px;
+}
+/* in the middle column the flex gap already spaces it, and the text indents
+   16px like the neighboring rail boxes */
+.sidebar .cluster.sponsored {
+  margin: 0;
+  padding-left: 16px;
+}
+.sidebar .cluster.sponsored h2 {
+  font-size: 0.9rem;
+}
+.cluster.sponsored h2 {
+  font-size: 1rem;
+}
+.cluster.sponsored h2 a {
+  color: var(--fg-soft);
+}
+.sponsored-tag {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--warn);
+  font-weight: 700;
+  text-align: right;
+  margin-top: 4px;
+}
+.new-items {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: var(--pill-bg);
+  border: 1px solid var(--ad-border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.new-items:hover {
+  border-color: var(--hover-mint);
+  color: var(--hover-mint);
+}
+.header-status {
+  /* two centered rows: date + clock over block + slot, dead-center in the
+     header both ways now that the strip is taller than the wordmark's cap */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+/* the short date form is phone furniture (swapped in below) */
+.date-short {
+  display: none;
+}
+/* Phones: the header packs into a two-column grid with no dead rows: wordmark
+   over the tagline on the left, the clock strip over search and theme on the
+   right. The strip right-aligns and its date swaps to the short form: the full
+   one does not fit beside the wordmark.
+   (must come AFTER the base .header-status and .tagline rules to win) */
+@media (max-width: 760px) {
+  .site-header .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 4px 12px;
+  }
+  .logo {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .tagline {
+    display: block;
+    grid-row: 2;
+    grid-column: 1;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+  .header-status {
+    position: static;
+    transform: none;
+    grid-row: 1;
+    grid-column: 2;
+    justify-self: end;
+    align-items: flex-end;
+    gap: 1px;
+  }
+  .header-right {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: end;
+    margin-left: 0;
+  }
+  .date-full {
+    display: none;
+  }
+  .date-short {
+    display: inline;
+  }
+}
+.clock-part {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+.clock-part:hover {
+  color: var(--fg);
+}
+.clock .clock-part + .clock-part {
+  margin-left: 4px;
+}
+.clock-blank {
+  min-width: 1.4em;
+}
+
+/* ---------- stream ---------- */
+.stream-date {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--fg-soft);
+  margin: 26px 0 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.stream-row {
+  display: flex;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+}
+.stream-time {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  /* wide enough for "10:30 AM" so the meridiem can never wrap, right-aligned
+     so every row's title starts at the same x */
+  min-width: 58px;
+  white-space: nowrap;
+  text-align: right;
+  padding-top: 3px;
+}
+.stream-main .org {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* ---------- river ---------- */
+.river-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+}
+.river-item .meta {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+/* ---------- archive banner ---------- */
+.archive-banner {
+  background: var(--pill-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--fg-soft);
+  margin-bottom: 20px;
+}
+
+/* ---------- footer ---------- */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 22px 0 40px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.site-footer .wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.footer-row {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+/* second row: the housekeeping links, a step quieter than the site's places */
+.footer-meta {
+  font-size: 0.75rem;
+}
+.footer-social {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.footer-social a {
+  display: inline-flex;
+}
+.footer-social svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+.footer-social a:hover {
+  color: var(--fg);
+}
+.site-footer a {
+  color: var(--muted);
+}
+.footer-cookie {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--link);
+  cursor: pointer;
+}
+/* 404: no section nav (the path isn't a section) */
+body:has(.notfound) .main-nav {
+  display: none;
+}
+/* standalone info pages (404, contact): breathing room, never crunched at top */
+/* min-height keeps the footer down on short pages without a dead band up top */
+.roomy {
+  padding-top: 22px;
+  min-height: 55vh;
+}
+.prose h1 {
+  font-size: 1.3rem;
+  margin-bottom: 16px;
+}
+.prose h2 {
+  font-size: 0.95rem;
+  margin: 30px 0 10px;
+}
+.prose p {
+  color: var(--fg-soft);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin-bottom: 10px;
+  max-width: 640px;
+}
+/* the global reset zeroes list padding, which hangs markers outside the text
+   column: restore an indent so bullets line up under the prose, not left of it */
+.prose ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  max-width: 640px;
+}
+.prose li {
+  color: var(--fg-soft);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.prose li:last-child {
+  margin-bottom: 0;
+}
+/* a lead-in line belongs with its list, and the next paragraph needs air after it */
+.prose p + ul {
+  margin-top: 8px;
+}
+.prose ul + p {
+  margin-top: 18px;
+}
+/* weekend week-in-review block: quieter than a story card, still scannable */
+.week-review {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+/* leading the weekend page, so it sits above the list with no rule over it */
+.week-review.lead {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.list-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 20px 0 2px;
+}
+.week-review h2 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.week-review ul {
+  list-style: none;
+}
+.week-review li {
+  padding: 7px 0;
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.95rem;
+}
+.week-review li:first-child {
+  border-top: 0;
+}
+.week-review .kicker {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+.week-review a {
+  color: var(--fg);
+}
+.week-review a:hover {
+  color: var(--hover-blue);
+}
+.week-review-permalink {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* day picker on the archive and daily index */
+.day-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.day-select select {
+  width: auto;
+}
+
+/* month pager on the full daily archive: older on the right, newer on the left */
+.month-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 640px;
+  margin-top: 20px;
+  font-size: 0.92rem;
+}
+.footer-cookie:hover {
+  color: var(--hover-lavender);
+  text-decoration: underline;
+}
+.consent-banner {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  max-width: min(92vw, 560px);
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  font-size: 0.85rem;
+  color: var(--fg-soft);
+}
+.consent-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.footer-pref {
+  margin-left: auto;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.footer-pref input {
+  accent-color: var(--muted);
+  cursor: pointer;
+}
+/* only the first pref pushes right; later ones sit beside it */
+.footer-pref ~ .footer-pref {
+  margin-left: 0;
+}
+
+/* ---------- public submit form ---------- */
+.submit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin-top: 20px;
+}
+.submit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--fg-soft);
+}
+.submit-form input,
+.submit-form textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 9px 11px;
+}
+.submit-form button {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 0.88rem;
+  padding: 9px 16px;
+}
+.submit-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* honeypot: offscreen for humans, present for bots */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  height: 0;
+  overflow: hidden;
+}
+.form-ok {
+  color: var(--fg-soft);
+  font-size: 0.88rem;
+}
+.form-err {
+  color: #c0564f;
+  font-size: 0.88rem;
+}
+
+/* ---------- admin ---------- */
+.admin {
+  font-size: 0.9rem;
+}
+.admin h1 {
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+}
+.admin h2 {
+  font-size: 0.95rem;
+  margin: 26px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  /* anchor targets land below the sticky header + Admin title + menu */
+  scroll-margin-top: 165px;
+}
+/* the whole Admin title + menu block pins below the sticky site header */
+.admin-head {
+  position: sticky;
+  top: 52px;
+  z-index: 5;
+  background: var(--bg);
+  padding-top: 4px;
+}
+.admin-head h1 {
+  margin-bottom: 8px;
+}
+@media (max-width: 760px) {
+  .admin-head {
+    top: 73px;
+  }
+}
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 6px 0 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.admin-nav a {
+  color: var(--fg-soft);
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 1px;
+}
+.admin-nav a.active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+.admin-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ad-bg);
+  border: 1px solid var(--ad-border);
+  border-radius: 6px;
+  padding: 2px 10px;
+}
+.admin-nav-group .group-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.admin-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.admin-card .headline {
+  font-weight: 600;
+}
+.admin-card .sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 4px 0 8px;
+}
+.btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+button.btn {
+  background: var(--pill-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg-soft);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  min-height: 34px;
+}
+button.btn:hover {
+  border-color: var(--muted);
+  color: var(--fg);
+}
+button.btn.danger {
+  color: var(--bad);
+}
+button.btn.primary {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+input.text,
+select.select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.88rem;
+  padding: 8px 10px;
+  width: 100%;
+}
+.check-group {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--fg-soft);
+}
+.check-group label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.form-row {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+.form-row input.text {
+  flex: 1;
+  min-width: 160px;
+}
+.status-line {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 8px 0;
+}
+.health-bad {
+  color: var(--bad);
+}
+.health-ok {
+  color: var(--good);
+}
+.notice {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 0.82rem;
+  color: var(--fg-soft);
+}
+.score-detail {
+  display: inline;
+}
+.score-detail summary {
+  display: inline;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  list-style: none;
+}
+.score-detail summary::-webkit-details-marker {
+  display: none;
+}
+.score-detail .score-math {
+  display: block;
+  margin: 4px 0;
+  padding: 8px 12px;
+  background: var(--pill-bg);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--fg-soft);
+}
+.score-line {
+  display: block;
+  margin: 3px 0;
+}
+.score-line strong {
+  color: var(--fg);
+}
+.shown-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: var(--fg-soft);
+  cursor: pointer;
+  user-select: none;
+}
+.admin-card.is-hidden {
+  opacity: 0.55;
+}
+.links-detail {
+  margin-top: 8px;
+}
+.links-detail summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--muted);
+  user-select: none;
+}
+.link-check {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--fg-soft);
+  margin: 4px 0;
+  cursor: pointer;
+}
+.link-check .src {
+  font-weight: 600;
+}
+.source-group {
+  margin: 10px 0;
+}
+.source-group summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 0;
+  color: var(--fg-soft);
+  user-select: none;
+}
+.source-group[open] summary {
+  color: var(--fg);
+}
+.leaderboard {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+  margin-top: 10px;
+}
+.leaderboard th,
+.leaderboard td {
+  text-align: left;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.leaderboard th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.leaderboard td:first-child {
+  color: var(--muted);
+}
+/* internal-scoring columns: visually fenced off, never to be made public */
+.leaderboard .admin-col {
+  background: var(--ad-bg);
+}
+.leaderboard th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.leaderboard th.sortable:hover {
+  color: var(--fg);
+}
+/* action feedback follows you down the page */
+.notice.toast {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: var(--surface);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  max-width: min(90vw, 560px);
+  margin: 0;
+  cursor: pointer;
+}
+
+/* ---------- space mode ----------
+   Easter egg: press and hold the theme toggle for about a second. Light mode
+   drifts toward the sun, dark mode out to the stars. Both layers sit behind
+   the content at low opacity so body text keeps its normal contrast. */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.theme-toggle {
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+/* both sky layers: fixed, inert, and always behind the page. The star layer
+   overhangs the viewport so it can drift; sun and moon stay anchored. */
+:root[data-space="on"] body::before,
+:root[data-space="on"] body::after {
+  content: "";
+  position: fixed;
+  inset: -10%;
+  z-index: -2;
+  pointer-events: none;
+}
+:root[data-space="on"] body::after {
+  inset: 0;
+}
+
+/* --- dark: out among the stars --- */
+:root[data-space="on"][data-theme="dark"] {
+  --bg: #0a0c14;
+}
+:root[data-space="on"][data-theme="dark"] body {
+  background-color: #0a0c14;
+}
+:root[data-space="on"][data-theme="dark"] body::before {
+  background-image:
+    radial-gradient(2px 2px at 12% 18%, rgba(255, 255, 255, 0.95), transparent 58%),
+    radial-gradient(1.4px 1.4px at 62% 8%, rgba(255, 255, 255, 0.8), transparent 58%),
+    radial-gradient(1.8px 1.8px at 84% 32%, rgba(214, 226, 255, 0.9), transparent 58%),
+    radial-gradient(1.3px 1.3px at 33% 46%, rgba(255, 255, 255, 0.7), transparent 58%),
+    radial-gradient(2.2px 2.2px at 74% 62%, rgba(255, 245, 230, 0.85), transparent 58%),
+    radial-gradient(1.3px 1.3px at 8% 72%, rgba(255, 255, 255, 0.68), transparent 58%),
+    radial-gradient(1.7px 1.7px at 46% 88%, rgba(226, 232, 255, 0.8), transparent 58%),
+    radial-gradient(1.2px 1.2px at 92% 80%, rgba(255, 255, 255, 0.62), transparent 58%),
+    radial-gradient(1.5px 1.5px at 24% 62%, rgba(255, 255, 255, 0.6), transparent 58%),
+    radial-gradient(1.2px 1.2px at 56% 28%, rgba(255, 255, 255, 0.55), transparent 58%);
+  background-size: 460px 460px;
+  animation: space-drift 260s linear infinite;
+}
+:root[data-space="on"][data-theme="dark"] body::after {
+  background-image:
+    /* the moon, kept to the top corner and softly lit */
+    radial-gradient(
+      circle 78px at calc(100% - 150px) 150px,
+      rgba(245, 246, 252, 0.82),
+      rgba(226, 231, 246, 0.5) 58%,
+      rgba(200, 210, 235, 0.12) 78%,
+      transparent 84%
+    ),
+    radial-gradient(circle 200px at calc(100% - 150px) 150px, rgba(180, 200, 255, 0.16), transparent 72%),
+    /* faint nebula wash in the far corners */
+    radial-gradient(ellipse 55% 40% at 6% 4%, rgba(110, 130, 235, 0.16), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 96% 96%, rgba(150, 110, 220, 0.13), transparent 72%);
+  animation: space-breathe 26s ease-in-out infinite;
+}
+
+/* --- light: close to the sun --- */
+:root[data-space="on"][data-theme="light"] {
+  --bg: #fdf5ea;
+}
+:root[data-space="on"][data-theme="light"] body {
+  background-color: #fdf5ea;
+}
+:root[data-space="on"][data-theme="light"] body::before {
+  background-image:
+    /* wisps of flame, blurred to keep them atmospheric rather than literal */
+    radial-gradient(ellipse 38% 9% at 16% 24%, rgba(233, 120, 40, 0.26), transparent 72%),
+    radial-gradient(ellipse 30% 7% at 74% 40%, rgba(226, 86, 52, 0.22), transparent 74%),
+    radial-gradient(ellipse 44% 11% at 40% 76%, rgba(240, 152, 56, 0.24), transparent 72%),
+    radial-gradient(ellipse 26% 7% at 88% 86%, rgba(228, 104, 46, 0.2), transparent 74%),
+    radial-gradient(ellipse 34% 8% at 58% 12%, rgba(244, 166, 74, 0.18), transparent 74%);
+  filter: blur(26px);
+  animation: space-drift-slow 190s ease-in-out infinite alternate;
+}
+:root[data-space="on"][data-theme="light"] body::after {
+  background-image:
+    /* the sun itself: a warm corona rather than a hard disc */
+    radial-gradient(
+      circle 120px at calc(100% - 150px) 140px,
+      rgba(255, 205, 118, 0.6),
+      rgba(255, 178, 80, 0.3) 55%,
+      rgba(255, 160, 60, 0.1) 76%,
+      transparent 86%
+    ),
+    radial-gradient(circle 340px at calc(100% - 150px) 140px, rgba(255, 168, 72, 0.16), transparent 74%),
+    radial-gradient(ellipse 80% 34% at 50% 0%, rgba(255, 198, 120, 0.2), transparent 72%);
+  animation: space-breathe 22s ease-in-out infinite;
+}
+
+@keyframes space-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-460px, -230px, 0);
+  }
+}
+@keyframes space-drift-slow {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(3%, -2%, 0) scale(1.08);
+  }
+}
+@keyframes space-breathe {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* narrow screens: pull the moon and the sun into the corner and shrink them,
+   so neither one sits over a column of text */
+@media (max-width: 760px) {
+  :root[data-space="on"][data-theme="dark"] body::after {
+    background-image:
+      radial-gradient(
+        circle 52px at calc(100% - 62px) 118px,
+        rgba(245, 246, 252, 0.8),
+        rgba(226, 231, 246, 0.48) 58%,
+        rgba(200, 210, 235, 0.12) 78%,
+        transparent 84%
+      ),
+      radial-gradient(circle 140px at calc(100% - 62px) 118px, rgba(180, 200, 255, 0.15), transparent 72%),
+      radial-gradient(ellipse 70% 30% at 4% 4%, rgba(110, 130, 235, 0.14), transparent 72%);
+  }
+  :root[data-space="on"][data-theme="light"] body::after {
+    background-image:
+      radial-gradient(
+        circle 82px at calc(100% - 60px) 110px,
+        rgba(255, 205, 118, 0.55),
+        rgba(255, 178, 80, 0.26) 55%,
+        transparent 84%
+      ),
+      radial-gradient(circle 230px at calc(100% - 60px) 110px, rgba(255, 168, 72, 0.14), transparent 74%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-space="on"] body::before,
+  :root[data-space="on"] body::after {
+    animation: none;
+  }
+}
+
+/* source candidate rows: several example links per cell, kept compact */
+.candidate-example {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+/* ---------- header time-travel pickers ---------- */
+/* date, block, and slot in the header open a small form that jumps to the
+   archived snapshot nearest the chosen moment (Techmeme-style time travel) */
+.header-pick {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  z-index: 60;
+  white-space: nowrap;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.header-pick input.text {
+  width: auto;
+}
+.pick-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+button.status-date {
+  text-align: center;
+}
+@media (max-width: 760px) {
+  /* the status strip is static in the phone grid; re-anchor the popover to it
+     and pin it to the right edge so it stays on screen. left/top MUST be
+     reset here: the desktop rule centers with left:50%/top:50%, which static
+     ignored but relative honors, and the un-reset offsets shoved the strip
+     half a viewport off the right edge on phones. */
+  .header-status {
+    position: relative;
+    left: auto;
+    top: auto;
+    /* wrap and shrink so the block+slot row can never widen the page */
+    white-space: normal;
+    font-size: 0.7rem;
+    max-width: 58vw;
+  }
+  .header-status .status-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 1px;
+    column-gap: 8px;
+  }
+  /* NOTE: no overflow-x on body here, however tempting: it turns the body
+     into the scroll container on Android and silently kills the sticky
+     header and section nav */
+  .header-pick {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .pick-hint {
+    display: none;
+  }
+}
+
+/* ---------- header stack ---------- */
+/* Desktop: the wrapper dissolves (display: contents) so the header sticks on
+   its own exactly as always. Phones: the wrapper itself is the sticky
+   element, so header and section nav move as ONE unit: no relative slide
+   while pinning, and no seam can open between them whatever the header's
+   real height works out to on a given device. */
+.header-stack {
+  display: contents;
+}
+@media (max-width: 760px) {
+  .header-stack {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    /* fills the breathing-room strip between header and nav while stuck */
+    background: var(--bg);
+  }
+  .header-stack .site-header {
+    position: static;
+  }
+  .header-stack .main-nav {
+    position: static;
+  }
+}
