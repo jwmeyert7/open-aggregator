@@ -5,6 +5,7 @@ import { ColumnHeads } from "@/components/ColumnHeads";
 import { hasSidebarContent, NewestRail, Sidebar, sidebarSponsored } from "@/components/Sidebar";
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { loadSiteConfig } from "@/lib/config";
+import { maybeDevSeed } from "@/lib/devSeed";
 import { adaptiveRanking, byPublished, itemDisplayTitle, leadLink, liveClusters, topStories, weekendMode, weekInReview } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS, sponsoredPlacements } from "@/lib/types";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const state = await loadState();
   const cfg = loadSiteConfig();
+  maybeDevSeed(state);
   // quiet spells stretch decay so real stories stay legible instead of fading
   // against competition that never arrived
   const ranking = adaptiveRanking(state, cfg.ranking);
