@@ -1629,9 +1629,23 @@ select.select {
   max-width: 320px;
 }
 
+/* the editor's one-line read on a candidate: wide enough to wrap in 3-4
+   lines instead of a skinny tower, smaller type than the numeric cells */
+.candidate-read {
+  min-width: 30ch;
+  max-width: 46ch;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.candidate-sections {
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
 /* ---------- header time-travel pickers ---------- */
-/* date, block, and slot in the header open a small form that jumps to the
-   archived snapshot nearest the chosen moment (Techmeme-style time travel) */
+/* the date in the header opens a small form that jumps to the archived
+   snapshot nearest the chosen moment (Techmeme-style time travel) */
 .header-pick {
   position: absolute;
   top: calc(100% + 8px);

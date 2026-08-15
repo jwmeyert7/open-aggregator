@@ -599,7 +599,9 @@ export function AdminClient({
               <th title="Distinct casts seen linking this domain">Casts</th>
               <th title="Likes plus replies across those casts">Engagement</th>
               <th title="Largest follower count among the accounts that linked it">Top reach</th>
-              <th title="One-time editor read: what the domain publishes and where its stories would land">Editor&apos;s read</th>
+              <th title="When the channel first pointed at this domain">First seen</th>
+              <th title="One-time editor read: what the domain publishes">Editor&apos;s read</th>
+              <th title="Where this domain's stories would mostly land">Sections</th>
               <th>Recent examples</th>
               <th />
             </tr>
@@ -615,14 +617,12 @@ export function AdminClient({
                 <td>{c.casts}</td>
                 <td>{c.engagement}</td>
                 <td>{c.topReach.toLocaleString()}</td>
-                <td>
-                  {c.assessment ? (
-                    <>
-                      {c.assessment.why} <span className="org">{c.assessment.sections.join(", ")}</span>
-                    </>
-                  ) : (
-                    <span className="org">next pipeline run</span>
-                  )}
+                <td className="candidate-sections">{c.firstSeen.slice(0, 10)}</td>
+                <td className="candidate-read">
+                  {c.assessment ? c.assessment.why : <span className="org">next pipeline run</span>}
+                </td>
+                <td className="candidate-sections">
+                  {c.assessment ? c.assessment.sections.join(", ") : <span className="org">·</span>}
                 </td>
                 <td>
                   {c.examples.slice(0, 3).map((e) => (
