@@ -129,6 +129,33 @@ export function editionDateLabel(date: string): string {
   });
 }
 
+/** "August 15, 2026" for a daily subject line: no weekday. */
+export function subjectDateLabel(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * Weekly subject range: "August 8-14, 2026" inside one month,
+ * "August 29 - September 4, 2026" across months, and both years spelled out
+ * when the week crosses New Year.
+ */
+export function subjectRangeLabel(start: Date, end: Date): string {
+  const month = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
+  const day = (d: Date) => d.getUTCDate();
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) {
+    return `${month(start)} ${day(start)}, ${start.getUTCFullYear()} - ${month(end)} ${day(end)}, ${end.getUTCFullYear()}`;
+  }
+  if (start.getUTCMonth() !== end.getUTCMonth()) {
+    return `${month(start)} ${day(start)} - ${month(end)} ${day(end)}, ${end.getUTCFullYear()}`;
+  }
+  return `${month(start)} ${day(start)}-${day(end)}, ${end.getUTCFullYear()}`;
+}
+
 /** The double-opt-in email: nothing else ever sends until its link is clicked. */
 export function confirmationEmail(token: string): Edition {
   const name = siteIdentity().siteName;
@@ -179,7 +206,7 @@ async function sendToAll(subs: DigestSubscriber[], e: Edition): Promise<{ sent: 
 export function buildDailyEdition(digest: { date: string; clusters: Cluster[]; summary?: string }): Edition {
   const heading = `${siteIdentity().siteName}, ${editionDateLabel(digest.date)}`;
   return {
-    subject: heading,
+    subject: `${siteIdentity().siteName} Daily Digest: ${subjectDateLabel(digest.date)}`,
     ...digestEmail({
       heading,
       archiveUrl: `${siteUrl()}/day/${digest.date}`,
@@ -230,11 +257,12 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig): Pro
   };
   const top = [...pool].sort((a, b) => eff(b) - eff(a) || magnitude(b, cfg.ranking) - magnitude(a, cfg.ranking)).slice(0, 10);
 
+  const start = new Date(`${days[0]}T00:00:00Z`);
   const end = new Date(`${days[days.length - 1]}T00:00:00Z`);
   const label = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
-  const heading = `${siteIdentity().siteName} weekly, ${label(new Date(`${days[0]}T00:00:00Z`))} to ${label(end)}`;
+  const heading = `${siteIdentity().siteName} weekly, ${label(start)} to ${label(end)}`;
   return {
-    subject: heading,
+    subject: `${siteIdentity().siteName} Weekly Digest: ${subjectRangeLabel(start, end)}`,
     ...digestEmail({
       heading,
       archiveUrl: `${siteUrl()}/day`,
