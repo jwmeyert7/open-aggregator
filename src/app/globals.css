@@ -1829,7 +1829,8 @@ button.status-date {
 /* subscribe page: the form breathes between the two copy paragraphs, a
    stacked column with the checks and button centered under the address */
 .subscribe-form {
-  margin: 20px 0;
+  /* auto margins center the fit-content column in the prose */
+  margin: 20px auto;
   display: flex;
   flex-direction: column;
   align-items: center;
