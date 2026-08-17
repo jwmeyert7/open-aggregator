@@ -34,7 +34,7 @@ npm install
 npm run dev
 ```
 
-That is it. With no env vars and no config files of your own, the site boots on the committed `config/*.example.*` files (BBC, NPR, Ars Technica, The Verge, Hacker News, NASA, and a Discourse forum, filed into Technology, Science, and World) and state lives in `.data/` on disk. Open http://localhost:3000 for the front page and `/admin` for the panel (set `ADMIN_PASSWORD` in `.env.local` to log in).
+With no env vars and no config files of your own, the site boots on the committed `config/*.example.*` files (BBC, NPR, Ars Technica, The Verge, Hacker News, NASA, and a Discourse forum, filed into Technology, Science, and World) and state lives in `.data/` on disk. Open http://localhost:3000 for the front page and `/admin` for the panel (set `ADMIN_PASSWORD` in `.env.local` to log in).
 
 The first page load against an empty state seeds itself: dev mode notices there is nothing to show and runs the pipeline once in the background, so refresh after half a minute and the example feeds are in. Set an LLM key in `.env.local` first if you want that run gated and clustered instead of raw headlines. Later runs are yours to trigger: press "Run pipeline now" in `/admin`, or set `CRON_SECRET` and curl the cron endpoint:
 
