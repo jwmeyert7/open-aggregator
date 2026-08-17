@@ -38,7 +38,7 @@ export default function AboutPage() {
           items, the <Link href="/day">daily archive</Link> freezes each day at UTC midnight, and clicking the date in
           the header time travels to any archived front page.
         </p>
-        <h2>Elsewhere</h2>
+        <h2>Follow and contact</h2>
         <p>
           {site.siteName} offers <Link href="/subscribe">daily and weekly email digests</Link>. Story suggestions come
           in through the <Link href="/submit">submit page</Link>, and anything else can be communicated to:{" "}
