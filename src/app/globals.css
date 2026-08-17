@@ -249,9 +249,12 @@ a:hover {
      pulling the tab left makes the active underline symmetric */
   margin-left: -12px;
 }
-/* in-grid header row: tabs over stories, labels over their rails, one line */
+/* in-grid header row: tabs over stories, labels over their rails, one line.
+   overflow visible so the first tab's negative margin (symmetric underline)
+   is not clipped by the scroll container mobile needs */
 .main-nav.in-grid {
   margin-top: 0;
+  overflow-x: visible;
 }
 .col-label {
   font-size: 0.78rem;
