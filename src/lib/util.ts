@@ -244,7 +244,8 @@ export function isPrivateHost(hostname: string): boolean {
 
 /**
  * Social permalinks carry their author in the URL path, so a link from X or
- * Farcaster is attributed to the account ("X: someuser"), never the bare host.
+ * Farcaster is attributed to the account ("@someuser on X"), never the bare
+ * host. The form reads cleanly ahead of the kicker's own trailing colon.
  */
 export function socialSourceName(url: string): string | null {
   try {
@@ -252,8 +253,8 @@ export function socialSourceName(url: string): string | null {
     const host = u.hostname.replace(/^www\./, "");
     const seg = u.pathname.split("/").filter(Boolean)[0] ?? "";
     const named = Boolean(seg) && !["i", "search", "home", "hashtag", "intent", "explore", "~"].includes(seg);
-    if (host === "x.com" || host === "twitter.com") return named ? `X: ${seg}` : "X";
-    if (host === "farcaster.xyz" || host === "warpcast.com") return named ? `Farcaster: ${seg}` : "Farcaster";
+    if (host === "x.com" || host === "twitter.com") return named ? `@${seg} on X` : "X";
+    if (host === "farcaster.xyz" || host === "warpcast.com") return named ? `@${seg} on Farcaster` : "Farcaster";
   } catch {}
   return null;
 }
