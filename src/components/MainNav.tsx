@@ -8,7 +8,8 @@ export function MainNav({ sections }: { sections: Array<{ id: string; title: str
   // The tabs belong to the front page and the section pages only. Those
   // pages carry their own in-grid header row on desktop, so this nav is
   // purely their mobile furniture; everywhere else it renders nothing.
-  const gridPage = path === "/" || sections.some((s) => `/${s.id}` === path);
+  // /new is mobile's fifth tab, so the row stays visible there too
+  const gridPage = path === "/" || path === "/new" || sections.some((s) => `/${s.id}` === path);
   if (!gridPage) return null;
   return (
     <nav className="main-nav wrap mobile-only">
