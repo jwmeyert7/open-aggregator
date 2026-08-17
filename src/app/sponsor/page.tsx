@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+import { loadState } from "@/lib/state";
 import { siteIdentity } from "@/lib/site";
 
 export const metadata = {
@@ -6,7 +8,10 @@ export const metadata = {
 };
 
 /** House style for this copy: no em dashes, no semicolons. */
-export default function SponsorPage() {
+export default async function SponsorPage() {
+  // owner opt-in via admin Layout: a fork that never sells placements should
+  // not ship a page soliciting them
+  if (!(await loadState()).sponsorPageEnabled) notFound();
   const site = siteIdentity();
   return (
     <main className="wrap page single roomy">

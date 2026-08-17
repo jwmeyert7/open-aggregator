@@ -6,11 +6,11 @@ import { discoverFeed, userAgent } from "@/lib/feeds";
 import { sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable } from "@/lib/llm";
-import { applyEditorOutput, digestClusters, digestPostText, reeditCluster, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { applyEditorOutput, digestClusters, digestPostText, knownSourceHosts, markSeen, reeditCluster, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
 import { sponsoredPlacements } from "@/lib/types";
-import type { CandidateItem, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
+import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
 import { isPrivateHost, newId, slugify, stripHtml, truncate } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +115,52 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
     tier: 1,
     weight: 1.5,
   };
+}
+
+/**
+ * Editor-in-chief override: attach a link straight onto a story, no editorial
+ * gate. Exists because the gate judges items as standalone stories, and a
+ * link that only makes sense as coverage of an existing story (an angle, a
+ * follow-on report) can be correctly rejected standalone yet belong here.
+ */
+async function attachLinkToCluster(state: SiteState, cluster: Cluster, rawUrl: string): Promise<string> {
+  const url = ensureHttp(rawUrl);
+  if (!url) return "Paste a link to attach.";
+  if (cluster.links.some((l) => l.url === url)) return "That link is already on this story.";
+  const page = await fetchPageAsItem(url);
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const known = knownSourceHosts(state).get(host);
+  const item = {
+    ...page,
+    id: newId(),
+    ...(known ? { sourceId: known.sourceId, sourceName: known.sourceName } : { sourceName: host }),
+  };
+  const now = new Date().toISOString();
+  cluster.links.push({
+    url,
+    title: item.title,
+    sourceId: item.sourceId,
+    sourceName: item.sourceName,
+    tier: item.tier,
+    weight: item.weight,
+    publishedAt: item.publishedAt,
+    addedAt: now,
+  });
+  cluster.updatedAt = now;
+  markSeen(state, item);
+  state.items.unshift({
+    id: item.id,
+    url,
+    title: item.title,
+    sourceId: item.sourceId,
+    sourceName: item.sourceName,
+    tier: item.tier,
+    publishedAt: item.publishedAt,
+    ingestedAt: now,
+    ...(item.excerpt ? { excerpt: item.excerpt } : {}),
+    clusterId: cluster.id,
+  });
+  return `Attached ${item.sourceName} to “${truncate(cluster.headline, 60)}”. No editorial gate applied.`;
 }
 
 async function addByUrl(state: SiteState, url: string): Promise<string> {
@@ -271,7 +317,7 @@ async function handle(req: NextRequest) {
   const state = await loadState({ fresh: true });
   const cfg = loadSiteConfig();
 
-  const clusterActions = ["pin", "kill", "merge", "resection", "edit", "postX", "reedit", "split"];
+  const clusterActions = ["pin", "kill", "merge", "resection", "edit", "postX", "reedit", "split", "attachLink"];
   if (clusterActions.includes(body.action)) {
     const cluster = ownEntry(state.clusters, String(body.clusterId ?? ""));
     if (!cluster) return fail("Unknown cluster.");
@@ -323,6 +369,9 @@ async function handle(req: NextRequest) {
         break;
       case "reedit":
         message = await reeditCluster(state, cluster);
+        break;
+      case "attachLink":
+        message = await attachLinkToCluster(state, cluster, String(body.url ?? ""));
         break;
       case "split": {
         const urls = new Set(Array.isArray(body.urls) ? body.urls.map(String) : []);
@@ -508,10 +557,25 @@ async function handle(req: NextRequest) {
       await saveState(state);
       return ok("Dismissed.");
     }
-    const message = await addByUrl(state, sub.url);
+    // a submission aimed at a specific story attaches straight to it, no
+    // editorial gate: the reader already told us where it belongs, and the
+    // gate judges standalone stories, not coverage angles
+    const target = sub.storySlug
+      ? Object.values(state.clusters).find(
+          (c) => !c.killed && !c.mergedInto && (c.slug === sub.storySlug || sub.storySlug!.endsWith(c.id))
+        )
+      : undefined;
+    const message = target ? await attachLinkToCluster(state, target, sub.url) : await addByUrl(state, sub.url);
+    if (target) await takeSnapshot(state);
     sub.status = "approved";
     await saveState(state);
     return ok(`Approved. ${message}`);
+  }
+
+  if (body.action === "setSponsorPage") {
+    state.sponsorPageEnabled = Boolean(body.enabled);
+    await saveState(state);
+    return ok(state.sponsorPageEnabled ? "Sponsor page is live (footer link included)." : "Sponsor page hidden.");
   }
 
   if (body.action === "setAnnouncement") {

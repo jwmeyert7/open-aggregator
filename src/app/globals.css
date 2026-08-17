@@ -1802,3 +1802,11 @@ button.status-date {
   font-size: 1.5rem;
   line-height: 1.24;
 }
+
+/* per-story attach input in admin: quiet, tucked under the action buttons */
+.attach-row {
+  margin-top: 6px;
+}
+.attach-row .text {
+  max-width: 420px;
+}

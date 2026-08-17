@@ -146,6 +146,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     podcasts: state.podcasts ?? [],
     announcement: state.announcement ?? null,
     sponsoredPosts: state.sponsoredPosts ?? [],
+    sponsorPageEnabled: Boolean(state.sponsorPageEnabled),
     layout: {
       preview: await adminLayoutPreview(),
       scheduled: weekendMode(cfg.ranking, now, state.weekendSchedule) ? "weekend" : "weekday",

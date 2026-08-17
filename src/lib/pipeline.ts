@@ -63,7 +63,7 @@ export function selectNewItems(state: SiteState, candidates: CandidateItem[]): A
   return out;
 }
 
-function markSeen(state: SiteState, item: CandidateItem): void {
+export function markSeen(state: SiteState, item: CandidateItem): void {
   const now = new Date().toISOString();
   state.seen[dedupeKeyUrl(item.url)] = now;
   state.seen[dedupeKeyContent(item.title, item.sourceId)] = now;

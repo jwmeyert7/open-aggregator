@@ -4,6 +4,7 @@ import { AdminLink } from "@/components/AdminLink";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
 import { loadSiteConfig, siteUrl } from "@/lib/config";
 import { siteIdentity } from "@/lib/site";
+import { loadState } from "@/lib/state";
 import { HeaderStatus } from "@/components/HeaderStatus";
 import { LinkPrefToggle } from "@/components/LinkPrefToggle";
 import { MainNav } from "@/components/MainNav";
@@ -34,7 +35,12 @@ export function generateMetadata(): Metadata {
 
 const themeInit = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t;if(localStorage.getItem("space")==="1"){document.documentElement.dataset.space="on"}}catch(e){}})()`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // best-effort state read for owner toggles (sponsor link); a failed read
+  // must never take the whole site down with it
+  const sponsorOn = await loadState()
+    .then((st) => Boolean(st.sponsorPageEnabled))
+    .catch(() => false);
   const site = siteIdentity();
   const sections = loadSiteConfig().sections;
   const xHandle = site.social?.xHandle;
@@ -79,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/about">About</Link>
               <Link href="/criteria">Criteria</Link>
               <Link href="/sources">Sources</Link>
-              <Link href="/sponsor">Sponsor</Link>
+              {sponsorOn ? <Link href="/sponsor">Sponsor</Link> : null}
               {xHandle || fcHandle ? (
                 <span className="footer-social">
                   {xHandle ? (

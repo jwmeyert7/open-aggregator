@@ -12,20 +12,20 @@ This is the platform that powers [ethernews.org](https://ethernews.org), its fla
 - Email digests (daily and weekly) with double opt-in and one-click unsubscribe
 - An admin panel: pin, kill, merge, split, re-edit, add a story by URL, review reader submissions, manage sources, and see every pipeline run
 - A source leaderboard, feed health tracking, and automatic source discovery from a Farcaster channel
-- Optional social bots for Farcaster and X, capped in code and dry-run by default
+- Optional social posting, capped in code and dry-run by default (Farcaster and X built in, the module pattern extends to others)
 - Optional sponsored posts, announcement slot, and jobs/events/podcasts listings, always visually marked as paid
 
 If the LLM is unreachable the pipeline degrades honestly: tier 1 items become single-link stories flagged "needs review", tier 2 items wait, and the site stays up.
 
 ## What you bring
 
-- **A Vercel account.** It provides the hosting, the 15-minute cron, and the Blob store that holds all state. The free Hobby tier works for trying it out.
-- **A domain, optionally.** Your project's `*.vercel.app` URL works fine on day one. Point a custom domain at it whenever you like.
-- **An LLM key.** Either `AI_GATEWAY_API_KEY` (Vercel AI Gateway, pass-through pricing) or `ANTHROPIC_API_KEY` (direct). The editor defaults to Claude Haiku and costs scale with news volume, not cron frequency: a no-news run makes no LLM call.
+- **A hosting account.** Something that runs a Next.js app, a 15-minute cron, and a blob store for state. Vercel is what the repo is wired for today (its free Hobby tier works for trying it out), and the storage and cron layers are the only pieces to swap for another host.
+- **A domain, optionally.** The URL your host gives you works fine on day one. Point a custom domain at it whenever you like.
+- **An LLM key.** Any capable model can play the editor in principle. Wired today: `AI_GATEWAY_API_KEY` (Vercel AI Gateway, pass-through pricing) or `ANTHROPIC_API_KEY` (direct), defaulting to Claude Haiku, overridable via `LLM_MODEL`. Costs scale with news volume, not cron frequency: a no-news run makes no LLM call.
 - **`ADMIN_PASSWORD`**, a password you choose for the admin panel, plus a recommended `SESSION_SECRET` (any long random string) to sign admin sessions.
 - **`CRON_SECRET`**, required. The cron route fails closed: without it nothing can trigger the pipeline, so a fork without secrets is safe, not open.
 - **SMTP credentials, only if you want email digests.** The worked example is a Gmail app password sending as a forwarding alias from ImprovMX (free): ImprovMX forwards `hello@yourdomain` to your Gmail, and Gmail's "send mail as" plus an app password lets the site send from that address. Any SMTP server works via `SMTP_HOST` and `SMTP_PORT`.
-- **Social credentials, only if you want the bots.** `NEYNAR_API_KEY` plus `FARCASTER_SIGNER_UUID` for Farcaster, and the four X API keys for X. Until they exist every post is a logged dry-run.
+- **Social credentials, only if you want posting.** The built-in modules are Farcaster (`NEYNAR_API_KEY` plus `FARCASTER_SIGNER_UUID`) and X (its four API keys), and the same small-module shape extends to any network. Until credentials exist every post is a logged dry-run.
 
 ## Quickstart (local)
 

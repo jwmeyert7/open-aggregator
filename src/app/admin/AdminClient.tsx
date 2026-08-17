@@ -64,6 +64,7 @@ export interface AdminData {
     lastSwingAt: string | null;
   }>;
   marketCfg: { threshold: number; cooldownHours: number; minLiquidity: number } | null;
+  sponsorPageEnabled: boolean;
   layout: {
     preview: "weekday" | "weekend" | null;
     scheduled: "weekday" | "weekend";
@@ -465,6 +466,23 @@ export function AdminClient({
               Re-edit
             </button>
           </div>
+          {/* editor override: attach coverage straight onto this story, skipping
+              the editorial gate (which judges standalone stories, not angles) */}
+          <form
+            className="form-row attach-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const url = String(new FormData(e.currentTarget).get("url") ?? "").trim();
+              if (!url) return;
+              act("attachLink", { clusterId: c.id, url });
+              e.currentTarget.reset();
+            }}
+          >
+            <input className="text" name="url" placeholder="Attach a link to this story (no gate)…" />
+            <button className="btn" type="submit" disabled={busy}>
+              Attach
+            </button>
+          </form>
           {c.editHistory.length > 0 ? (
             <details className="links-detail">
               <summary>edit history ({c.editHistory.length})</summary>
@@ -546,8 +564,8 @@ export function AdminClient({
       <h2 id="submissions">Submissions</h2>
       {data.submissions.length === 0 ? (
         <p className="status-line">
-          No pending reader suggestions. Links suggested via /submit queue here (and email you), then Approve runs the
-          same editorial flow as Add by URL.
+          No pending reader suggestions. Links suggested via /submit queue here (and email you). Approve attaches a
+          story-targeted suggestion straight to its story, and runs the Add by URL editorial flow otherwise.
         </p>
       ) : null}
       {data.submissions.map((s) => (
@@ -948,6 +966,17 @@ export function AdminClient({
           Open front page ↗
         </a>
       </div>
+      <p className="status-line">
+        <label className="footer-pref" style={{ marginLeft: 0 }}>
+          <input
+            type="checkbox"
+            checked={data.sponsorPageEnabled}
+            disabled={busy}
+            onChange={(e) => act("setSponsorPage", { enabled: e.target.checked })}
+          />{" "}
+          show the Sponsor page and its footer link
+        </label>
+      </p>
       <form
         onSubmit={(e) => {
           e.preventDefault();

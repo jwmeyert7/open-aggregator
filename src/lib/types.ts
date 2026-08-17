@@ -276,6 +276,8 @@ export interface SiteState {
   sourceCandidates?: Record<string, SourceCandidate>;
   /** Admin-edited weekend-mode window (UTC); absent = the config default. */
   weekendSchedule?: WeekendSchedule;
+  /** Owner opt-in: the /sponsor page and its footer link render only when true. */
+  sponsorPageEnabled?: boolean;
   /** Readers signed up for the daily and/or weekly email digests. */
   digestSubscribers?: DigestSubscriber[];
   /** UTC Saturday the weekly email last went out (once-per-week guard). */
