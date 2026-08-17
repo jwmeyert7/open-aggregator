@@ -75,17 +75,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {children}
         <footer className="site-footer">
           <div className="wrap">
-            {/* the site's places, with the bot accounts tucked to the right */}
+            {/* row one is places to read, with the bot accounts tucked right */}
             <div className="footer-row">
               {/* the snapshot archive is reached by clicking the header's date */}
               <Link href="/stream">Stream</Link>
               <Link href="/day">Daily Archive</Link>
-              <Link href="/subscribe">Email</Link>
-              <Link href="/submit">Submit</Link>
+              <Link href="/sources">Sources</Link>
               <Link href="/about">About</Link>
               <Link href="/criteria">Criteria</Link>
-              <Link href="/sources">Sources</Link>
-              {sponsorOn ? <Link href="/sponsor">Sponsor</Link> : null}
               {xHandle || fcHandle ? (
                 <span className="footer-social">
                   {xHandle ? (
@@ -112,8 +109,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </span>
               ) : null}
             </div>
-            {/* quieter second row so the main row stops feeling crowded */}
+            {/* row two is actions and meta */}
             <div className="footer-row footer-meta">
+              <Link href="/subscribe">Email</Link>
+              <Link href="/submit">Submit</Link>
+              {sponsorOn ? <Link href="/sponsor">Sponsor</Link> : null}
               {/* the Admin link renders only in browsers that logged into the
                   admin (cosmetic cookie); visitors see nothing here */}
               <Link href="/privacy">Privacy</Link>
