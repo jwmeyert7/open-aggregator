@@ -2,7 +2,7 @@
 
 An open source, self-hostable news aggregation platform. Point it at a handpicked list of feeds on any topic and it runs a Techmeme-style front page for you: a cron pipeline fetches your sources on a schedule you set, an LLM editor gates, clusters, headlines, and scores the news, and an admin panel gives you control. Sections, sources, prompts, and the site's identity are all configurable.
 
-This is the platform that powers [ethernews.org](https://ethernews.org), its flagship deployment.
+This is the platform that powers [ethernews.org](https://ethernews.org).
 
 ## What you get
 
