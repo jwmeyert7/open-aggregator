@@ -192,6 +192,13 @@ async function addByUrl(state: SiteState, url: string): Promise<string> {
   const normalized = normalizeUrl(page.url);
   if (state.items.some((i) => normalizeUrl(i.url) === normalized)) return "Already in the stream (duplicate URL).";
   delete state.seen[sha256(`url:${normalized}`)];
+  // credit the real source when the host is one we know, same as Attach
+  const host = new URL(page.url).hostname.replace(/^www\./, "");
+  const known = knownSourceHosts(state).get(host);
+  if (known) {
+    page.sourceId = known.sourceId;
+    page.sourceName = known.sourceName;
+  }
   const candidates = selectNewItems(state, [page]);
   if (candidates.length === 0) return "Already in the stream (duplicate URL).";
   const out = llmAvailable()
