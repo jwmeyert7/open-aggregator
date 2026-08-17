@@ -8,6 +8,7 @@ export function SubscribeForm() {
 
   return (
     <form
+      className="subscribe-form"
       onSubmit={async (e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
@@ -34,17 +35,19 @@ export function SubscribeForm() {
     >
       <div className="form-row">
         <input className="text" type="email" name="email" placeholder="you@example.com" required />
+        {/* honeypot: hidden from people, tempting to bots */}
+        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-9999px" }} />
+        <button className="btn primary" type="submit" disabled={busy}>
+          Sign up
+        </button>
+      </div>
+      <div className="form-row subscribe-checks">
         <label className="shown-check">
           <input type="checkbox" name="daily" /> daily
         </label>
         <label className="shown-check">
           <input type="checkbox" name="weekly" defaultChecked /> weekly
         </label>
-        {/* honeypot: hidden from people, tempting to bots */}
-        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-9999px" }} />
-        <button className="btn primary" type="submit" disabled={busy}>
-          Sign up
-        </button>
       </div>
       {status ? <p className="status-line">{status}</p> : null}
     </form>

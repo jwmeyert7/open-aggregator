@@ -1825,3 +1825,12 @@ button.status-date {
   font-size: 0.72rem;
   white-space: nowrap;
 }
+
+/* subscribe page: the form breathes between the two copy paragraphs, and the
+   edition checks sit on their own line under the address */
+.subscribe-form {
+  margin: 20px 0;
+}
+.subscribe-checks {
+  margin-top: 10px;
+}
