@@ -5,16 +5,13 @@ import { usePathname } from "next/navigation";
 
 export function MainNav({ sections }: { sections: Array<{ id: string; title: string }> }) {
   const path = usePathname();
-  if (
-    path.startsWith("/admin") ||
-    path.startsWith("/day") ||
-    ["/about", "/archive", "/stream", "/privacy", "/contact", "/submit", "/criteria", "/sponsor", "/sources", "/subscribe"].includes(path)
-  )
-    return null;
-  // front/section pages carry their own in-grid header row on desktop
+  // The tabs belong to the front page and the section pages only. Those
+  // pages carry their own in-grid header row on desktop, so this nav is
+  // purely their mobile furniture; everywhere else it renders nothing.
   const gridPage = path === "/" || sections.some((s) => `/${s.id}` === path);
+  if (!gridPage) return null;
   return (
-    <nav className={`main-nav wrap${gridPage ? " mobile-only" : ""}`}>
+    <nav className="main-nav wrap mobile-only">
       <Link href="/" className={path === "/" ? "active" : ""}>
         Top Stories
       </Link>
