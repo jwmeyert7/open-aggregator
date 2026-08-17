@@ -245,7 +245,9 @@ a:hover {
   }
 }
 .main-nav a:first-child {
-  padding-left: 0;
+  /* text stays flush with the column edge, but keeping the padding and
+     pulling the tab left makes the active underline symmetric */
+  margin-left: -12px;
 }
 /* in-grid header row: tabs over stories, labels over their rails, one line */
 .main-nav.in-grid {
