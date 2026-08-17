@@ -90,6 +90,7 @@ function ensureHttp(raw: unknown): string {
 async function fetchPageAsItem(url: string): Promise<CandidateItem> {
   let title = url;
   let excerpt = "";
+  let publishedAt = new Date().toISOString();
   try {
     if (isPrivateHost(new URL(url).hostname)) throw new Error("private host");
     const res = await fetch(url, {
@@ -102,6 +103,15 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
     const metaDesc =
       /<meta[^>]+(?:name="description"|property="og:description")[^>]+content="([^"]*)"/i.exec(html)?.[1] ?? "";
     excerpt = truncate(`${stripHtml(metaDesc)} ${stripHtml(html).slice(0, 2000)}`.trim(), 1500);
+    // the page's own publish date beats fetch time: without it a re-added
+    // old article wears a NEW badge and ranks as if it broke just now
+    const rawDate =
+      /<meta[^>]+(?:property|name)="article:published_time"[^>]+content="([^"]*)"/i.exec(html)?.[1] ??
+      /<time[^>]+datetime="([^"]*)"/i.exec(html)?.[1];
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (Number.isFinite(d.getTime()) && d.getTime() < Date.now()) publishedAt = d.toISOString();
+    }
   } catch {
     // Unreachable pages (e.g. tweet links behind JS walls) still get injected;
     // the LLM works from the URL alone in that case.
@@ -109,7 +119,7 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
   return {
     url,
     title: truncate(title, 300),
-    publishedAt: new Date().toISOString(),
+    publishedAt,
     excerpt,
     sourceId: "manual",
     sourceName: "Added by editor",
@@ -135,10 +145,27 @@ async function attachLinkToCluster(
   const social = socialSourceName(url);
   const existing = cluster.links.find((l) => l.url === url);
   if (existing) {
-    // re-attaching an existing URL refreshes its attribution and lead choice
-    if (social) existing.sourceName = social;
+    // re-attaching an existing URL refreshes its attribution (social handle
+    // or whitelisted source name, on the link and its stream item alike),
+    // repairs a wrong publish stamp, and applies the lead choice
+    const knownHost = knownSourceHosts(state).get(new URL(url).hostname.replace(/^www\./, ""));
+    const fresh: Record<string, string> = social
+      ? { sourceName: social }
+      : knownHost
+        ? { sourceId: knownHost.sourceId, sourceName: knownHost.sourceName }
+        : {};
+    const refetched = await fetchPageAsItem(url);
+    if (new Date(refetched.publishedAt).getTime() < Date.now() - 60 * 60000) {
+      fresh.publishedAt = refetched.publishedAt;
+    }
+    if (Object.keys(fresh).length > 0) {
+      Object.assign(existing, fresh);
+      for (const i of state.items) {
+        if (normalizeUrl(i.url) === normalizeUrl(url)) Object.assign(i, fresh);
+      }
+    }
     if (as_ === "lead") cluster.leadUrl = url;
-    return social ? "Already on this story. Refreshed its attribution." : "That link is already on this story.";
+    return Object.keys(fresh).length > 0 ? "Already on this story. Refreshed its attribution." : "That link is already on this story.";
   }
   const page = await fetchPageAsItem(url);
   const host = new URL(url).hostname.replace(/^www\./, "");
