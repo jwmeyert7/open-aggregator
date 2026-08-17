@@ -229,11 +229,15 @@ export async function sendDailyEmail(
 }
 
 /**
- * The weekly edition: the prior Saturday to Friday's biggest stories, pulled from
- * the frozen daily digests (falling back to live clusters when the archive is
- * thin). Importance leads and magnitude breaks ties, same as the weekend page.
+ * The prior Saturday to Friday's biggest stories, pulled from the frozen daily
+ * digests (falling back to live clusters when the archive is thin).
+ * Importance leads and magnitude breaks ties, same as the weekend page.
+ * Shared by the weekly email and the weekly cast.
  */
-export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig): Promise<Edition | null> {
+async function weeklyTop(
+  state: SiteState,
+  cfg: SiteConfig
+): Promise<{ top: Cluster[]; start: Date; end: Date } | null> {
   const days: string[] = [];
   for (let i = 7; i >= 1; i--) {
     days.push(utcDay(new Date(Date.now() - i * 24 * 60 * 60000).toISOString()));
@@ -256,9 +260,43 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig): Pro
     return b.importanceCapped ? 2 : c.importance;
   };
   const top = [...pool].sort((a, b) => eff(b) - eff(a) || magnitude(b, cfg.ranking) - magnitude(a, cfg.ranking)).slice(0, 10);
+  return {
+    top,
+    start: new Date(`${days[0]}T00:00:00Z`),
+    end: new Date(`${days[days.length - 1]}T00:00:00Z`),
+  };
+}
 
-  const start = new Date(`${days[0]}T00:00:00Z`);
-  const end = new Date(`${days[days.length - 1]}T00:00:00Z`);
+/** "August 10-16" or "August 29 - September 4", with years only when the week crosses New Year. */
+export function shortRangeLabel(start: Date, end: Date): string {
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) return subjectRangeLabel(start, end);
+  const month = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
+  if (start.getUTCMonth() !== end.getUTCMonth()) {
+    return `${month(start)} ${start.getUTCDate()} - ${month(end)} ${end.getUTCDate()}`;
+  }
+  return `${month(start)} ${start.getUTCDate()}-${end.getUTCDate()}`;
+}
+
+/**
+ * The Saturday weekly cast for the digest channel: the week's top three
+ * headlines. Skipped when the week was too thin to rank three stories.
+ */
+export async function buildWeeklyCast(state: SiteState, cfg: SiteConfig): Promise<{ text: string; url: string } | null> {
+  const week = await weeklyTop(state, cfg);
+  if (!week || week.top.length < 3) return null;
+  const site = siteIdentity();
+  const lines = week.top.slice(0, 3).map((c, i) => `${i + 1}. ${c.headline}`);
+  return {
+    text: `This week in ${site.topic}, ${shortRangeLabel(week.start, week.end)}:\n\n${lines.join("\n")}\n\nFull week's news: ${site.domain}/day`,
+    url: `${siteUrl()}/day`,
+  };
+}
+
+/** The weekly edition email, assembled from the same weekly top. */
+export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig): Promise<Edition | null> {
+  const week = await weeklyTop(state, cfg);
+  if (!week) return null;
+  const { top, start, end } = week;
   const label = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
   const heading = `${siteIdentity().siteName} weekly, ${label(start)} to ${label(end)}`;
   return {

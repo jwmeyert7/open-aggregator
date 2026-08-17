@@ -1,5 +1,5 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
-import { sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
+import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
 import { enrichNewItems, fetchAllFeeds, normalizeHost, updateFeedHealth, type FeedFetchResult } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, dayInReview, heuristicFallback, llmAvailable, type EditorOutput, type SummaryBullet } from "./llm";
 import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, topStories, weekInReview, weekendMode } from "./rank";
@@ -962,6 +962,18 @@ export async function runPipeline(): Promise<RunReport> {
       if (note) report.notes.push(note);
     } catch (err) {
       report.notes.push(`Weekly email failed: ${err instanceof Error ? err.message : err}`);
+    }
+    // the weekly cast rides the same once-per-Saturday trigger as the email
+    try {
+      const wc = await buildWeeklyCast(state, cfg);
+      if (wc) {
+        const r = await castRaw(wc.text, wc.url, cfg.bots.farcaster.digestChannel || undefined);
+        report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
+      } else {
+        report.notes.push("Weekly cast skipped (fewer than three stories this week).");
+      }
+    } catch (err) {
+      report.notes.push(`Weekly cast failed: ${err instanceof Error ? err.message : err}`);
     }
     state.lastWeeklyDigest = today;
   }
