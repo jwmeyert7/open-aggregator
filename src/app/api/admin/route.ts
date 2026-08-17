@@ -12,7 +12,7 @@ import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
 import { sponsoredPlacements } from "@/lib/types";
 import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
-import { isPrivateHost, newId, slugify, socialSourceName, stripHtml, truncate } from "@/lib/util";
+import { isPrivateHost, newId, normalizeUrl, sha256, slugify, socialSourceName, stripHtml, truncate } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -185,7 +185,14 @@ async function attachLinkToCluster(
 }
 
 async function addByUrl(state: SiteState, url: string): Promise<string> {
-  const candidates = selectNewItems(state, [await fetchPageAsItem(url)]);
+  const page = await fetchPageAsItem(url);
+  // An admin pasting a URL is the override: a prior seen mark (an old gate
+  // rejection, or a batch an LLM outage swallowed) must not block a
+  // deliberate re-add. Only a link already in the stream is a true duplicate.
+  const normalized = normalizeUrl(page.url);
+  if (state.items.some((i) => normalizeUrl(i.url) === normalized)) return "Already in the stream (duplicate URL).";
+  delete state.seen[sha256(`url:${normalized}`)];
+  const candidates = selectNewItems(state, [page]);
   if (candidates.length === 0) return "Already in the stream (duplicate URL).";
   const out = llmAvailable()
     ? await classifyAndCluster(candidates, digestClusters(state, loadSiteConfig().ingest), "add-by-url")

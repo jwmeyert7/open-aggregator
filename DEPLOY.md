@@ -57,7 +57,7 @@ The response is a JSON run report: items fetched, stories created, feed errors. 
 
 ## 8. Log into the admin
 
-Open `https://your-project.vercel.app/admin`, enter your `ADMIN_PASSWORD`, and you have the whole editorial desk: stories, sources, submissions, runs, layout, email, and the sponsored surfaces. A cosmetic Admin link appears in the site footer in any browser that has logged in.
+Open `https://your-project.vercel.app/admin`, enter your `ADMIN_PASSWORD`. The admin covers stories, sources, submissions, runs, layout, email, and the sponsored surfaces. A cosmetic Admin link appears in the site footer in any browser that has logged in.
 
 ## 9. Optional: a custom domain
 

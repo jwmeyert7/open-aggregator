@@ -872,7 +872,7 @@ export async function runPipeline(): Promise<RunReport> {
   let contentChanged = false;
   if (newItems.length > 0) {
     await enrichNewItems(newItems, feeds, cfg.ingest.feedTimeoutMs);
-    let out: EditorOutput;
+    let out: EditorOutput | null;
     if (llmAvailable()) {
       try {
         // the front summary describes the FRONT PAGE, so the editor is shown
@@ -886,13 +886,22 @@ export async function runPipeline(): Promise<RunReport> {
         });
         report.usedLlm = true;
       } catch (err) {
-        report.notes.push(`LLM failed, using fallback: ${err instanceof Error ? err.message : err}`);
-        out = heuristicFallback(newItems);
+        // A transient LLM failure must not swallow the batch. Applying the
+        // fallback here used to reject every tier-2 item AND mark it seen,
+        // silently eating whatever arrived during an outage. Holding the
+        // items unseen instead means the next run simply retries them.
+        report.notes.push(
+          `LLM failed, holding ${newItems.length} item(s) for retry next run: ${err instanceof Error ? err.message : err}`
+        );
+        out = null;
       }
     } else {
+      // deliberate no-key mode: the degraded gate still applies (and marks
+      // seen), because with no key there is nothing to wait for
       report.notes.push("No LLM key configured; heuristic fallback (tier-1 only, needs review).");
       out = heuristicFallback(newItems);
     }
+    if (out) {
     const applied = applyEditorOutput(state, newItems, out);
     report.rejected = applied.rejected;
     rejectedSamples = applied.rejectedSamples;
@@ -918,6 +927,7 @@ export async function runPipeline(): Promise<RunReport> {
         text: carryForwardSummary(summaryText, state.frontSummary?.text),
         at: new Date().toISOString(),
       };
+    }
     }
   }
 
