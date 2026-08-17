@@ -68,4 +68,4 @@ Add your domain in Settings, Domains, then update `SITE_URL` (and the `domain` f
 - **The pipeline never runs.** Check that `CRON_SECRET` is set in the production environment and that the cron appears under Settings, Cron Jobs. The route answers 401 to anything without the right bearer token.
 - **The site renders but stays empty.** Trigger a run (step 7) and read the report. Feed errors name the failing source. With no LLM key, only tier 1 items appear, flagged "needs review".
 - **Admin login fails.** `ADMIN_PASSWORD` must be set in the environment the deployment runs in. Redeploy after adding it.
-- **Emails do not send.** Set `SMTP_USER` and `SMTP_PASS` (a Gmail app password works), and check the run log: send failures are reported there, never swallowed.
+- **Emails do not send.** Set `SMTP_USER` and `SMTP_PASS` (a Gmail app password works), and check the run log: send failures are reported there.

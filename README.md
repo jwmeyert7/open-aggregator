@@ -1,6 +1,6 @@
 # open-aggregator
 
-An open source, self-hostable news aggregation platform. Point it at a handpicked list of feeds on any topic and it runs a Techmeme-style front page for you: a cron pipeline fetches your sources on a schedule you set, an LLM editor gates, clusters, headlines, and scores the news, and an admin panel gives you one-tap editorial control from your phone. Sections, sources, prompts, and the site's identity are all configuration, not code.
+An open source, self-hostable news aggregation platform. Point it at a handpicked list of feeds on any topic and it runs a Techmeme-style front page for you: a cron pipeline fetches your sources on a schedule you set, an LLM editor gates, clusters, headlines, and scores the news, and an admin panel gives you control. Sections, sources, prompts, and the site's identity are all configurable.
 
 This is the platform that powers [ethernews.org](https://ethernews.org), its flagship deployment.
 
@@ -19,7 +19,7 @@ If the LLM is unreachable the pipeline degrades honestly: tier 1 items become si
 
 ## What you bring
 
-- **A hosting account.** Something that runs a Next.js app, a recurring cron, and a blob store for state. Vercel is what the repo is wired for today (its free Hobby tier works for trying it out), and the storage and cron layers are the only pieces to swap for another host.
+- **A hosting account.** Something that runs a Next.js app, a recurring cron, and a blob store for state. Vercel is what the repo is wired for today (note that Vercel's Hobby tier caps cron jobs at once per day, so a continuously updating site needs Pro), and the storage and cron layers are the only pieces to swap for another host.
 - **A domain, optionally.** The URL your host gives you works fine on day one. Point a custom domain at it whenever you like.
 - **An LLM key.** Any capable model can play the editor in principle. Wired today: `AI_GATEWAY_API_KEY` (Vercel AI Gateway, pass-through pricing) or `ANTHROPIC_API_KEY` (direct), defaulting to Claude Haiku, overridable via `LLM_MODEL`. Costs scale with news volume, not cron frequency: a no-news run makes no LLM call.
 - **`ADMIN_PASSWORD`**, a password you choose for the admin panel, plus a recommended `SESSION_SECRET` (any long random string) to sign admin sessions.
@@ -70,9 +70,8 @@ See [DEPLOY.md](DEPLOY.md) for the step-by-step Vercel path: fork, link, create 
 ## Cost profile
 
 - LLM: scales with news volume (roughly 1 to 3 Haiku calls per news-bearing run, batched). Quiet runs are free.
-- Blob storage: pennies. State is about 1 MB and snapshots accumulate slowly.
+- Blob storage: very low. State is about 1 MB and snapshots accumulate slowly.
 - X posting: hard-capped in code (default 30 posts per month).
-- Everything else fits Vercel's Hobby or Pro plans.
 
 ## License
 
