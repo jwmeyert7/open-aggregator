@@ -155,6 +155,23 @@ a:hover {
   align-items: center;
   gap: 12px;
 }
+/* quiet header links; hidden on narrow screens where the footer covers them */
+.header-links {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+.header-links a {
+  color: var(--muted);
+}
+.header-links a:hover {
+  color: var(--fg);
+}
+@media (max-width: 760px) {
+  .header-links {
+    display: none;
+  }
+}
 .search-box input {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -461,6 +478,12 @@ a:hover {
 .fresh-ago {
   color: var(--hover-peach);
   font-weight: 600;
+}
+/* younger than one pipeline interval: a small caps NEW instead of minutes */
+.new-tag {
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
 }
 .hours-ago {
   color: var(--fg-soft);

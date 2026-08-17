@@ -54,6 +54,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="tagline">{site.tagline}</span>
               <HeaderStatus />
               <div className="header-right">
+                {/* two quiet links only; the header is full and everything else stays in the footer */}
+                <nav className="header-links">
+                  <Link href="/about">About</Link>
+                  <Link href="/subscribe">Subscribe</Link>
+                </nav>
                 <SearchBox />
                 <ThemeToggle />
               </div>
@@ -71,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/day">Daily Archive</Link>
               <Link href="/subscribe">Email</Link>
               <Link href="/submit">Submit</Link>
+              <Link href="/about">About</Link>
               <Link href="/criteria">Criteria</Link>
               <Link href="/sources">Sources</Link>
               <Link href="/sponsor">Sponsor</Link>
