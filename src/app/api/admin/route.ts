@@ -7,11 +7,12 @@ import { sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable } from "@/lib/llm";
 import { applyEditorOutput, digestClusters, digestPostText, knownSourceHosts, markSeen, reeditCluster, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { leadLink } from "@/lib/rank";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
 import { sponsoredPlacements } from "@/lib/types";
 import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
-import { isPrivateHost, newId, slugify, stripHtml, truncate } from "@/lib/util";
+import { isPrivateHost, newId, slugify, socialSourceName, stripHtml, truncate } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -123,19 +124,38 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
  * link that only makes sense as coverage of an existing story (an angle, a
  * follow-on report) can be correctly rejected standalone yet belong here.
  */
-async function attachLinkToCluster(state: SiteState, cluster: Cluster, rawUrl: string): Promise<string> {
+async function attachLinkToCluster(
+  state: SiteState,
+  cluster: Cluster,
+  rawUrl: string,
+  as_: "auto" | "lead" | "coverage" = "auto"
+): Promise<string> {
   const url = ensureHttp(rawUrl);
   if (!url) return "Paste a link to attach.";
-  if (cluster.links.some((l) => l.url === url)) return "That link is already on this story.";
+  const social = socialSourceName(url);
+  const existing = cluster.links.find((l) => l.url === url);
+  if (existing) {
+    // re-attaching an existing URL refreshes its attribution and lead choice
+    if (social) existing.sourceName = social;
+    if (as_ === "lead") cluster.leadUrl = url;
+    return social ? "Already on this story. Refreshed its attribution." : "That link is already on this story.";
+  }
   const page = await fetchPageAsItem(url);
   const host = new URL(url).hostname.replace(/^www\./, "");
   const known = knownSourceHosts(state).get(host);
   const item = {
     ...page,
     id: newId(),
-    ...(known ? { sourceId: known.sourceId, sourceName: known.sourceName } : { sourceName: host }),
+    ...(social
+      ? { sourceName: social }
+      : known
+        ? { sourceId: known.sourceId, sourceName: known.sourceName }
+        : { sourceName: host }),
   };
   const now = new Date().toISOString();
+  // "coverage" must never take over the kicker: pin the current automatic
+  // lead before this link joins and could outrank it
+  if (as_ === "coverage" && !cluster.leadUrl && cluster.links.length > 0) cluster.leadUrl = leadLink(cluster).url;
   cluster.links.push({
     url,
     title: item.title,
@@ -160,7 +180,8 @@ async function attachLinkToCluster(state: SiteState, cluster: Cluster, rawUrl: s
     ...(item.excerpt ? { excerpt: item.excerpt } : {}),
     clusterId: cluster.id,
   });
-  return `Attached ${item.sourceName} to “${truncate(cluster.headline, 60)}”. No editorial gate applied.`;
+  if (as_ === "lead") cluster.leadUrl = url;
+  return `Attached ${item.sourceName}${as_ === "lead" ? " as the lead" : ""} to “${truncate(cluster.headline, 60)}”. No editorial gate applied.`;
 }
 
 async function addByUrl(state: SiteState, url: string): Promise<string> {
@@ -317,7 +338,7 @@ async function handle(req: NextRequest) {
   const state = await loadState({ fresh: true });
   const cfg = loadSiteConfig();
 
-  const clusterActions = ["pin", "kill", "merge", "resection", "edit", "postX", "reedit", "split", "attachLink"];
+  const clusterActions = ["pin", "kill", "merge", "resection", "edit", "postX", "reedit", "split", "attachLink", "setLead"];
   if (clusterActions.includes(body.action)) {
     const cluster = ownEntry(state.clusters, String(body.clusterId ?? ""));
     if (!cluster) return fail("Unknown cluster.");
@@ -370,9 +391,23 @@ async function handle(req: NextRequest) {
       case "reedit":
         message = await reeditCluster(state, cluster);
         break;
-      case "attachLink":
-        message = await attachLinkToCluster(state, cluster, String(body.url ?? ""));
+      case "attachLink": {
+        const mode = ["lead", "coverage"].includes(String(body.as)) ? (String(body.as) as "lead" | "coverage") : "auto";
+        message = await attachLinkToCluster(state, cluster, String(body.url ?? ""), mode);
         break;
+      }
+      case "setLead": {
+        const url = String(body.url ?? "");
+        if (!url) {
+          delete cluster.leadUrl;
+          message = "Lead returns to automatic.";
+          break;
+        }
+        if (!cluster.links.some((l) => l.url === url)) return fail("That link is not on this story.");
+        cluster.leadUrl = url;
+        message = "Lead set.";
+        break;
+      }
       case "split": {
         const urls = new Set(Array.isArray(body.urls) ? body.urls.map(String) : []);
         if (urls.size === 0) return fail("Select at least one link to split out.");

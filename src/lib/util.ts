@@ -241,3 +241,19 @@ export function isPrivateHost(hostname: string): boolean {
   const [a, b] = [Number(m[1]), Number(m[2])];
   return a === 127 || a === 10 || a === 0 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
 }
+
+/**
+ * Social permalinks carry their author in the URL path, so a link from X or
+ * Farcaster is attributed to the account ("X: someuser"), never the bare host.
+ */
+export function socialSourceName(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    const seg = u.pathname.split("/").filter(Boolean)[0] ?? "";
+    const named = Boolean(seg) && !["i", "search", "home", "hashtag", "intent", "explore", "~"].includes(seg);
+    if (host === "x.com" || host === "twitter.com") return named ? `X: ${seg}` : "X";
+    if (host === "farcaster.xyz" || host === "warpcast.com") return named ? `Farcaster: ${seg}` : "Farcaster";
+  } catch {}
+  return null;
+}

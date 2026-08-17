@@ -53,6 +53,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           ? `https://farcaster.xyz/${siteIdentity().social!.farcasterHandle}/${c.posted.farcasterHash.slice(0, 10)}`
           : null,
       linkList: c.links.map((l) => ({ url: l.url, sourceName: l.sourceName, title: l.title })),
+      leadUrl: c.leadUrl ?? null,
       links: c.links.length,
       pinned: Boolean(c.pinned),
       needsReview: Boolean(c.needsReview),

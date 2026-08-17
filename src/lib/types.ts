@@ -127,6 +127,8 @@ export interface Cluster {
   /** Opinion essay rather than reporting; rendered as a visible label so provenance stays legible. */
   opinion?: boolean;
   pinned?: boolean;
+  /** Admin-chosen lead link URL; unset means the automatic tier/weight pick. */
+  leadUrl?: string;
   killed?: boolean;
   mergedInto?: string;
   needsReview?: boolean; // set when created by the no-LLM fallback

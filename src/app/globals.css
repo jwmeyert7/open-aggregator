@@ -1810,3 +1810,18 @@ button.status-date {
 .attach-row .text {
   max-width: 420px;
 }
+
+/* link rows in the admin links detail: checkbox label plus a lead pin button */
+.link-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.link-row .link-check {
+  flex: 1;
+  min-width: 0;
+}
+.lead-btn {
+  font-size: 0.72rem;
+  white-space: nowrap;
+}

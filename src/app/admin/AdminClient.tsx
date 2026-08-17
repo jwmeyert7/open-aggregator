@@ -23,6 +23,7 @@ export interface AdminData {
     farcasterUrl: string | null;
     links: number;
     linkList: Array<{ url: string; sourceName: string; title: string }>;
+    leadUrl: string | null;
     pinned: boolean;
     needsReview: boolean;
     postedX: boolean;
@@ -472,13 +473,24 @@ export function AdminClient({
             className="form-row attach-row"
             onSubmit={(e) => {
               e.preventDefault();
-              const url = String(new FormData(e.currentTarget).get("url") ?? "").trim();
+              const f = new FormData(e.currentTarget);
+              const url = String(f.get("url") ?? "").trim();
               if (!url) return;
-              act("attachLink", { clusterId: c.id, url });
+              act("attachLink", { clusterId: c.id, url, as: String(f.get("as") ?? "auto") });
               e.currentTarget.reset();
             }}
           >
             <input className="text" name="url" placeholder="Attach a link to this story (no gate)…" />
+            <select
+              className="text"
+              name="as"
+              defaultValue="auto"
+              title="auto lets tier and weight decide the kicker, lead pins this link as the kicker, coverage pins the current lead so this link can never take over"
+            >
+              <option value="auto">auto</option>
+              <option value="lead">as lead</option>
+              <option value="coverage">as coverage</option>
+            </select>
             <button className="btn" type="submit" disabled={busy}>
               Attach
             </button>
@@ -516,10 +528,25 @@ export function AdminClient({
                 }}
               >
                 {c.linkList.map((l) => (
-                  <label key={l.url} className="link-check">
-                    <input type="checkbox" name="url" value={l.url} /> <span className="src">{l.sourceName}</span>:{" "}
-                    {l.title}
-                  </label>
+                  <div key={l.url} className="link-row">
+                    <label className="link-check">
+                      <input type="checkbox" name="url" value={l.url} /> <span className="src">{l.sourceName}</span>:{" "}
+                      {l.title}
+                    </label>
+                    <button
+                      type="button"
+                      className="btn lead-btn"
+                      disabled={busy}
+                      title={
+                        c.leadUrl === l.url
+                          ? "Pinned as the lead. Click to return to automatic."
+                          : "Pin this link as the story's lead (the kicker source)"
+                      }
+                      onClick={() => act("setLead", { clusterId: c.id, url: c.leadUrl === l.url ? "" : l.url })}
+                    >
+                      {c.leadUrl === l.url ? "lead ✓" : "make lead"}
+                    </button>
+                  </div>
                 ))}
                 <div className="btn-row">
                   <button className="btn" type="submit" disabled={busy}>

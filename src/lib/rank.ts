@@ -233,8 +233,10 @@ export function byPublished(items: RiverItem[]): RiverItem[] {
   return [...items].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 }
 
-/** Lead link for a cluster: primary sources (weight) first, earliest coverage breaks ties. */
+/** Lead link for a cluster: the admin's explicit pick when set and still present, else primary sources (weight) first, earliest coverage breaks ties. */
 export function leadLink(cluster: Cluster) {
+  const chosen = cluster.leadUrl ? cluster.links.find((l) => l.url === cluster.leadUrl) : undefined;
+  if (chosen) return chosen;
   return [...cluster.links].sort((a, b) => {
     if (a.tier !== b.tier) return a.tier - b.tier;
     if (a.weight !== b.weight) return b.weight - a.weight;

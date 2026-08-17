@@ -129,7 +129,6 @@ export function HeaderStatus() {
             Go
           </button>
           {/* dismissal is click-away (see the pointerdown effect above) */}
-          <span className="pick-hint">jumps to the archived front page nearest that moment</span>
         </form>
       ) : null}
     </div>
