@@ -23,7 +23,7 @@ export default function AboutPage() {
         </p>
         <h2>How it works</h2>
         <p>
-          A pipeline runs every fifteen minutes. It reads the whitelisted sources and hands anything new to an editor
+          A pipeline runs around the clock. It reads the whitelisted sources and hands anything new to an editor
           model that decides what counts as news, merges coverage of the same event into one story, and files it under{" "}
           {sections.map((s, i) => (
             <span key={s.id}>

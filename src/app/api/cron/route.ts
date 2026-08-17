@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * The 15-minute pipeline entrypoint. Vercel Cron calls GET with
+ * The pipeline entrypoint (schedule lives in vercel.ts). Vercel Cron calls GET with
  * `Authorization: Bearer $CRON_SECRET` automatically. Fails closed: with no
  * CRON_SECRET set, nothing can trigger the pipeline (which spends LLM money
  * and posts to social), so a fork without the env var is safe, not open.

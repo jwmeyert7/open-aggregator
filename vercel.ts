@@ -5,6 +5,10 @@ export const config: VercelConfig = {
   crons: [
     // The whole product: fetch → dedupe → LLM edit → merge → snapshot → bots.
     // Vercel sends Authorization: Bearer $CRON_SECRET automatically.
-    { path: "/api/cron", schedule: "*/15 * * * *" },
+    // The cadence is yours: faster means fresher and pairs well with the
+    // prompt cache (runs inside each other's cache window read the editorial
+    // rules at a tenth of the input price). Watch feed politeness and LLM
+    // spend as you tighten it.
+    { path: "/api/cron", schedule: "*/5 * * * *" },
   ],
 };

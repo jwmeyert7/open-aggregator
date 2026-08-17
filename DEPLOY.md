@@ -1,6 +1,6 @@
 # Deploying to Vercel
 
-The whole platform runs on one Vercel project: the site, the admin, the 15-minute cron pipeline, and a Blob store for state. This walkthrough assumes nothing beyond a GitHub account and a Vercel account.
+The whole platform runs on one Vercel project: the site, the admin, the cron pipeline (schedule yours to set in `vercel.ts`), and a Blob store for state. This walkthrough assumes nothing beyond a GitHub account and a Vercel account.
 
 ## 1. Fork and clone
 
@@ -47,7 +47,7 @@ The deployed site reads the config files baked into the deployment. Out of the b
 
 ## 7. First run
 
-The cron fires within 15 minutes of the first production deploy. To trigger a run immediately:
+The cron fires within one schedule interval of the first production deploy. To trigger a run immediately:
 
 ```
 curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-project.vercel.app/api/cron

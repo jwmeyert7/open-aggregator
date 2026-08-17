@@ -152,17 +152,31 @@ export async function classifyAndCluster(
       sections.map((s) => s.id),
       sectionIds()
     ),
-    system: loadPrompt(prompt),
-    prompt: JSON.stringify({
-      todayUtc: new Date().toISOString().slice(0, 10),
-      // the valid section ids with their meanings, so the prompt can stay generic
-      sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
-      weekendMode: Boolean(ctx.weekendMode),
-      frontPageTop: headlines(ctx.frontPageTop),
-      weekTop: headlines(ctx.weekTop),
-      activeClusters: clusterDigest(activeClusters),
-      newItems: itemPayload(newItems),
-    }),
+    messages: [
+      {
+        role: "system",
+        content: loadPrompt(prompt),
+        // The rulebook is byte-identical every run. Caching it means cron
+        // runs that land inside the cache window read it at a tenth of the
+        // input price instead of re-paying full freight. The per-run payload
+        // below stays uncached. Harmless when the prompt is below the
+        // model's cacheable minimum: it simply does not cache.
+        providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          todayUtc: new Date().toISOString().slice(0, 10),
+          // the valid section ids with their meanings, so the prompt can stay generic
+          sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+          weekendMode: Boolean(ctx.weekendMode),
+          frontPageTop: headlines(ctx.frontPageTop),
+          weekTop: headlines(ctx.weekTop),
+          activeClusters: clusterDigest(activeClusters),
+          newItems: itemPayload(newItems),
+        }),
+      },
+    ],
   });
   return object as EditorOutput;
 }
