@@ -405,7 +405,8 @@ a:hover {
 
 /* ---------- clusters ---------- */
 .cluster {
-  padding: 18px 0;
+  /* roomier than the original 18px: stories breathe, the page reads less like a list */
+  padding: 24px 0;
   border-bottom: 1px solid var(--border-soft);
 }
 .cluster:first-child {
@@ -974,6 +975,11 @@ body:has(.notfound) .main-nav {
 .roomy {
   padding-top: 22px;
   min-height: 55vh;
+}
+/* every public single-column page opens with the same buffer the grid pages
+   get from their tabs row, so nothing sits jammed against the header */
+.page.single:not(.admin) {
+  padding-top: 48px;
 }
 .prose h1 {
   font-size: 1.3rem;
@@ -1753,4 +1759,46 @@ button.status-date {
   .header-stack .main-nav {
     position: static;
   }
+}
+
+
+/* ---------- front page lead pass ---------- */
+/* The summary lives in the newest rail on desktop, freeing the story column
+   to open with a true lead headline. The above-nav copy is mobile's, where
+   the rail stacks far below and quick reads must stay first. */
+@media (min-width: 761px) {
+  .front-summary.above-nav {
+    display: none;
+  }
+  /* with the above-nav copy hidden, the summary grid row collapses back out */
+  .page.has-summary {
+    grid-template-rows: auto 1fr;
+  }
+  .page.has-summary .main-nav.in-grid {
+    grid-row: 1;
+  }
+  .page.has-summary .stories-col {
+    grid-row: 2;
+  }
+  .page.has-summary > .sidebar {
+    grid-row: 1 / 3;
+  }
+  .newest-col .front-summary {
+    margin: 0 0 18px;
+    padding: 8px 10px;
+  }
+  .newest-col .front-summary-groups {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+@media (max-width: 760px) {
+  .newest-col .front-summary {
+    display: none;
+  }
+}
+/* the top story reads as the page's headline, Techmeme style */
+.stories-col > .cluster:first-child:not(.sponsored) h2 {
+  font-size: 1.5rem;
+  line-height: 1.24;
 }

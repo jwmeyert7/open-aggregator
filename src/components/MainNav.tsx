@@ -8,7 +8,7 @@ export function MainNav({ sections }: { sections: Array<{ id: string; title: str
   if (
     path.startsWith("/admin") ||
     path.startsWith("/day") ||
-    ["/archive", "/stream", "/privacy", "/contact", "/submit", "/criteria", "/sponsor", "/sources", "/subscribe"].includes(path)
+    ["/about", "/archive", "/stream", "/privacy", "/contact", "/submit", "/criteria", "/sponsor", "/sources", "/subscribe"].includes(path)
   )
     return null;
   // front/section pages carry their own in-grid header row on desktop

@@ -31,8 +31,7 @@ export default function AboutPage() {
               <Link href={`/${s.id}`}>{s.title}</Link>
             </span>
           ))}
-          . The rules it applies are public on the <Link href="/criteria">criteria page</Link>. Whitelisting is done by
-          a human, and the front page is watched by one too.
+          . The rules it applies are public on the <Link href="/criteria">criteria page</Link>.
         </p>
         <p>
           Everything on the site flows from that: the <Link href="/stream">stream</Link> is the raw feed of accepted
@@ -42,7 +41,7 @@ export default function AboutPage() {
         <h2>Elsewhere</h2>
         <p>
           {site.siteName} offers <Link href="/subscribe">daily and weekly email digests</Link>. Story suggestions come
-          in through the <Link href="/submit">submit page</Link>, and anything else reaches a human at{" "}
+          in through the <Link href="/submit">submit page</Link>, and anything else can be communicated to:{" "}
           <a href={`mailto:${site.contactEmail}`}>{site.contactEmail}</a>.
         </p>
       </div>

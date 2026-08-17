@@ -73,6 +73,26 @@ export default async function HomePage() {
   );
 
   const showSidebar = hasSidebarContent(state);
+  const summaryAt = (aboveNav: boolean) =>
+    gistLines.length > 0 ? (
+      <SummaryBlock
+        aboveNav={aboveNav}
+        sections={cfg.sections.map((s) => ({ id: s.id, title: s.title }))}
+        heading={leadWithWeek ? "Week in review" : "Latest in"}
+        quietText={leadWithWeek ? "A quiet week here." : undefined}
+        text={gistLines.join("\n")}
+        // a bullet's story jumps in page when its card is below, and falls
+        // back to the story permalink when it ranks off the front page
+        storyHrefs={storyHref}
+        // a refless bullet fuzzy-matches to the story it is plainly about;
+        // its section page is the last resort when nothing matches
+        fallbackHref={(section, text) => {
+          const cands = liveClusters(state).filter((c) => c.section === section);
+          const i = bestMatchIndex(text, cands.map((c) => `${c.headline} ${(c.keywords ?? []).join(" ")}`));
+          return i >= 0 ? storyHref.get(cands[i].id) : `/${section}`;
+        }}
+      />
+    ) : null;
   return (
     <main
       className={`wrap page${showSidebar ? "" : " no-middle"}${gistLines.length > 0 ? " has-summary" : ""}`}
@@ -83,27 +103,10 @@ export default async function HomePage() {
           {scheduledWeekend ? "weekend" : "weekday"} right now). Clear it in the <Link href="/admin#layout">admin</Link>.
         </div>
       ) : null}
-      {/* editor-model gist of the news cycle, above the section tabs; hidden
-          once it goes stale. At weekends it reviews the week instead. */}
-      {gistLines.length > 0 ? (
-        <SummaryBlock
-          aboveNav
-          sections={cfg.sections.map((s) => ({ id: s.id, title: s.title }))}
-          heading={leadWithWeek ? "Week in review" : "Latest in"}
-          quietText={leadWithWeek ? "A quiet week here." : undefined}
-          text={gistLines.join("\n")}
-          // a bullet's story jumps in page when its card is below, and falls
-          // back to the story permalink when it ranks off the front page
-          storyHrefs={storyHref}
-          // a refless bullet fuzzy-matches to the story it is plainly about;
-          // its section page is the last resort when nothing matches
-          fallbackHref={(section, text) => {
-            const cands = liveClusters(state).filter((c) => c.section === section);
-            const i = bestMatchIndex(text, cands.map((c) => `${c.headline} ${(c.keywords ?? []).join(" ")}`));
-            return i >= 0 ? storyHref.get(cands[i].id) : `/${section}`;
-          }}
-        />
-      ) : null}
+      {/* editor-model gist of the news cycle; hidden once it goes stale. At
+          weekends it reviews the week instead. Rendered twice: the above-nav
+          copy is mobile's, the rail copy is desktop's (CSS shows one each). */}
+      {summaryAt(true)}
       <ColumnHeads sections={cfg.sections} active="top" />
       <div className="stories-col">
         {leadWithWeek ? (
@@ -181,6 +184,7 @@ export default async function HomePage() {
           .slice(0, 12)
           .map((i) => ({ ...i, rawTitle: i.title, title: itemDisplayTitle(state, i) }))}
         latestId={state.items[0]?.id}
+        top={summaryAt(false)}
       />
     </main>
   );

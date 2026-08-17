@@ -103,12 +103,16 @@ export function Sidebar({
 export function NewestRail({
   items,
   latestId,
+  top,
 }: {
   items: Array<RiverItem & { rawTitle?: string }>;
   latestId?: string;
+  /** Desktop-only block above the list (the front page parks Latest in here). */
+  top?: React.ReactNode;
 }) {
   return (
     <aside className="sidebar newest-col">
+      {top}
       {/* desktop column label; hidden on mobile where the rail's own h3 takes over */}
       <div className="col-label">Newest</div>
       <div className="rail">
