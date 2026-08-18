@@ -854,7 +854,9 @@ a.pill:hover {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  user-select: none;
+  /* the strip reads as prose, so it must copy as prose; the component
+     ignores the click that ends a drag-selection */
+  user-select: text;
 }
 .clock-part:hover {
   color: var(--fg);

@@ -38,6 +38,15 @@ export function HeaderStatus() {
     return () => clearInterval(clock);
   }, []);
 
+  // the strip is selectable text, and mouseup after a drag-selection still
+  // fires click, so a click that follows a selection must not act
+  function unlessSelecting(fn: () => void) {
+    return () => {
+      if (window.getSelection()?.toString()) return;
+      fn();
+    };
+  }
+
   function toggleUtc() {
     setUseUtc((v) => {
       try {
@@ -90,27 +99,27 @@ export function HeaderStatus() {
       <span className="status-row">
         <button
           className="clock-part status-date"
-          onClick={openPick}
+          onClick={unlessSelecting(openPick)}
           title="See the front page as it was on a past date"
         >
           <span className="date-full">{dateFull}</span>
           <span className="date-short">{dateShort}</span>
         </button>
         <span className="clock">
-          <button className="clock-part" onClick={toggleUtc} title="Toggle local / UTC">
+          <button className="clock-part" onClick={unlessSelecting(toggleUtc)} title="Toggle local / UTC">
             {time}
           </button>
           {use24h ? (
-            <button className="clock-part clock-blank" onClick={() => set24h(false)} title="Back to 12-hour" aria-label="Back to 12-hour clock">
+            <button className="clock-part clock-blank" onClick={unlessSelecting(() => set24h(false))} title="Back to 12-hour" aria-label="Back to 12-hour clock">
               {"  "}
             </button>
           ) : (
-            <button className="clock-part" onClick={() => set24h(true)} title="Switch to 24-hour">
+            <button className="clock-part" onClick={unlessSelecting(() => set24h(true))} title="Switch to 24-hour">
               {suffix}
             </button>
           )}
           {useUtc ? (
-            <button className="clock-part" onClick={toggleUtc} title="Toggle local / UTC">
+            <button className="clock-part" onClick={unlessSelecting(toggleUtc)} title="Toggle local / UTC">
               UTC
             </button>
           ) : null}
