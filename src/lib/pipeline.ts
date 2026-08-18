@@ -2,7 +2,7 @@ import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
 import { enrichNewItems, fetchAllFeeds, normalizeHost, updateFeedHealth, type FeedFetchResult } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, dayInReview, heuristicFallback, llmAvailable, type EditorOutput, type SummaryBullet } from "./llm";
-import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, topStories, weekInReview, weekendMode } from "./rank";
+import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
@@ -117,6 +117,25 @@ function carryForwardSummary(newText: string, prevText: string | undefined): str
     .filter((l) => l.section && !covered.has(l.section))
     .map((l) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.text}`);
   return [newText, ...carried].join("\n");
+}
+
+/**
+ * The editor is told to give every section a line, and carryForwardSummary
+ * keeps old lines alive, but a section no summary has EVER covered (a fresh
+ * site's first run, a newly added section, an editor that ignored the
+ * instruction) still renders its box as a "nothing notable" placeholder while
+ * stories sit directly beneath it. Last resort: front the section's
+ * top-ranked story headline. Only fills boxes that would otherwise be empty;
+ * an editor-written line is never replaced.
+ */
+function backfillSummarySections(text: string, state: SiteState, cfg: SiteConfig): string {
+  const covered = new Set<string | null>(parseSummaryLines(text).map((l) => l.section));
+  const added = cfg.sections
+    .filter((s) => !covered.has(s.id))
+    .map((s) => sectionStories(state, s.id, cfg.ranking)[0])
+    .filter((c): c is Cluster => Boolean(c))
+    .map((c) => `[${c.section}@${c.id}] ${truncate(c.headline, 160)}`);
+  return added.length > 0 ? [text, ...added].filter(Boolean).join("\n") : text;
 }
 
 /** Apply the editor's (LLM or fallback) decisions to state. Returns counts. */
@@ -924,7 +943,7 @@ export async function runPipeline(): Promise<RunReport> {
     const summaryText = report.usedLlm && out.frontSummary ? joinSummaryLines(out.frontSummary, resolveRef) : "";
     if (summaryText) {
       state.frontSummary = {
-        text: carryForwardSummary(summaryText, state.frontSummary?.text),
+        text: backfillSummarySections(carryForwardSummary(summaryText, state.frontSummary?.text), state, cfg),
         at: new Date().toISOString(),
       };
     }
