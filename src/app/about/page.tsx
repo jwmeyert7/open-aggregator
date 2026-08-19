@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { loadSiteConfig } from "@/lib/config";
+import { loadSiteConfig, siteUrl } from "@/lib/config";
 import { siteIdentity } from "@/lib/site";
 
 export const metadata = {
@@ -37,6 +37,12 @@ export default function AboutPage() {
           Everything on the site flows from that: the <Link href="/stream">stream</Link> is the raw feed of accepted
           items, the <Link href="/day">daily archive</Link> freezes each day at UTC midnight, and clicking the date in
           the header time travels to any archived front page.
+        </p>
+        <h2>Connect an AI assistant</h2>
+        <p>
+          {site.siteName} is also a remote MCP server. Point any MCP enabled assistant at{" "}
+          <code>{siteUrl()}/api/mcp</code> and it can pull the current top stories, search them, or fetch any frozen
+          daily edition. The connection is read only and needs no account or key.
         </p>
         <h2>Follow and contact</h2>
         <p>
