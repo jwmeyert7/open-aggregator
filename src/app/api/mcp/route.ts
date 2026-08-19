@@ -1,7 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { loadSiteConfig, navSections, siteUrl } from "@/lib/config";
-import { adaptiveRanking, leadLink, liveClusters, rankClusters, sectionStories, topStories } from "@/lib/rank";
+import { adaptiveRanking, byPublished, itemDisplayTitle, leadLink, liveClusters, rankClusters, sectionStories, topStories, weekInReview } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadDailyDigest, loadState } from "@/lib/state";
 import type { Cluster } from "@/lib/types";
@@ -114,6 +114,64 @@ const handler = createMcpHandler(
           stories: rankClusters(matches, ranking)
             .slice(0, count ?? 10)
             .map((c, i) => serializeCluster(c, i + 1, base)),
+        });
+      }
+    );
+
+    server.registerTool(
+      "get_newest",
+      {
+        title: "Get newest items",
+        description:
+          "The newest accepted items across all whitelisted sources, one entry per article, newest first by publish time. This is the raw unranked stream: use it for questions like what just came in or has anything happened in the last hour. For what matters most, use get_top_stories instead.",
+        annotations: { readOnlyHint: true },
+        inputSchema: z.object({
+          count: countSchema,
+        }),
+      },
+      async ({ count }) => {
+        const state = await loadState();
+        const base = siteUrl();
+        return asText({
+          site: base,
+          updatedAt: state.updatedAt,
+          items: byPublished(state.items)
+            .slice(0, count ?? 10)
+            .map((item) => {
+              const c = item.clusterId ? state.clusters[item.clusterId] : undefined;
+              return {
+                title: itemDisplayTitle(state, item),
+                url: item.url,
+                source: item.sourceName,
+                publishedAt: item.publishedAt,
+                ...(c && !c.killed ? { storyPermalink: `${base}/story/${c.slug}` } : {}),
+              };
+            }),
+        });
+      }
+    );
+
+    server.registerTool(
+      "get_week_in_review",
+      {
+        title: "Get week in review",
+        description:
+          "The past week's biggest stories, ranked by editorial importance and total coverage rather than freshness. Use it for catch-me-up questions like what happened this week. When presenting a story to the user, link its permalink.",
+        annotations: { readOnlyHint: true },
+        inputSchema: z.object({
+          count: countSchema,
+        }),
+      },
+      async ({ count }) => {
+        const state = await loadState();
+        const cfg = loadSiteConfig();
+        const ranking = adaptiveRanking(state, cfg.ranking);
+        const week = weekInReview(state, ranking, new Set());
+        const base = siteUrl();
+        return asText({
+          site: base,
+          updatedAt: state.updatedAt,
+          stories: week.slice(0, count ?? week.length).map((c, i) => serializeCluster(c, i + 1, base)),
         });
       }
     );
