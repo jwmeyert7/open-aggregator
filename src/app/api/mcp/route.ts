@@ -56,7 +56,8 @@ const handler = createMcpHandler(
         title: "Get top stories",
         description:
           `The current top stories about ${id.topic} from ${id.siteName}, ranked exactly as the live front page ranks them.` +
-          (sections.length > 0 ? ` Optionally filter to one section: ${sectionList}.` : ""),
+          (sections.length > 0 ? ` Optionally filter to one section: ${sectionList}.` : "") +
+          " When presenting a story to the user, link its permalink.",
         inputSchema: z.object({
           section: z.string().optional(),
           count: countSchema,
@@ -85,7 +86,7 @@ const handler = createMcpHandler(
       {
         title: "Search stories",
         description:
-          `Search the live ${id.siteName} stories by keyword. Matches headlines, explainers, editor keywords, and the titles of the underlying source links. Results come back in current rank order.`,
+          `Search the live ${id.siteName} stories by keyword. Matches headlines, explainers, editor keywords, and the titles of the underlying source links. Results come back in current rank order. When presenting a story to the user, link its permalink.`,
         inputSchema: z.object({
           query: z.string().min(2).max(200),
           count: countSchema,
@@ -120,7 +121,7 @@ const handler = createMcpHandler(
       {
         title: "Get daily digest",
         description:
-          "One UTC day's frozen edition: the day's top stories plus an editor-written day-in-review paragraph. Omit the date for the most recent edition. Editions freeze shortly after midnight UTC, so today's edition usually does not exist yet and the live view is get_top_stories.",
+          "One UTC day's frozen edition: the day's top stories plus an editor-written day-in-review paragraph. Omit the date for the most recent edition. Editions freeze shortly after midnight UTC, so today's edition usually does not exist yet and the live view is get_top_stories. When presenting a story to the user, link its permalink.",
         inputSchema: z.object({
           date: z
             .string()
