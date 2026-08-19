@@ -14,6 +14,7 @@ This is the platform that powers [ethernews.org](https://ethernews.org).
 - A source leaderboard, feed health tracking, and automatic source discovery from a Farcaster channel
 - Optional social posting, capped in code and dry-run by default (Farcaster and X built in, the module pattern extends to others)
 - Optional sponsored posts, announcement slot, and jobs/events/podcasts listings, always visually marked as paid
+- A built-in remote MCP server at `/api/mcp` (streamable HTTP, stateless, read-only): AI assistants like Claude can pull your ranked top stories, search them, or fetch a daily edition. It serves the same state the front page renders and makes no LLM calls, so it adds nothing to your costs.
 
 If the LLM is unreachable, tier 1 items become single-link stories flagged "needs review", tier 2 items wait, and the site stays up.
 
