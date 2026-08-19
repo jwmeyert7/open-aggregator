@@ -156,21 +156,35 @@ const handler = createMcpHandler(
       {
         title: "Get week in review",
         description:
-          "The past week's biggest stories, ranked by editorial importance and total coverage rather than freshness. Use it for catch-me-up questions like what happened this week. When presenting a story to the user, link its permalink.",
+          "The week's biggest stories, ranked by editorial importance and total coverage rather than freshness. Periods: last_7_days is a rolling window ending now (the default), week_so_far covers the current Saturday-to-Friday week up to now, and last_week is the most recent completed Saturday-to-Friday week. A user asking about 'this week' on a Saturday or Sunday usually means the week just completed, so prefer last_week then. Every response states the exact date range it covered. When presenting a story to the user, link its permalink.",
         annotations: { readOnlyHint: true },
         inputSchema: z.object({
+          period: z.enum(["last_7_days", "week_so_far", "last_week"]).optional(),
           count: countSchema,
         }),
       },
-      async ({ count }) => {
+      async ({ period, count }) => {
         const state = await loadState();
         const cfg = loadSiteConfig();
         const ranking = adaptiveRanking(state, cfg.ranking);
-        const week = weekInReview(state, ranking, new Set());
+        const now = new Date();
+        const daysSinceSat = (now.getUTCDay() + 1) % 7;
+        const weekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceSat));
+        const window =
+          period === "week_so_far"
+            ? { start: weekStart, end: now }
+            : period === "last_week"
+              ? { start: new Date(weekStart.getTime() - 7 * 24 * 60 * 60000), end: weekStart }
+              : undefined;
+        const week = weekInReview(state, ranking, new Set(), now, window);
         const base = siteUrl();
         return asText({
           site: base,
           updatedAt: state.updatedAt,
+          period: period ?? "last_7_days",
+          range: window
+            ? { from: window.start.toISOString(), to: window.end.toISOString() }
+            : { from: new Date(now.getTime() - 7 * 24 * 60 * 60000).toISOString(), to: now.toISOString() },
           stories: week.slice(0, count ?? week.length).map((c, i) => serializeCluster(c, i + 1, base)),
         });
       }

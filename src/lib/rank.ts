@@ -158,18 +158,22 @@ export function weekendMode(cfg: SiteConfig["ranking"], now: Date = new Date(), 
 /**
  * The week's biggest stories by magnitude, for the weekend front page. Skips
  * anything already listed in Top Stories so the page never repeats itself.
+ * Default window is the rolling last seven days ending now; an explicit
+ * window (e.g. a calendar week) filters on when each story broke instead.
  */
 export function weekInReview(
   state: SiteState,
   cfg: SiteConfig["ranking"],
   excludeIds: Set<string>,
-  now: Date = new Date()
+  now: Date = new Date(),
+  window?: { start: Date; end: Date }
 ): Cluster[] {
   const broke = (c: Cluster) =>
     c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
-  const eligible = liveClusters(state).filter(
-    (c) => !excludeIds.has(c.id) && hoursAgo(broke(c), now) <= 7 * 24
-  );
+  const inWindow = window
+    ? (c: Cluster) => broke(c) >= window.start.toISOString() && broke(c) < window.end.toISOString()
+    : (c: Cluster) => hoursAgo(broke(c), now) <= 7 * 24;
+  const eligible = liveClusters(state).filter((c) => !excludeIds.has(c.id) && inWindow(c));
   // What mattered this week is a question about importance first. Magnitude
   // alone lets a routine client release outrank a corroborated exploit, because
   // primary sources carry heavy weight, so importance leads and magnitude only

@@ -4,7 +4,7 @@ import { siteIdentity } from "./site";
 import { leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
 import { loadDailyDigest } from "./state";
 import type { Cluster, DigestSubscriber, SiteConfig, SiteState } from "./types";
-import { hoursAgo, parseSummaryLines, utcDay } from "./util";
+import { parseSummaryLines, utcDay } from "./util";
 
 /**
  * The email editions. The daily one is the frozen daily archive page in mail
@@ -229,8 +229,11 @@ export async function sendDailyEmail(
 }
 
 /**
- * The prior Saturday to Friday's biggest stories, pulled from the frozen daily
- * digests (falling back to live clusters when the archive is thin).
+ * The most recent COMPLETED Saturday to Friday week's biggest stories, pulled
+ * from the frozen daily digests (falling back to live clusters when the
+ * archive is thin). Anchoring to the completed week makes the weekly an
+ * edition: an ad hoc mid-week send reproduces the same email Saturday's run
+ * sent, instead of a trailing window that shifts with the send moment.
  * Importance leads and magnitude breaks ties, same as the weekend page.
  * Shared by the weekly email and the weekly cast.
  */
@@ -238,20 +241,28 @@ async function weeklyTop(
   state: SiteState,
   cfg: SiteConfig
 ): Promise<{ top: Cluster[]; start: Date; end: Date } | null> {
+  const daysSinceSat = (new Date().getUTCDay() + 1) % 7;
   const days: string[] = [];
-  for (let i = 7; i >= 1; i--) {
+  for (let i = daysSinceSat + 7; i >= daysSinceSat + 1; i--) {
     days.push(utcDay(new Date(Date.now() - i * 24 * 60 * 60000).toISOString()));
   }
-  const collected: Cluster[] = [];
+  // A story big enough to top consecutive dailies appears in several of them:
+  // keep one copy per cluster (the latest day's version) or a multi-day story
+  // occupies several of the edition's slots.
+  const byId = new Map<string, Cluster>();
   for (const d of days) {
     const digest = await loadDailyDigest(d);
-    if (digest) collected.push(...digest.clusters);
+    for (const c of digest?.clusters ?? []) byId.set(c.id, c);
   }
-  let pool = collected;
+  let pool = [...byId.values()];
   if (pool.length === 0) {
+    const start = `${days[0]}T00:00:00.000Z`;
+    const endExclusive = new Date(
+      new Date(`${days[days.length - 1]}T00:00:00Z`).getTime() + 24 * 60 * 60000
+    ).toISOString();
     const broke = (c: Cluster) =>
       c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
-    pool = liveClusters(state).filter((c) => hoursAgo(broke(c)) <= 7 * 24);
+    pool = liveClusters(state).filter((c) => broke(c) >= start && broke(c) < endExclusive);
   }
   if (pool.length === 0) return null;
 
