@@ -41,8 +41,8 @@ export default function AboutPage() {
         <h2>Connect an AI assistant</h2>
         <p>
           {site.siteName} is also a remote MCP server. Point any MCP enabled assistant at{" "}
-          <code>{siteUrl()}/api/mcp</code> and it can pull the current top stories, search them, or fetch any frozen
-          daily edition. The connection is read only and needs no account or key.
+          <code>{siteUrl()}/api/mcp</code> and it can pull the top stories, the newest items, daily and weekly
+          reviews, or search. The connection is read only and needs no account or key.
         </p>
         <h2>Follow and contact</h2>
         <p>
