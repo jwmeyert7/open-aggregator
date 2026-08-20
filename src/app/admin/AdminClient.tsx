@@ -903,6 +903,9 @@ export function AdminClient({
         <button className="btn primary" disabled={busy} onClick={() => act("runPipeline")}>
           Run pipeline now
         </button>
+        <button className="btn" disabled={busy} onClick={() => act("refreshSummary")}>
+          Refresh summary
+        </button>
       </div>
       {data.digests.length > 0 ? (
         <div className="admin-card">

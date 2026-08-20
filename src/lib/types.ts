@@ -240,8 +240,13 @@ export interface SiteState {
   podcasts?: Listing[];
   /** Paid announcement slot on the front page; hidden keeps the text but stops rendering it. */
   announcement?: { text: string; url?: string; hidden?: boolean } | null;
-  /** Editor-model summary of the current news cycle, shown atop the front page while fresh. */
-  frontSummary?: { text: string; at: string };
+  /**
+   * Editor-model summary of the current news cycle, shown atop the front page
+   * while fresh. stale marks it for reconsideration on the next pipeline run
+   * (set when an admin action changes a story a line cites, or a cited story
+   * dies); still-accurate lines survive that pass verbatim.
+   */
+  frontSummary?: { text: string; at: string; stale?: boolean };
   /** Paid posts injected into the story lists, clearly marked as ads. */
   sponsoredPosts?: SponsoredPost[];
   /** Admin-managed source changes layered over config/feeds.json. */

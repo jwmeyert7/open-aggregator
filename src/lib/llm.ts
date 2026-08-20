@@ -181,6 +181,38 @@ export async function classifyAndCluster(
   return object as EditorOutput;
 }
 
+/**
+ * Reconsider the existing front summary against the page's current stories,
+ * without a full editor pass. The prompt reuses still-accurate lines verbatim,
+ * so a refresh only changes what the underlying stories no longer support.
+ */
+export async function refreshFrontSummary(
+  current: SummaryBullet[],
+  frontPageTop: Cluster[],
+  weekend: boolean
+): Promise<SummaryBullet[]> {
+  const sections = navSections();
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: z.object({
+      frontSummary: z
+        .array(summaryBulletSchema(sections.map((s) => s.id)))
+        .max(4)
+        .describe("the full summary: still-accurate lines verbatim, broken lines rewritten"),
+    }),
+    system: loadPrompt("summary-refresh"),
+    prompt: JSON.stringify({
+      todayUtc: new Date().toISOString().slice(0, 10),
+      // the valid section ids with their meanings, so the prompt can stay generic
+      sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+      weekendMode: weekend,
+      currentSummary: current,
+      frontPageTop: frontPageTop.map((c) => ({ id: c.id, headline: c.headline, explainer: c.explainer, section: c.section })),
+    }),
+  });
+  return object.frontSummary as SummaryBullet[];
+}
+
 /** Day-in-review bullets for a frozen daily digest: one small call, best-effort at the call site. */
 export async function dayInReview(date: string, clusters: Cluster[]): Promise<SummaryBullet[]> {
   const sections = navSections();

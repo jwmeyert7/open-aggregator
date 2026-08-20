@@ -6,7 +6,7 @@ import { discoverFeed, userAgent } from "@/lib/feeds";
 import { sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable } from "@/lib/llm";
-import { applyEditorOutput, digestClusters, digestPostText, knownSourceHosts, markSeen, reeditCluster, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { applyEditorOutput, digestClusters, digestPostText, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
@@ -494,9 +494,19 @@ async function handle(req: NextRequest) {
       }
     }
     cluster.updatedAt = new Date().toISOString();
+    // a story change can invalidate a summary line citing it; flag the
+    // summary so the next pipeline run reconsiders it
+    if (body.action !== "postX" && state.frontSummary?.text) state.frontSummary.stale = true;
     if (snapshot && body.action !== "pin") await takeSnapshot(state);
     await saveState(state);
     return ok(message);
+  }
+
+  if (body.action === "refreshSummary") {
+    const r = await reconsiderFrontSummary(state, cfg);
+    if (r.changed) await takeSnapshot(state);
+    await saveState(state);
+    return ok(r.note);
   }
 
   if (body.action === "testDigestEmail") {

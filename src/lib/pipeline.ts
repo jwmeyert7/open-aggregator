@@ -1,7 +1,7 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
 import { enrichNewItems, fetchAllFeeds, normalizeHost, updateFeedHealth, type FeedFetchResult } from "./feeds";
-import { assessSourceCandidates, classifyAndCluster, dayInReview, heuristicFallback, llmAvailable, type EditorOutput, type SummaryBullet } from "./llm";
+import { assessSourceCandidates, classifyAndCluster, dayInReview, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet } from "./llm";
 import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
@@ -746,6 +746,41 @@ export async function reeditCluster(state: SiteState, cluster: Cluster): Promise
     : `Re-edited: headline is now “${cluster.headline}”.`;
 }
 
+/**
+ * Reconsider the front summary against the page's current stories without a
+ * full editor pass. Admin actions that change a story flag the summary stale
+ * (a line may now claim something its story no longer says); the refresh
+ * prompt reuses still-accurate lines verbatim, so running this never reworks
+ * the box for its own sake.
+ */
+export async function reconsiderFrontSummary(state: SiteState, cfg: SiteConfig): Promise<{ note: string; changed: boolean }> {
+  const summary = state.frontSummary;
+  if (!summary?.text) return { note: "No front summary to reconsider.", changed: false };
+  if (!llmAvailable()) return { note: "LLM not configured. Front summary left unchanged.", changed: false };
+  const lines = parseSummaryLines(summary.text)
+    .filter((l) => l.section)
+    .map((l) => ({ section: l.section!, ref: l.ref ?? undefined, text: l.text }));
+  const weekend = weekendMode(cfg.ranking, new Date(), state.weekendSchedule);
+  const top = weekend ? weekInReview(state, cfg.ranking, new Set()) : topStories(state, cfg.ranking).slice(0, 6);
+  const bullets = await refreshFrontSummary(lines, top, weekend);
+  const resolveRef = (ref: string): string | undefined => {
+    const c = state.clusters[ref];
+    return c && !c.killed && /^[a-z0-9]+$/.test(ref) ? ref : undefined;
+  };
+  const text = joinSummaryLines(bullets, resolveRef);
+  if (!text) {
+    summary.stale = false;
+    return { note: "Front summary reconsidered: editor returned nothing, left unchanged.", changed: false };
+  }
+  const merged = backfillSummarySections(carryForwardSummary(text, summary.text), state, cfg);
+  if (merged === summary.text) {
+    summary.stale = false;
+    return { note: "Front summary reconsidered: still accurate, unchanged.", changed: false };
+  }
+  state.frontSummary = { text: merged, at: new Date().toISOString() };
+  return { note: "Front summary refreshed: a line no longer matched its story.", changed: true };
+}
+
 export async function takeSnapshot(state: SiteState): Promise<string> {
   const cfg = loadSiteConfig();
   const id = snapshotId();
@@ -959,6 +994,28 @@ export async function runPipeline(): Promise<RunReport> {
   }
 
   prune(state);
+
+  // The editor's summary pass only runs when new items arrive, but the box can
+  // go stale on a quiet run too: an admin corrected a story a line cites, or a
+  // cited story died. Reconsider it here; still-accurate lines come back
+  // verbatim, so this never churns the box just because a run happened.
+  if (state.frontSummary?.text) {
+    if (
+      !state.frontSummary.stale &&
+      parseSummaryLines(state.frontSummary.text).some((l) => l.ref && (!state.clusters[l.ref] || state.clusters[l.ref].killed))
+    ) {
+      state.frontSummary.stale = true;
+    }
+    if (state.frontSummary.stale && llmAvailable()) {
+      try {
+        const r = await reconsiderFrontSummary(state, cfg);
+        report.notes.push(r.note);
+        if (r.changed) contentChanged = true;
+      } catch (err) {
+        report.notes.push(`Front summary refresh failed, retrying next run: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+  }
 
   const today = utcDay(new Date().toISOString());
   if ((state.lastDailyDigest ?? "") !== today) {

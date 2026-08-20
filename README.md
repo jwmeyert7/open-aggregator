@@ -55,6 +55,7 @@ cp config/prompts/cluster.example.md config/prompts/cluster.md
 cp config/prompts/add-by-url.example.md config/prompts/add-by-url.md
 cp config/prompts/day-summary.example.md config/prompts/day-summary.md
 cp config/prompts/source-candidate.example.md config/prompts/source-candidate.md
+cp config/prompts/summary-refresh.example.md config/prompts/summary-refresh.md
 ```
 
 - **`site.json`** is the site's identity: name, tagline, topic, domain, contact address, optional social handles.
