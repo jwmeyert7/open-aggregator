@@ -1,7 +1,7 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
-import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet } from "./llm";
+import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
 import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
@@ -807,7 +807,11 @@ export async function rejudgeMedia(
   const filled = await fillVideoDetails(items, timeoutMs, true);
   const paired = pairPodcastsWithVideos(items);
   // episodes shelved before show notes were read get their description now
-  const noNotes = items.filter((m) => m.kind === "video" && !m.links && !m.chapters && !m.notesLinkedAt);
+  // mentions rebuild from scratch under the current matching rules, so a
+  // tightened matcher clears earlier junk
+  for (const c of Object.values(state.clusters)) delete c.mentions;
+  for (const m of items) delete m.notesLinkedAt;
+  const noNotes = items.filter((m) => m.kind === "video" && !m.links && !m.chapters);
   if (noNotes.length > 0) {
     const byId = new Map<string, MediaItem[]>();
     for (const m of noNotes) {
@@ -824,7 +828,7 @@ export async function rejudgeMedia(
       }
     }
   }
-  const mentions = linkEpisodesToStories(state);
+  const mentions = await linkEpisodesToStories(state);
   const gated = items.filter((m) => !m.hidden && (feedById.get(m.sourceId)?.tier ?? 1) !== 1);
   if (gated.length === 0) return { note: `Shelf re-labeled, ${filled} length(s) filled in; no tier 2 episodes to re-judge.` };
   if (!llmAvailable()) return { note: "Shelf re-labeled; LLM not configured, so nothing was re-judged." };
@@ -846,21 +850,24 @@ export async function rejudgeMedia(
 }
 
 /**
- * Show notes tie episodes to stories. For every shelved episode not yet
- * linked: a note link that matches one of a live story's articles attaches
- * the episode to that story as a mention (with the chapter moment when the
- * link sat on a chapter line), and a chapter whose words match a story's
- * headline and keywords does the same. Runs at media ingest and on Re-judge.
- * The link-as-new-coverage half (a note link to a whitelisted source that is
- * not yet a story) rides the Farcaster discovery path in runPipeline.
+ * Show notes tie episodes to stories. Deterministic signals first: a note
+ * link that matches one of a live story's articles, and a chapter naming a
+ * proposal number that exactly one live non-roundup story names. Everything
+ * softer is a meaning call, not a word-overlap call (overlap matched "What
+ * Actually Breaks With More ETH Staked?" to a treasury-purchase story on
+ * "more" and "eth"), so remaining chapters go to the editor model in one
+ * batched call, where "no match" is the normal answer. Runs at media ingest
+ * and on Re-judge; without an LLM only the deterministic signals apply.
  */
-function linkEpisodesToStories(state: SiteState, only?: MediaItem[]): number {
-  const pool = (only ?? state.mediaItems ?? []).filter((m) => !m.hidden && !m.notesLinkedAt && ((m.links?.length ?? 0) > 0 || (m.chapters?.length ?? 0) > 0));
+async function linkEpisodesToStories(state: SiteState, only?: MediaItem[]): Promise<number> {
+  const pool = (only ?? state.mediaItems ?? []).filter(
+    (m) => !m.hidden && !m.notesLinkedAt && ((m.links?.length ?? 0) > 0 || (m.chapters?.length ?? 0) > 0)
+  );
   if (pool.length === 0) return 0;
   const live = liveClusters(state);
   const byUrl = new Map<string, Cluster>();
   for (const c of live) for (const l of c.links) byUrl.set(normalizeUrl(l.url), c);
-  const candidates = live.map((c) => `${c.headline} ${c.keywords.join(" ")}`);
+  const byId = new Map(live.map((c) => [c.id, c]));
   const now = new Date().toISOString();
   let added = 0;
   const mention = (c: Cluster, m: MediaItem, at?: number) => {
@@ -875,20 +882,46 @@ function linkEpisodesToStories(state: SiteState, only?: MediaItem[]): number {
     c.updatedAt = now;
     added += 1;
   };
+  const unresolved: Array<{ id: string; show: string; title: string; chapters: Array<{ at: number; label: string }> }> = [];
   for (const m of pool) {
-    // a chapter line's links carry the chapter's moment
     const linkAt = new Map<string, number>();
     for (const ch of m.chapters ?? []) for (const l of ch.links ?? []) linkAt.set(normalizeUrl(l), ch.at);
     for (const l of m.links ?? []) {
       const c = byUrl.get(normalizeUrl(l));
       if (c) mention(c, m, linkAt.get(normalizeUrl(l)));
     }
+    const soft: Array<{ at: number; label: string }> = [];
     for (const ch of m.chapters ?? []) {
-      if (ch.links && ch.links.some((l) => byUrl.has(normalizeUrl(l)))) continue; // already placed by its link
-      const i = bestMatchIndex(ch.label, candidates, 2);
-      if (i >= 0) mention(live[i], m, ch.at);
+      if (ch.links && ch.links.some((l) => byUrl.has(normalizeUrl(l)))) continue; // placed by its link
+      // a proposal number is an identity: when exactly one live non-roundup
+      // story names it, the chapter is about that story, no judgment needed
+      const ids = proposalIds(ch.label);
+      if (ids.size > 0) {
+        const named = live.filter((c) => c.section !== "general" && [...proposalIds(`${c.headline} ${c.keywords.join(" ")}`)].some((x) => ids.has(x)));
+        if (named.length === 1) {
+          mention(named[0], m, ch.at);
+          continue;
+        }
+      }
+      if (ch.label.length >= 8) soft.push({ at: ch.at, label: ch.label });
     }
+    if (soft.length > 0) unresolved.push({ id: m.id, show: m.sourceName, title: m.displayTitle ?? m.title, chapters: soft.slice(0, 20) });
     m.notesLinkedAt = now;
+  }
+  if (unresolved.length > 0 && llmAvailable()) {
+    try {
+      const stories = live.filter((c) => c.section !== "general").map((c) => ({ id: c.id, headline: c.headline }));
+      const poolById = new Map(pool.map((m) => [m.id, m]));
+      const matches = await matchChaptersToStories(unresolved, stories);
+      for (const match of matches) {
+        const c = byId.get(match.storyId);
+        const m = poolById.get(match.episodeId);
+        if (c && m && c.section !== "general") mention(c, m, match.at);
+      }
+    } catch {
+      // best effort: deterministic mentions stand, the model pass retries never
+      // (chapters are marked linked); Re-judge can always rebuild
+    }
   }
   return added;
 }
@@ -982,7 +1015,7 @@ export async function ingestMedia(
   // podcast episodes with their video twins so they inherit those numbers
   await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
   pairPodcastsWithVideos(state.mediaItems);
-  const mentions = linkEpisodesToStories(state);
+  const mentions = await linkEpisodesToStories(state);
   updateFeedHealth(state, results, new Set(shelved.map((i) => i.sourceId)));
 
   const note =

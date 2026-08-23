@@ -223,6 +223,36 @@ export async function refreshFrontSummary(
   return object.frontSummary as SummaryBullet[];
 }
 
+/**
+ * Which podcast chapters are about which current stories. Word overlap cannot
+ * tell "Why EIP-8363 Is So Contentious" from a roundup that lists EIP-8363,
+ * so this is a judgment call: one small batched call, "no match" the normal
+ * answer, used by the show-notes linker for chapters that carry no URL.
+ */
+export async function matchChaptersToStories(
+  episodes: Array<{ id: string; show: string; title: string; chapters: Array<{ at: number; label: string }> }>,
+  stories: Array<{ id: string; headline: string }>
+): Promise<Array<{ episodeId: string; at: number; storyId: string }>> {
+  if (episodes.length === 0 || stories.length === 0) return [];
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: z.object({
+      matches: z.array(
+        z.object({
+          episodeId: z.string(),
+          at: z.number().describe("the chapter's time in seconds, exactly as given"),
+          storyId: z.string().describe("the id of the ONE story this chapter is about"),
+        })
+      ),
+    }),
+    system: loadPrompt("chapter-match"),
+    prompt: JSON.stringify({ episodes, stories }),
+  });
+  const storyIds = new Set(stories.map((s) => s.id));
+  const episodeIds = new Set(episodes.map((e) => e.id));
+  return object.matches.filter((m) => storyIds.has(m.storyId) && episodeIds.has(m.episodeId));
+}
+
 /** Day-in-review bullets for a frozen daily digest: one small call, best-effort at the call site. */
 export async function dayInReview(date: string, clusters: Cluster[]): Promise<SummaryBullet[]> {
   const sections = navSections();

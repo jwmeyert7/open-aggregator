@@ -59,6 +59,7 @@ cp config/prompts/day-summary.example.md config/prompts/day-summary.md
 cp config/prompts/source-candidate.example.md config/prompts/source-candidate.md
 cp config/prompts/summary-refresh.example.md config/prompts/summary-refresh.md
 cp config/prompts/media-gate.example.md config/prompts/media-gate.md
+cp config/prompts/chapter-match.example.md config/prompts/chapter-match.md
 ```
 
 - **`site.json`** is the site's identity: name, tagline, topic, domain, contact address, optional social handles.
