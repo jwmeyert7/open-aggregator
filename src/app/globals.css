@@ -2146,3 +2146,16 @@ button.status-date {
 .cluster-meta .mention-link {
   color: var(--muted);
 }
+
+/* six tabs on a phone (Top Stories through Podcasts) need a touch less room
+   each, so the row fits without a scroll */
+@media (max-width: 760px) {
+  .main-nav a {
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 0.9rem;
+  }
+  .main-nav a:first-child {
+    margin-left: -8px;
+  }
+}
