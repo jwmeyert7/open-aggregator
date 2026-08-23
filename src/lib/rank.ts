@@ -218,7 +218,8 @@ export function topStories(state: SiteState, cfg: SiteConfig["ranking"], now: Da
 }
 
 export function sectionStories(state: SiteState, section: SectionId, cfg: SiteConfig["ranking"], now: Date = new Date()): Cluster[] {
-  const ranked = rankClusters(liveClusters(state).filter((c) => c.section === section), cfg, now);
+  // a story lists on its section page and on its alsoIn page alike, ranked the same way
+  const ranked = rankClusters(liveClusters(state).filter((c) => c.section === section || c.alsoIn === section), cfg, now);
   return ranked.slice(0, cfg.maxSectionStories);
 }
 

@@ -24,6 +24,7 @@ function serializeCluster(c: Cluster, rank: number, base: string) {
     headline: c.headline,
     explainer: c.explainer,
     section: c.section,
+    ...(c.alsoIn ? { alsoIn: c.alsoIn } : {}),
     ...(c.opinion ? { opinion: true } : {}),
     updatedAt: c.updatedAt,
     permalink: `${base}/story/${c.slug}`,

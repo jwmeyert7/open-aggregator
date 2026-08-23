@@ -411,9 +411,24 @@ async function handle(req: NextRequest) {
         break;
       }
       case "resection":
+        if (body.alsoIn !== undefined) {
+          // the second label: empty clears it; never general, never the primary
+          const also = String(body.alsoIn ?? "");
+          if (!also) {
+            delete cluster.alsoIn;
+            message = "Second label cleared.";
+          } else {
+            if (!cfg.sections.some((s) => s.id === also)) return fail("Unknown section.");
+            if (also === cluster.section) return fail("That is already the story's section.");
+            cluster.alsoIn = also as SectionId;
+            message = `Also listed in ${also}.`;
+          }
+          break;
+        }
         // general is a valid roundup section without a nav entry in cfg.sections
         if (body.section !== "general" && !cfg.sections.some((s) => s.id === body.section)) return fail("Unknown section.");
         cluster.section = body.section as SectionId;
+        if (cluster.alsoIn === cluster.section) delete cluster.alsoIn;
         message = `Moved to ${body.section}.`;
         break;
       case "edit":

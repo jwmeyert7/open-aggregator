@@ -54,6 +54,7 @@ export interface EditorOutput {
     headline: string;
     explainer: string;
     section: string;
+    alsoIn?: string;
     importance: number;
     centrality?: number;
     keywords: string[];
@@ -78,6 +79,11 @@ function editorSchema(navIds: string[], allIds: string[]) {
         headline: z.string(),
         explainer: z.string().describe("one standalone capitalized plain-language sentence on why the story matters"),
         section: enumOf(allIds),
+        alsoIn: enumOf(navIds)
+          .optional()
+          .describe(
+            "RARE: a second section only when the story genuinely belongs to two (judge by the section descriptions in `sections`: a product story whose subject is also a regulatory event, a research result that is also a shipped release). Omit for almost every story; never the same as section; never for general."
+          ),
         importance: z.number().min(1).max(5),
         centrality: z
           .number()

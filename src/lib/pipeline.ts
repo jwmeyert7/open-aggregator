@@ -198,6 +198,7 @@ export function applyEditorOutput(
         headline: stripEmDashes(truncate(c.headline, 140)),
         explainer: cleanExplainer(c.explainer),
         section: c.section,
+        ...(c.alsoIn && c.alsoIn !== c.section ? { alsoIn: c.alsoIn } : {}),
         links: [],
         importance: Math.max(1, Math.min(5, Math.round(c.importance))),
         centrality: Math.max(1, Math.min(5, Math.round(c.centrality ?? 3))),
@@ -236,6 +237,8 @@ export function applyEditorOutput(
       existing.headline = stripEmDashes(truncate(c.headline, 140));
       existing.explainer = cleanExplainer(c.explainer);
       existing.section = c.section;
+      if (c.alsoIn && c.alsoIn !== c.section) existing.alsoIn = c.alsoIn;
+      else delete existing.alsoIn;
       existing.importance = Math.max(1, Math.min(5, Math.round(c.importance)));
       existing.centrality = Math.max(1, Math.min(5, Math.round(c.centrality ?? 3)));
       existing.keywords = c.keywords;
@@ -995,6 +998,8 @@ export async function reeditCluster(state: SiteState, cluster: Cluster): Promise
   cluster.headline = stripEmDashes(truncate(entry.headline, 140));
   cluster.explainer = cleanExplainer(entry.explainer);
   cluster.section = entry.section;
+  if (entry.alsoIn && entry.alsoIn !== entry.section) cluster.alsoIn = entry.alsoIn;
+  else delete cluster.alsoIn;
   cluster.importance = Math.max(1, Math.min(5, Math.round(entry.importance)));
   cluster.centrality = Math.max(1, Math.min(5, Math.round(entry.centrality ?? 3)));
   cluster.keywords = entry.keywords;

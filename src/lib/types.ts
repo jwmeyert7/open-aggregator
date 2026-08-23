@@ -125,6 +125,13 @@ export interface Cluster {
   headline: string;
   explainer: string;
   section: SectionId;
+  /**
+   * An optional second section label. One label is the rule; a second is the
+   * exception the editor has to justify (a product story that is also a
+   * regulatory one). The story lists on both section pages, ranked normally,
+   * and wears both pills. Never "general", never equal to section.
+   */
+  alsoIn?: SectionId;
   links: CoverageLink[];
   importance: number; // 1-5
   /** 1-5: how specifically about the site's topic (5 = core subject, 1 = tangential angle). */

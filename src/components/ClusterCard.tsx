@@ -47,10 +47,18 @@ export function SponsoredCard({ post }: { post?: SponsoredPost }) {
 export function ClusterCard({
   cluster,
   showSection = false,
+  pageSection,
 }: {
   cluster: Cluster;
   showSection?: boolean;
+  /** the section page this card sits on: its own label is implied there, any other label still shows */
+  pageSection?: string;
 }) {
+  // labels are labels, not buckets: a story wears every section it carries,
+  // minus the one the page already stands for
+  const labels = [cluster.section, ...(cluster.alsoIn ? [cluster.alsoIn] : [])].filter(
+    (l) => showSection || l !== pageSection
+  );
   const lead = leadLink(cluster);
   const others = cluster.links.filter((l) => l !== lead);
   // displayed age = when the story BROKE (earliest coverage): a straggling
@@ -93,7 +101,9 @@ export function ClusterCard({
         </p>
       ) : null}
       <div className="cluster-meta">
-        {showSection ? <SectionPill section={cluster.section} /> : null}
+        {labels.map((l) => (
+          <SectionPill key={l} section={l} />
+        ))}
         {cluster.opinion ? (
           <span className="pill opinion" title="An opinion essay, not reporting. Admitted under the site's opinion exception">
             opinion

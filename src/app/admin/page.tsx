@@ -41,6 +41,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       headline: c.headline,
       explainer: c.explainer,
       section: c.section,
+      alsoIn: c.alsoIn,
       slug: c.slug,
       score: Math.round(score(c, cfg.ranking, now) * 100) / 100,
       breakdown: scoreBreakdown(c, cfg.ranking, now),

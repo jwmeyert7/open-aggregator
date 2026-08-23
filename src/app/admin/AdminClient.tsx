@@ -13,6 +13,7 @@ export interface AdminData {
     headline: string;
     explainer: string;
     section: string;
+    alsoIn?: string;
     slug: string;
     score: number;
     breakdown: ScoreBreakdown;
@@ -418,6 +419,23 @@ export function AdminClient({
                   {s}
                 </option>
               ))}
+            </select>
+            <select
+              className="select"
+              style={{ width: "auto" }}
+              value={c.alsoIn ?? ""}
+              disabled={busy}
+              title="A second section label, for the rare story that belongs to two"
+              onChange={(e) => act("resection", { clusterId: c.id, alsoIn: e.target.value })}
+            >
+              <option value="">also in…</option>
+              {data.sections
+                .filter((s) => s !== c.section)
+                .map((s) => (
+                  <option key={s} value={s}>
+                    also in {s}
+                  </option>
+                ))}
             </select>
             <select
               className="select"

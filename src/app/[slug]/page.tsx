@@ -100,7 +100,7 @@ export default async function SlugPage({
             );
           }
           return stories.flatMap((c, i) => {
-            const card = <ClusterCard key={c.id} cluster={c} />;
+            const card = <ClusterCard key={c.id} cluster={c} pageSection={section.id} />;
             if (ad && i === Math.min(2, stories.length - 1)) {
               return [<SponsoredCard key="sponsored" post={ad} />, card];
             }
