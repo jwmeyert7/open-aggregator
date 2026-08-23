@@ -25,7 +25,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const state = await loadState();
   const cfg = loadSiteConfig();
   const now = new Date();
-  const ranked = rankClusters(liveClusters(state), cfg.ranking, now).slice(0, 40);
+  // every live story ships to the admin: the client shows a short list until
+  // the filter box is used, and a merge or filter must be able to reach a
+  // story however old and low it ranks
+  const ranked = rankClusters(liveClusters(state), cfg.ranking, now);
   const topIds = topStories(state, cfg.ranking, now).map((c) => c.id);
   const sectionRanks = new Map<string, number>();
   for (const s of cfg.sections) {
