@@ -2002,12 +2002,17 @@ button.status-date {
 }
 /* Expanded player: the same element, now a centered overlay on the current
    page. Clicking the backdrop, Escape, or "shrink" puts it back inline. */
-.media-player.expanded {
+.media-player.expanded,
+.stream-episode .media-player.expanded,
+.newest-episode .media-player.expanded,
+.media-rail .media-player.expanded,
+.media-list .media-player.expanded {
   position: fixed;
   inset: 0;
   z-index: 1000;
   margin: 0;
   max-width: none;
+  width: auto;
   background: rgba(0, 0, 0, 0.78);
   display: flex;
   align-items: center;
@@ -2117,7 +2122,7 @@ button.status-date {
   border-radius: 4px;
   display: block;
 }
-.stream-episode .media-player.compact {
+.stream-episode .media-player.compact:not(.expanded) {
   max-width: 640px;
 }
 
