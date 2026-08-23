@@ -1,7 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { loadSiteConfig, navSections, siteUrl } from "@/lib/config";
-import { adaptiveRanking, byPublished, itemDisplayTitle, leadLink, liveClusters, rankClusters, rankMedia, sectionStories, topStories, weekInReview } from "@/lib/rank";
+import { adaptiveRanking, byPublished, episodeStories, itemDisplayTitle, leadLink, liveClusters, rankClusters, rankMedia, sectionStories, topStories, weekInReview } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadDailyDigest, loadState } from "@/lib/state";
 import type { Cluster } from "@/lib/types";
@@ -176,6 +176,7 @@ const handler = createMcpHandler(
         }
         const state = await loadState();
         const base = siteUrl();
+        const covered = episodeStories(state);
         const pool = (state.mediaItems ?? []).filter((m) => !m.hidden && (!section || m.section === section));
         return asText({
           site: base,
@@ -195,6 +196,12 @@ const handler = createMcpHandler(
               ...(m.durationSec ? { durationSec: m.durationSec } : {}),
               ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
               ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
+              ...((): object => {
+                const c = covered.get(m.id) ?? [];
+                return c.length > 0
+                  ? { covers: c.slice(0, 8).map((x) => ({ headline: x.headline, storyPermalink: `${base}/story/${x.slug}`, ...(x.at !== undefined ? { at: x.at } : {}) })) }
+                  : {};
+              })(),
               playOnSite: `${base}/podcasts?play=${m.id}`,
             })),
         });

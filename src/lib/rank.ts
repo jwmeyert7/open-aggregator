@@ -355,3 +355,21 @@ export function rankMedia(items: MediaItem[], state: SiteState, cfg: SiteConfig[
     .map((c) => mediaTokens(`${c.headline} ${c.keywords?.join(" ") ?? ""}`));
   return [...items].sort((a, b) => mediaScore(b, topTokens, now) - mediaScore(a, topTokens, now));
 }
+
+/**
+ * The reverse of a story's mentions: for each episode, the live stories its
+ * show notes point at, with the moment when known, chapter order first.
+ * Feeds the "in this episode" list under a row on /podcasts.
+ */
+export function episodeStories(state: SiteState): Map<string, Array<{ id: string; slug: string; headline: string; at?: number }>> {
+  const out = new Map<string, Array<{ id: string; slug: string; headline: string; at?: number }>>();
+  for (const c of liveClusters(state)) {
+    for (const m of c.mentions ?? []) {
+      const list = out.get(m.mediaId) ?? [];
+      list.push({ id: c.id, slug: c.slug, headline: c.headline, ...(m.at !== undefined ? { at: m.at } : {}) });
+      out.set(m.mediaId, list);
+    }
+  }
+  for (const list of out.values()) list.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
+  return out;
+}

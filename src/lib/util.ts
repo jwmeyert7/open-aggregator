@@ -267,3 +267,11 @@ export function formatDuration(sec?: number): string | null {
   if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
   return `${Math.max(1, m)}m`;
 }
+
+/** "12:34" or "1:02:33" for a moment inside an episode. */
+export function formatMoment(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}

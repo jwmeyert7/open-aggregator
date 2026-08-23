@@ -3,10 +3,10 @@ import { AgeStamp } from "@/components/AgeStamp";
 import { SectionPill } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { loadSiteConfig } from "@/lib/config";
-import { adaptiveRanking, rankMedia } from "@/lib/rank";
+import { adaptiveRanking, episodeStories, rankMedia } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
-import { formatDuration } from "@/lib/util";
+import { formatDuration, formatMoment } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,7 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
   const state = await loadState();
   const site = siteIdentity();
   const items = (state.mediaItems ?? []).filter((m) => !m.hidden).slice(0, 100);
+  const covered = episodeStories(state);
   const cfg = loadSiteConfig();
   const weekAgo = Date.now() - 7 * 24 * 60 * 60000;
   const top = rankMedia(
@@ -83,6 +84,20 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                     {formatDuration(m.durationSec) ? <> · {formatDuration(m.durationSec)}</> : null} ·{" "}
                     <AgeStamp iso={m.publishedAt} />
                   </div>
+                  {(covered.get(m.id) ?? []).length > 0 ? (
+                    <ul className="episode-stories">
+                      {(covered.get(m.id) ?? []).slice(0, 6).map((c) => (
+                        <li key={c.id}>
+                          {c.at !== undefined ? (
+                            <Link href={`/podcasts?play=${m.id}&t=${c.at}#m-${m.id}`} className="moment" title="Play the episode here, from this moment">
+                              {formatMoment(c.at)}
+                            </Link>
+                          ) : null}{" "}
+                          <Link href={`/story/${c.slug}`}>{c.headline}</Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               </MediaPlayer>
             </li>

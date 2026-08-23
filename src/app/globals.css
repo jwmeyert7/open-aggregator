@@ -2159,3 +2159,19 @@ button.status-date {
     margin-left: -7px;
   }
 }
+
+/* "in this episode": the stories an episode's show notes point at, chapter
+   order first; the moment plays the episode here, the headline opens the story */
+.episode-stories {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 0.88rem;
+}
+.episode-stories li {
+  margin: 3px 0;
+}
+.episode-stories .moment {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
