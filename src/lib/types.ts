@@ -200,6 +200,8 @@ export interface MediaItem {
    */
   links?: string[];
   chapters?: Array<{ at: number; label: string; links?: string[] }>;
+  /** a scheduled premiere or live stream that has not aired; never shelved, evicted on re-judge */
+  upcoming?: boolean;
   /** set once the show notes have been matched against stories */
   notesLinkedAt?: string;
   /** set once the show-note links have been routed as possible coverage */

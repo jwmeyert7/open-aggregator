@@ -670,7 +670,7 @@ export const MAX_MEDIA_ITEMS = 200;
  * Best effort: an episode without a length just shows none.
  */
 async function fillVideoDetails(
-  items: Array<{ url: string; kind: string; durationSec?: number; views?: number; likes?: number; statsAt?: string; publishedAt: string }>,
+  items: Array<{ url: string; kind: string; durationSec?: number; views?: number; likes?: number; statsAt?: string; publishedAt: string; upcoming?: boolean }>,
   timeoutMs: number,
   refreshStats = false
 ): Promise<number> {
@@ -701,6 +701,13 @@ async function fillVideoDetails(
         i.views = d.views;
         if (d.likes !== undefined) i.likes = d.likes;
         i.statsAt = at;
+      }
+      // a scheduled premiere is not an episode yet; one that aired gets its
+      // honest publish time (the air time, not the listing's creation time)
+      if (d.upcoming) i.upcoming = true;
+      else {
+        i.upcoming = undefined;
+        if (d.airedAt) i.publishedAt = d.airedAt;
       }
     }
   }
@@ -805,13 +812,24 @@ export async function rejudgeMedia(
   }
   // hidden ones too: a hidden video may be the twin of a podcast episode, and pairing needs both lengths
   const filled = await fillVideoDetails(items, timeoutMs, true);
-  const paired = pairPodcastsWithVideos(items);
+  // scheduled premieres that slipped onto the shelf leave it and are
+  // forgotten, so they come back on their own once they air
+  const upcoming = items.filter((m) => m.upcoming);
+  if (upcoming.length > 0) {
+    state.mediaItems = items.filter((m) => !m.upcoming);
+    for (const m of upcoming) {
+      delete state.seen[dedupeKeyUrl(m.url)];
+      delete state.seen[dedupeKeyContent(m.title, m.sourceId)];
+    }
+  }
+  const kept2 = state.mediaItems ?? [];
+  const paired = pairPodcastsWithVideos(kept2);
   // episodes shelved before show notes were read get their description now
   // mentions rebuild from scratch under the current matching rules, so a
   // tightened matcher clears earlier junk
   for (const c of Object.values(state.clusters)) delete c.mentions;
-  for (const m of items) delete m.notesLinkedAt;
-  const noNotes = items.filter((m) => m.kind === "video" && !m.links && !m.chapters);
+  for (const m of kept2) delete m.notesLinkedAt;
+  const noNotes = kept2.filter((m) => m.kind === "video" && !m.links && !m.chapters);
   if (noNotes.length > 0) {
     const byId = new Map<string, MediaItem[]>();
     for (const m of noNotes) {
@@ -829,7 +847,7 @@ export async function rejudgeMedia(
     }
   }
   const mentions = await linkEpisodesToStories(state);
-  const gated = items.filter((m) => !m.hidden && (feedById.get(m.sourceId)?.tier ?? 1) !== 1);
+  const gated = kept2.filter((m) => !m.hidden && (feedById.get(m.sourceId)?.tier ?? 1) !== 1);
   if (gated.length === 0) return { note: `Shelf re-labeled, ${filled} length(s) filled in; no tier 2 episodes to re-judge.` };
   if (!llmAvailable()) return { note: "Shelf re-labeled; LLM not configured, so nothing was re-judged." };
   let hidden = 0;
@@ -846,7 +864,7 @@ export async function rejudgeMedia(
       } else if (v.section) m.section = v.section;
     }
   }
-  return { note: `Re-judged ${gated.length} tier 2 episode(s): ${hidden} hidden, the rest kept and labeled. ${filled} length(s) filled in.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}${paired > 0 ? ` ${paired} podcast episode(s) paired with their video.` : ""}${mentions > 0 ? ` ${mentions} story mention(s) from show notes.` : ""}` };
+  return { note: `Re-judged ${gated.length} tier 2 episode(s): ${hidden} hidden, the rest kept and labeled. ${filled} length(s) filled in.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}${paired > 0 ? ` ${paired} podcast episode(s) paired with their video.` : ""}${upcoming.length > 0 ? ` ${upcoming.length} scheduled premiere(s) removed until they air.` : ""}${mentions > 0 ? ` ${mentions} story mention(s) from show notes.` : ""}` };
 }
 
 /**
@@ -983,10 +1001,16 @@ export async function ingestMedia(
     }
   }
 
-  for (const item of judged) markSeen(state, item);
   await fillVideoDetails(kept, cfg.ingest.feedTimeoutMs);
+  // a scheduled premiere stays unseen, so it arrives on its own once it airs,
+  // with its publish time set to the air time by the details fill
+  const ready = kept.filter((i) => !i.upcoming);
+  const scheduled = kept.length - ready.length;
+  for (const item of judged) {
+    if (!(item as MediaCandidate).upcoming) markSeen(state, item);
+  }
   const now = new Date().toISOString();
-  const shelved: MediaItem[] = kept.map((i) => ({
+  const shelved: MediaItem[] = ready.map((i) => ({
     id: i.id,
     kind: i.kind,
     url: i.url,
@@ -1019,8 +1043,8 @@ export async function ingestMedia(
   updateFeedHealth(state, results, new Set(shelved.map((i) => i.sourceId)));
 
   const note =
-    fresh.length > 0 || held > 0 || mentions > 0
-      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}${mentions > 0 ? `, ${mentions} story mention(s) from show notes` : ""}.`
+    fresh.length > 0 || held > 0 || mentions > 0 || scheduled > 0
+      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}${mentions > 0 ? `, ${mentions} story mention(s) from show notes` : ""}${scheduled > 0 ? `, ${scheduled} scheduled premiere(s) waiting to air` : ""}.`
       : undefined;
   return { errors, note };
 }

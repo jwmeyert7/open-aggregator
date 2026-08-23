@@ -24,6 +24,8 @@ export interface MediaCandidate extends CandidateItem {
   durationSec?: number;
   /** podcast episodes: the enclosure audio url. */
   audioUrl?: string;
+  /** a scheduled premiere or live stream that has not aired */
+  upcoming?: boolean;
   /** show notes read from the full description */
   descriptionLinks?: string[];
   chapters?: Array<{ at: number; label: string; links?: string[] }>;
@@ -625,6 +627,10 @@ export interface YoutubeDetails {
   likes?: number;
   /** the full description, when asked for (the feed's copy is kept only in part) */
   description?: string;
+  /** a scheduled premiere or live stream that has not aired: not an episode yet */
+  upcoming?: boolean;
+  /** when a live stream or premiere actually happened, which is its honest publish time */
+  airedAt?: string;
 }
 
 export async function fetchYoutubeDetails(
@@ -641,7 +647,9 @@ export async function fetchYoutubeDetails(
     for (let i = 0; i < unique.length; i += 50) {
       const chunk = unique.slice(i, i + 50);
       try {
-        const parts = withDescription ? "contentDetails,statistics,snippet" : "contentDetails,statistics";
+        const parts = withDescription
+          ? "contentDetails,statistics,snippet,liveStreamingDetails"
+          : "contentDetails,statistics,liveStreamingDetails";
         const url = `https://www.googleapis.com/youtube/v3/videos?part=${parts}&id=${chunk.join(",")}&key=${key}`;
         const json = JSON.parse(await fetchText(url, timeoutMs)) as {
           items?: Array<{
@@ -649,6 +657,7 @@ export async function fetchYoutubeDetails(
             contentDetails?: { duration?: string };
             statistics?: { viewCount?: string; likeCount?: string };
             snippet?: { description?: string };
+            liveStreamingDetails?: { scheduledStartTime?: string; actualStartTime?: string; actualEndTime?: string };
           }>;
         };
         for (const v of json.items ?? []) {
@@ -660,6 +669,13 @@ export async function fetchYoutubeDetails(
             ...(Number.isFinite(views) ? { views } : {}),
             ...(Number.isFinite(likes) ? { likes } : {}),
             ...(withDescription && v.snippet?.description ? { description: v.snippet.description } : {}),
+            ...((): Partial<YoutubeDetails> => {
+              const live = v.liveStreamingDetails;
+              if (!live) return {};
+              if (!live.actualStartTime && live.scheduledStartTime) return { upcoming: true };
+              const airedAt = live.actualEndTime ?? live.actualStartTime;
+              return airedAt ? { airedAt } : {};
+            })(),
           });
         }
       } catch {
