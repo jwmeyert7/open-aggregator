@@ -29,6 +29,7 @@ export interface FeedConfig {
    */
   includePattern?: string;
   /** media feeds only: a regex rewrite applied to every title from this feed at ingest (a show that shouts "ROUNDUP:" reads "Roundup:"). */
+  /** the replacement may use {date} for the episode's publish date ("Aug 21"), so a recurring segment can be dated in its title. */
   titleRewrite?: { pattern: string; replacement: string };
   /** media feeds only: episodes whose title matches skip the media gate and shelve with the feed's sectionHint (a recurring show segment that always belongs, like a weekly roundup). */
   alwaysPattern?: string;

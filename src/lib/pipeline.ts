@@ -731,10 +731,19 @@ function pairPodcastsWithVideos(items: MediaItem[]): number {
 }
 
 /** A feed's titleRewrite, when it has one: one regex pass over the show's own title. */
-function rewriteTitle(feed: { titleRewrite?: { pattern: string; replacement: string } } | undefined, title: string): string {
+function rewriteTitle(
+  feed: { titleRewrite?: { pattern: string; replacement: string } } | undefined,
+  title: string,
+  publishedAt?: string
+): string {
   if (!feed?.titleRewrite) return title;
   try {
-    return title.replace(new RegExp(feed.titleRewrite.pattern, "i"), feed.titleRewrite.replacement);
+    // the replacement may carry {date}, filled with the episode's publish
+    // date as "Aug 21", so a recurring segment can be dated in its title
+    const date = publishedAt
+      ? new Date(publishedAt).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })
+      : "";
+    return title.replace(new RegExp(feed.titleRewrite.pattern, "i"), feed.titleRewrite.replacement.replace(/\{date\}/g, date));
   } catch {
     return title;
   }
@@ -742,7 +751,10 @@ function rewriteTitle(feed: { titleRewrite?: { pattern: string; replacement: str
 
 /** Feed titles arrive with stray trailing separators ("Conference 2026 Recap Video |"); drop them. */
 function cleanMediaTitle(title: string): string {
-  return title.replace(/[\s|:\-\u2013\u2014\u00b7]+$/u, "").trim();
+  return title
+    .replace(/[\s|:\-\u2013\u2014\u00b7]+$/u, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /**
@@ -762,7 +774,7 @@ export async function rejudgeMedia(
   const feedById = new Map(mediaFeeds.map((f) => [f.id, f]));
   let clips = 0;
   for (const m of items) {
-    m.title = cleanMediaTitle(rewriteTitle(feedById.get(m.sourceId), m.title));
+    m.title = cleanMediaTitle(rewriteTitle(feedById.get(m.sourceId), m.title, m.publishedAt));
     const hint = feedById.get(m.sourceId)?.sectionHint;
     if (!m.section && hint) m.section = hint;
     const tier = feedById.get(m.sourceId)?.tier;
@@ -860,7 +872,7 @@ export async function ingestMedia(
     id: i.id,
     kind: i.kind,
     url: i.url,
-    title: cleanMediaTitle(rewriteTitle(feedById.get(i.sourceId), i.title)),
+    title: cleanMediaTitle(rewriteTitle(feedById.get(i.sourceId), i.title, i.publishedAt)),
     tier: i.tier,
     // a label, not a bucket: tier 1 shows carry the feed's hint, tier 2
     // episodes get the gate's call, and the episode also shows in that
