@@ -1045,6 +1045,11 @@ export async function ingestMedia(
   // keep view counts fresh for young episodes so the ranked boxes track what
   // people are actually watching (one API call per fifty videos), then pair
   // podcast episodes with their video twins so they inherit those numbers
+  for (const m of state.mediaItems) {
+    const ts = feedById.get(m.sourceId)?.thumbStyle;
+    if (ts && ts !== "episode") m.thumbStyle = ts;
+    else delete m.thumbStyle;
+  }
   await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
   pairPodcastsWithVideos(state.mediaItems);
   const mentions = await linkEpisodesToStories(state);

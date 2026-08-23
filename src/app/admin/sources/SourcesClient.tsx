@@ -218,7 +218,9 @@ export function SourcesClient({ chrome, data }: { chrome: AdminChromeData; data:
                           title="What the episode tile shows: the episode's own art, a plain frame from the video, or a flat tile with the show's name"
                         >
                           <option value="episode">episode art</option>
-                          <option value="frame">video frame</option>
+                          <option value="frame">video frame (early)</option>
+                          <option value="frame2">video frame (middle)</option>
+                          <option value="frame3">video frame (late)</option>
                           <option value="show">show tile</option>
                         </select>
                       ) : null}

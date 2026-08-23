@@ -33,8 +33,8 @@ export interface FeedConfig {
   titleRewrite?: { pattern: string; replacement: string };
   /** media feeds only: episodes whose title matches skip the media gate and shelve with the feed's sectionHint (a recurring show segment that always belongs, like a weekly roundup). */
   alwaysPattern?: string;
-  /** media feeds only: what an episode row's tile shows. "episode" (the default) uses the episode's own art, "frame" swaps in a plain frame from the video (YouTube's hq1.jpg) for shows whose designed cards are unbearable, "show" drops the image for a flat tile carrying the show's name. */
-  thumbStyle?: "episode" | "frame" | "show";
+  /** media feeds only: what an episode row's tile shows. "episode" (the default) uses the episode's own art; "frame", "frame2", and "frame3" swap in a plain frame from the video itself (YouTube's hq1/hq2/hq3.jpg, roughly the quarter points) for shows whose designed cards are unbearable; "show" drops the image for a flat tile carrying the show's name. Applied to shelved episodes on every pipeline run. */
+  thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show";
   /** listing type only: regex an href must match to count as a post link. */
   linkPattern?: string;
   /** Admin-facing grouping only; never shown on the public site. */
@@ -190,8 +190,8 @@ export interface MediaItem {
   publishedAt: string;
   ingestedAt: string;
   thumbnail?: string;
-  /** copied from the feed's thumbStyle at ingest and on re-judge; absent means the episode's own art */
-  thumbStyle?: "frame" | "show";
+  /** copied from the feed's thumbStyle on every pipeline run and on re-judge; absent means the episode's own art */
+  thumbStyle?: "frame" | "frame2" | "frame3" | "show";
   durationSec?: number;
   /** podcast episodes only: the enclosure audio, so the page can play it natively. */
   audioUrl?: string;
@@ -331,7 +331,7 @@ export interface SiteState {
     custom: FeedConfig[];
     disabled: string[];
     /** Per-source overrides of tier/weight/category, applied over the config file. */
-    edits?: Record<string, { tier?: 1 | 2; weight?: number; category?: string; thumbStyle?: "episode" | "frame" | "show" }>;
+    edits?: Record<string, { tier?: 1 | 2; weight?: number; category?: string; thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show" }>;
   };
   /** Admin-managed Polymarket market changes layered over config/sections.json. */
   marketOverrides?: {
