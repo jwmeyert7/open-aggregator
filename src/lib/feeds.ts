@@ -771,7 +771,17 @@ export function updateFeedHealth(state: SiteState, results: FeedFetchResult[], n
   }
 }
 
-/** Feeds that are erroring or have gone silent for cfg.feedSilentDays+, feed rot made visible. */
+/**
+ * Days without a new item before a feed counts as silent. Software release
+ * feeds ship every few weeks by nature, so a month of quiet is normal there
+ * and only a hard error is worth a look.
+ */
+function silentDays(feed: FeedConfig, cfg: SiteConfig["ingest"]): number {
+  const releases = /\/releases\.atom$/.test(feed.url) || /\breleases$/i.test(feed.name);
+  return releases ? Math.max(cfg.feedSilentDays, 45) : cfg.feedSilentDays;
+}
+
+/** Feeds that are erroring or have gone silent for their silent threshold: feed rot made visible. */
 export function unhealthyFeeds(state: SiteState, feeds: FeedConfig[], cfg: SiteConfig["ingest"]): Array<{ feed: FeedConfig; reason: string }> {
   const out: Array<{ feed: FeedConfig; reason: string }> = [];
   for (const feed of feeds) {
@@ -782,9 +792,9 @@ export function unhealthyFeeds(state: SiteState, feeds: FeedConfig[], cfg: SiteC
     } else if (feed.type === "gnews" || feed.type === "farcaster") {
       // query and discovery feeds are quiet by design: a stretch with nothing
       // new is normal, not rot, so only hard errors above count against them
-    } else if (h.lastNewItemAt && hoursAgo(h.lastNewItemAt) > cfg.feedSilentDays * 24) {
+    } else if (h.lastNewItemAt && hoursAgo(h.lastNewItemAt) > silentDays(feed, cfg) * 24) {
       out.push({ feed, reason: `no new items for ${Math.floor(hoursAgo(h.lastNewItemAt) / 24)} days` });
-    } else if (!h.lastNewItemAt && h.lastSuccessAt && hoursAgo(h.lastSuccessAt) > cfg.feedSilentDays * 24) {
+    } else if (!h.lastNewItemAt && h.lastSuccessAt && hoursAgo(h.lastSuccessAt) > silentDays(feed, cfg) * 24) {
       out.push({ feed, reason: "reachable but has never produced an item" });
     }
   }

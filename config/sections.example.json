@@ -22,12 +22,13 @@
     "weekendUntilMondayHourUtc": 12
   },
   "ingest": {
-    "$comment": "maxItemAgeHours drops anything older at fetch time so history never backfills. riverRetentionDays/maxRiverItems bound the raw item stream kept in state. seenHashRetentionDays is how long a URL stays deduped. feedSilentDays is when a quiet feed is flagged as unhealthy. digestClusterDays/digestMaxClusters bound how many active clusters each LLM call sees.",
+    "$comment": "maxItemAgeHours drops anything older at fetch time so history never backfills. riverRetentionDays/maxRiverItems bound the raw item stream kept in state. seenHashRetentionDays is how long a URL stays deduped. feedSilentDays is when a quiet feed is flagged as unhealthy (software release feeds, whose url ends in /releases.atom or whose name ends in 'releases', get at least 45 days, since releases ship every few weeks by nature). maxEditorBatch caps how many new items one editor call handles, oldest first, because headline quality drops with batch size; the rest stay unseen and the next run picks them up. digestClusterDays/digestMaxClusters bound how many active clusters each LLM call sees.",
     "maxItemAgeHours": 48,
     "riverRetentionDays": 30,
     "maxRiverItems": 2000,
     "seenHashRetentionDays": 60,
     "feedSilentDays": 7,
+    "maxEditorBatch": 30,
     "feedTimeoutMs": 15000,
     "digestClusterDays": 7,
     "digestMaxClusters": 120

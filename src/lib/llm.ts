@@ -158,10 +158,14 @@ export async function classifyAndCluster(
         content: loadPrompt(prompt),
         // The rulebook is byte-identical every run. Caching it means cron
         // runs that land inside the cache window read it at a tenth of the
-        // input price instead of re-paying full freight. The per-run payload
-        // below stays uncached. Harmless when the prompt is below the
-        // model's cacheable minimum: it simply does not cache.
-        providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+        // input price instead of re-paying full freight. The editor only runs
+        // when new items arrive, which can be well over five minutes apart,
+        // so the one hour TTL keeps the cache warm between calls (the five
+        // minute default was expiring between runs and losing money on
+        // writes). The per-run payload below stays uncached. Harmless when
+        // the prompt is below the model's cacheable minimum: it simply does
+        // not cache.
+        providerOptions: { anthropic: { cacheControl: { type: "ephemeral", ttl: "1h" } } },
       },
       {
         role: "user",

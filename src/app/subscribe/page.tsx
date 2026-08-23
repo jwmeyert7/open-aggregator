@@ -24,6 +24,10 @@ export default async function SubscribePage({
           daily archive. The weekly edition arrives Saturday morning with the biggest stories of the week just ended,
           ready to read over the weekend.
         </p>
+        <p>
+          See what you would get before you sign up: a <a href="/subscribe/sample/daily">sample daily edition</a> and
+          a <a href="/subscribe/sample/weekly">sample weekly edition</a>, each the most recent one sent.
+        </p>
         <SubscribeForm />
         <p>
           One email per edition, an unsubscribe link in every footer, and your address is never shared or used for

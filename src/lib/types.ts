@@ -78,6 +78,8 @@ export interface SiteConfig {
     maxRiverItems: number;
     seenHashRetentionDays: number;
     feedSilentDays: number;
+    /** Most new items handed to one editor call; the rest wait for the next run (unseen, so nothing is lost). */
+    maxEditorBatch?: number;
     feedTimeoutMs: number;
     digestClusterDays: number;
     digestMaxClusters: number;

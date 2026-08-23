@@ -1165,6 +1165,19 @@ export async function runPipeline(): Promise<RunReport> {
     newItems = newItems.filter((i) => !firstCrawlListings.has(i.sourceId));
   }
 
+  // One editor call handles a bounded batch. Normal runs see a handful of
+  // items; a backlog after an outage can be dozens, and headline quality
+  // drops with batch size (a newsletter issue once inherited the previous
+  // issue's framing in a forty item call). Oldest first so nothing ages past
+  // the ingest cutoff while it waits. Items left out stay unseen, so the next
+  // run simply picks them up.
+  const batchCap = cfg.ingest.maxEditorBatch ?? 30;
+  if (newItems.length > batchCap) {
+    const deferred = newItems.length - batchCap;
+    newItems = [...newItems].sort((a, b) => a.publishedAt.localeCompare(b.publishedAt)).slice(0, batchCap);
+    report.notes.push(`Editor batch capped at ${batchCap}; ${deferred} newer item(s) wait for the next run.`);
+  }
+
   let rejectedSamples: Array<{ title: string; source: string; reason: string }> = [];
   report.newItems = newItems.length;
   updateFeedHealth(state, results, new Set(newItems.map((i) => i.sourceId)));
