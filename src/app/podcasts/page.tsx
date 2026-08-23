@@ -13,8 +13,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Podcasts" };
 
 /** House style for this copy: no em dashes, no semicolons. */
-export default async function PodcastsPage({ searchParams }: { searchParams: Promise<{ play?: string }> }) {
-  const { play } = await searchParams;
+export default async function PodcastsPage({ searchParams }: { searchParams: Promise<{ play?: string; t?: string }> }) {
+  const { play, t } = await searchParams;
+  const startAt = t && /^\d+$/.test(t) ? Number(t) : undefined;
   const state = await loadState();
   const site = siteIdentity();
   const items = (state.mediaItems ?? []).filter((m) => !m.hidden).slice(0, 100);
@@ -63,6 +64,7 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 autoOpen={play === m.id}
+                startAt={play === m.id ? startAt : undefined}
               >
                 <div className="media-body">
                   {/* the show reads first, on its own line, like the story cards */}

@@ -1,6 +1,6 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
-import { enrichNewItems, fetchAllFeeds, fetchMediaFeeds, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type FeedFetchResult, type MediaCandidate } from "./feeds";
+import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet } from "./llm";
 import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
@@ -11,7 +11,7 @@ import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from
 import { loadState, saveDailyDigest, saveSnapshot, saveState } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, SiteState } from "./types";
-import { hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, truncate, utcDay } from "./util";
+import { bestMatchIndex, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, truncate, utcDay } from "./util";
 
 /** Gate counters are kept a little longer than the leaderboard's 30 day window. */
 export const SOURCE_STATS_RETENTION_DAYS = 35;
@@ -520,9 +520,11 @@ export function knownSourceHosts(state: SiteState): Map<string, { sourceId: stri
 function routeCastLinks(
   state: SiteState,
   results: FeedFetchResult[],
-  cfg: SiteConfig
+  cfg: SiteConfig,
+  /** show-note links from shelved episodes: routed to known sources only, never to the candidate list */
+  episodeLinks: Array<CastLink & { mediaId: string }> = []
 ): { items: CandidateItem[]; links: number; newHosts: string[] } {
-  const links = results.flatMap((r) => r.castLinks ?? []);
+  const links: Array<CastLink & { mediaId?: string }> = [...results.flatMap((r) => r.castLinks ?? []), ...episodeLinks];
   const newHosts: string[] = [];
   if (links.length === 0) return { items: [], links: 0, newHosts };
 
@@ -550,10 +552,13 @@ function routeCastLinks(
         tier: feed.tier,
         weight: feed.weight,
         sectionHint: feed.sectionHint,
-        viaFarcaster: true,
+        ...(link.mediaId ? { viaEpisode: link.mediaId } : { viaFarcaster: true }),
       });
       continue;
     }
+    // show notes link to sponsors and shops as a matter of course: an unknown
+    // host from an episode is not a source candidate
+    if (link.mediaId) continue;
     if (!candidates[link.host]) newHosts.push(link.host);
     const entry = (candidates[link.host] ??= {
       host: link.host,
@@ -801,6 +806,25 @@ export async function rejudgeMedia(
   // hidden ones too: a hidden video may be the twin of a podcast episode, and pairing needs both lengths
   const filled = await fillVideoDetails(items, timeoutMs, true);
   const paired = pairPodcastsWithVideos(items);
+  // episodes shelved before show notes were read get their description now
+  const noNotes = items.filter((m) => m.kind === "video" && !m.links && !m.chapters && !m.notesLinkedAt);
+  if (noNotes.length > 0) {
+    const byId = new Map<string, MediaItem[]>();
+    for (const m of noNotes) {
+      const id = youtubeVideoId(m.url);
+      if (id) byId.set(id, [...(byId.get(id) ?? []), m]);
+    }
+    const found = await fetchYoutubeDetails([...byId.keys()], timeoutMs, 0, true);
+    for (const [id, d] of found) {
+      for (const m of byId.get(id) ?? []) {
+        const links = extractDescriptionLinks(d.description);
+        const chapters = extractChapters(d.description);
+        if (links.length > 0) m.links = links;
+        if (chapters.length > 0) m.chapters = chapters;
+      }
+    }
+  }
+  const mentions = linkEpisodesToStories(state);
   const gated = items.filter((m) => !m.hidden && (feedById.get(m.sourceId)?.tier ?? 1) !== 1);
   if (gated.length === 0) return { note: `Shelf re-labeled, ${filled} length(s) filled in; no tier 2 episodes to re-judge.` };
   if (!llmAvailable()) return { note: "Shelf re-labeled; LLM not configured, so nothing was re-judged." };
@@ -818,7 +842,55 @@ export async function rejudgeMedia(
       } else if (v.section) m.section = v.section;
     }
   }
-  return { note: `Re-judged ${gated.length} tier 2 episode(s): ${hidden} hidden, the rest kept and labeled. ${filled} length(s) filled in.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}${paired > 0 ? ` ${paired} podcast episode(s) paired with their video.` : ""}` };
+  return { note: `Re-judged ${gated.length} tier 2 episode(s): ${hidden} hidden, the rest kept and labeled. ${filled} length(s) filled in.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}${paired > 0 ? ` ${paired} podcast episode(s) paired with their video.` : ""}${mentions > 0 ? ` ${mentions} story mention(s) from show notes.` : ""}` };
+}
+
+/**
+ * Show notes tie episodes to stories. For every shelved episode not yet
+ * linked: a note link that matches one of a live story's articles attaches
+ * the episode to that story as a mention (with the chapter moment when the
+ * link sat on a chapter line), and a chapter whose words match a story's
+ * headline and keywords does the same. Runs at media ingest and on Re-judge.
+ * The link-as-new-coverage half (a note link to a whitelisted source that is
+ * not yet a story) rides the Farcaster discovery path in runPipeline.
+ */
+function linkEpisodesToStories(state: SiteState, only?: MediaItem[]): number {
+  const pool = (only ?? state.mediaItems ?? []).filter((m) => !m.hidden && !m.notesLinkedAt && ((m.links?.length ?? 0) > 0 || (m.chapters?.length ?? 0) > 0));
+  if (pool.length === 0) return 0;
+  const live = liveClusters(state);
+  const byUrl = new Map<string, Cluster>();
+  for (const c of live) for (const l of c.links) byUrl.set(normalizeUrl(l.url), c);
+  const candidates = live.map((c) => `${c.headline} ${c.keywords.join(" ")}`);
+  const now = new Date().toISOString();
+  let added = 0;
+  const mention = (c: Cluster, m: MediaItem, at?: number) => {
+    const list = (c.mentions ??= []);
+    const existing = list.find((x) => x.mediaId === m.id);
+    if (existing) {
+      if (at !== undefined && (existing.at === undefined || at < existing.at)) existing.at = at;
+      return;
+    }
+    list.push({ mediaId: m.id, show: m.sourceName, title: m.displayTitle ?? m.title, kind: m.kind, ...(at !== undefined ? { at } : {}), addedAt: now });
+    if (list.length > 6) list.splice(0, list.length - 6);
+    c.updatedAt = now;
+    added += 1;
+  };
+  for (const m of pool) {
+    // a chapter line's links carry the chapter's moment
+    const linkAt = new Map<string, number>();
+    for (const ch of m.chapters ?? []) for (const l of ch.links ?? []) linkAt.set(normalizeUrl(l), ch.at);
+    for (const l of m.links ?? []) {
+      const c = byUrl.get(normalizeUrl(l));
+      if (c) mention(c, m, linkAt.get(normalizeUrl(l)));
+    }
+    for (const ch of m.chapters ?? []) {
+      if (ch.links && ch.links.some((l) => byUrl.has(normalizeUrl(l)))) continue; // already placed by its link
+      const i = bestMatchIndex(ch.label, candidates, 2);
+      if (i >= 0) mention(live[i], m, ch.at);
+    }
+    m.notesLinkedAt = now;
+  }
+  return added;
 }
 
 /**
@@ -898,6 +970,8 @@ export async function ingestMedia(
     ...(i.thumbnail ? { thumbnail: i.thumbnail } : {}),
     ...(i.durationSec ? { durationSec: i.durationSec } : {}),
     ...(i.audioUrl ? { audioUrl: i.audioUrl } : {}),
+    ...(i.descriptionLinks && i.descriptionLinks.length > 0 ? { links: i.descriptionLinks } : {}),
+    ...(i.chapters && i.chapters.length > 0 ? { chapters: i.chapters } : {}),
     ...(i.excerpt ? { excerpt: truncate(i.excerpt, 300) } : {}),
   }));
   state.mediaItems = [...shelved, ...(state.mediaItems ?? [])]
@@ -908,11 +982,12 @@ export async function ingestMedia(
   // podcast episodes with their video twins so they inherit those numbers
   await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
   pairPodcastsWithVideos(state.mediaItems);
+  const mentions = linkEpisodesToStories(state);
   updateFeedHealth(state, results, new Set(shelved.map((i) => i.sourceId)));
 
   const note =
-    fresh.length > 0 || held > 0
-      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}.`
+    fresh.length > 0 || held > 0 || mentions > 0
+      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}${mentions > 0 ? `, ${mentions} story mention(s) from show notes` : ""}.`
       : undefined;
   return { errors, note };
 }
@@ -1145,7 +1220,22 @@ export async function runPipeline(): Promise<RunReport> {
   const results = await fetchAllFeeds(feeds, cfg.ingest, cfg.farcaster);
   report.feedErrors = results.filter((r) => r.error).map((r) => ({ feedId: r.feed.id, error: r.error! }));
 
-  const fc = routeCastLinks(state, results, cfg);
+  // show-note links from episodes not yet routed ride the same discovery path
+  // as Farcaster casts: a link to a whitelisted source becomes an item, a
+  // link into an existing story is a mention (handled at media ingest)
+  const episodeLinks: Array<CastLink & { mediaId: string }> = [];
+  for (const m of state.mediaItems ?? []) {
+    if (m.hidden || !m.links || m.linksRoutedAt) continue;
+    for (const url of m.links) {
+      try {
+        episodeLinks.push({ url, host: normalizeHost(new URL(url).hostname), author: m.sourceName, reach: m.views ?? 0, engagement: 0, text: m.displayTitle ?? m.title, at: m.publishedAt, mediaId: m.id });
+      } catch {
+        // not a url
+      }
+    }
+    m.linksRoutedAt = new Date().toISOString();
+  }
+  const fc = routeCastLinks(state, results, cfg, episodeLinks);
   // always logged when a discovery feed is configured, so a silent run is
   // distinguishable from a broken one in the run log
   if (feeds.some((f) => f.type === "farcaster")) {

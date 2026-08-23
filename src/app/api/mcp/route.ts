@@ -25,6 +25,9 @@ function serializeCluster(c: Cluster, rank: number, base: string) {
     explainer: c.explainer,
     section: c.section,
     ...(c.alsoIn ? { alsoIn: c.alsoIn } : {}),
+    ...(c.mentions && c.mentions.length > 0
+      ? { discussedOn: c.mentions.map((m) => ({ show: m.show, title: m.title, ...(m.at !== undefined ? { at: m.at } : {}), playOnSite: `${base}/podcasts?play=${m.mediaId}${m.at !== undefined ? `&t=${m.at}` : ""}` })) }
+      : {}),
     ...(c.opinion ? { opinion: true } : {}),
     updatedAt: c.updatedAt,
     permalink: `${base}/story/${c.slug}`,

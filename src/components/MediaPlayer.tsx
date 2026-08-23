@@ -70,6 +70,7 @@ export function MediaPlayer({
   autoOpen = false,
   compact = false,
   header,
+  startAt,
   children,
 }: {
   id: string;
@@ -84,6 +85,8 @@ export function MediaPlayer({
   compact?: boolean;
   /** rendered above the row, spanning thumbnail and text (the box puts the show's kicker here) */
   header?: ReactNode;
+  /** an explicit moment to start at (a story's "discussed at 12:34" link); beats the remembered playhead */
+  startAt?: number;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -98,8 +101,9 @@ export function MediaPlayer({
 
   // the remembered spot is read on the client only (no storage on the server)
   useEffect(() => {
-    if (memoryKey) setResumeAt(loadPos(memoryKey));
-  }, [memoryKey, open]);
+    if (startAt !== undefined && startAt > 0) setResumeAt(startAt);
+    else if (memoryKey) setResumeAt(loadPos(memoryKey));
+  }, [memoryKey, open, startAt]);
   const playable = Boolean(ytId || (kind === "podcast" && audioUrl));
 
   // Ask the YouTube player to stream its state, and keep the playhead. The

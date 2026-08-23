@@ -148,6 +148,12 @@ export interface Cluster {
   mergedInto?: string;
   needsReview?: boolean; // set when created by the no-LLM fallback
   posted?: { x?: string; farcaster?: string; farcasterHash?: string };
+  /**
+   * Episodes whose show notes point at this story (a link to one of its
+   * articles, or a chapter whose words match it), with the moment in the
+   * episode when known. Rendered as "discussed at 12:34 on {show}".
+   */
+  mentions?: Array<{ mediaId: string; show: string; title: string; kind: "video" | "podcast"; at?: number; addedAt: string }>;
   /** Last few re-edit/manual-edit events, newest first, capped small. */
   editHistory?: Array<{ at: string; kind: "reedit" | "manual" | "split"; before: string; after: string }>;
 }
@@ -187,6 +193,17 @@ export interface MediaItem {
   audioUrl?: string;
   /** admin-set site title for the rare episode whose own title misleads; the show's title stays in the tooltip and on the watch link. */
   displayTitle?: string;
+  /**
+   * Show notes, read from the episode's description: links to other pages
+   * (platform, shop, and sponsor hosts dropped) and chapter marks ("12:34
+   * The new rules"). They tie episodes to stories.
+   */
+  links?: string[];
+  chapters?: Array<{ at: number; label: string; links?: string[] }>;
+  /** set once the show notes have been matched against stories */
+  notesLinkedAt?: string;
+  /** set once the show-note links have been routed as possible coverage */
+  linksRoutedAt?: string;
   /** the show's tier at shelve time: tier 1 shows outrank tier 2 in the ranked boxes. */
   tier?: 1 | 2;
   /** YouTube view and like counts at statsAt, refreshed while the episode is young; the ranking's velocity signal. */
@@ -457,6 +474,8 @@ export interface CandidateItem {
   origTitle?: string;
   /** Surfaced by a Farcaster cast rather than by the source's own feed. */
   viaFarcaster?: boolean;
+  /** Surfaced by an episode's show notes rather than by the source's own feed: the episode's id. */
+  viaEpisode?: string;
 }
 
 export function emptyState(): SiteState {

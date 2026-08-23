@@ -2141,3 +2141,8 @@ button.status-date {
 .media-top li a {
   font-weight: 600;
 }
+
+/* "discussed at 12:34 on {show}" on a story card: a pointer into an episode */
+.cluster-meta .mention-link {
+  color: var(--muted);
+}

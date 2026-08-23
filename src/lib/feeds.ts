@@ -24,6 +24,58 @@ export interface MediaCandidate extends CandidateItem {
   durationSec?: number;
   /** podcast episodes: the enclosure audio url. */
   audioUrl?: string;
+  /** show notes read from the full description */
+  descriptionLinks?: string[];
+  chapters?: Array<{ at: number; label: string; links?: string[] }>;
+}
+
+/** Hosts that show notes link to as a matter of course and that never carry a story: the platforms, the shops, the sponsors' storefronts. */
+const NOTE_LINK_DROP = /(^|\.)(youtube\.com|youtu\.be|spotify\.com|apple\.com|podcasts\.apple\.com|google\.com|discord\.gg|discord\.com|t\.me|telegram\.org|twitter\.com|x\.com|instagram\.com|tiktok\.com|linkedin\.com|facebook\.com|patreon\.com|amazon\.com|amzn\.to|bit\.ly|linktr\.ee|substack\.com\/subscribe)$/i;
+
+/** Every http(s) link in a description, minus platform and sponsor hosts, deduped in order. */
+export function extractDescriptionLinks(text: string | undefined): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of text.matchAll(/https?:\/\/[^\s<>"'()\[\]]+/gi)) {
+    let url = m[0].replace(/[.,;:!?]+$/, "");
+    try {
+      const u = new URL(url);
+      if (NOTE_LINK_DROP.test(u.hostname)) continue;
+      url = u.toString();
+    } catch {
+      continue;
+    }
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+/**
+ * Chapter marks in a description: lines that start with a time ("12:34" or
+ * "1:02:33", optionally in brackets), then a label. Links on the same line
+ * travel with the chapter, which is how a show note ties a story to the
+ * moment it is discussed.
+ */
+export function extractChapters(text: string | undefined): Array<{ at: number; label: string; links?: string[] }> {
+  if (!text) return [];
+  const out: Array<{ at: number; label: string; links?: string[] }> = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const m = line.match(/^[\(\[]?((?:\d{1,2}:)?\d{1,2}:\d{2})[\)\]]?\s*[-\u2013\u2014:|]?\s*(.+)$/);
+    if (!m) continue;
+    const parts = m[1].split(":").map(Number);
+    const at = parts.reduce((acc, n) => acc * 60 + n, 0);
+    const links = extractDescriptionLinks(m[2]);
+    const label = m[2].replace(/https?:\/\/\S+/g, "").replace(/[\s\-\u2013\u2014:|]+$/, "").trim();
+    if (label.length < 4 && links.length === 0) continue;
+    out.push({ at, label, ...(links.length > 0 ? { links } : {}) });
+    if (out.length >= 60) break;
+  }
+  return out;
 }
 
 export interface MediaFetchResult {
@@ -428,7 +480,7 @@ async function enrichListingPages(items: CandidateItem[], feeds: FeedConfig[], t
  * article's own metadata so the editor judges the piece and not the sharer.
  */
 async function enrichFarcasterItems(items: CandidateItem[], timeoutMs: number): Promise<void> {
-  const targets = items.filter((i) => i.viaFarcaster).slice(0, 12);
+  const targets = items.filter((i) => i.viaFarcaster || i.viaEpisode).slice(0, 12);
   await Promise.all(
     targets.map(async (i) => {
       try {
@@ -519,10 +571,14 @@ async function fetchYoutubeMedia(feed: FeedConfig, timeoutMs: number): Promise<M
       const thumbnail =
         (typeof thumbRaw === "object" ? thumbRaw?.$?.url : undefined) ??
         (item.videoId ? `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg` : undefined);
+      const descriptionLinks = extractDescriptionLinks(desc);
+      const chapters = extractChapters(desc);
       return {
         ...candidate(feed, i.link!, i.title!, i.isoDate || new Date().toISOString(), desc),
         kind: "video" as const,
         ...(thumbnail ? { thumbnail } : {}),
+        ...(descriptionLinks.length > 0 ? { descriptionLinks } : {}),
+        ...(chapters.length > 0 ? { chapters } : {}),
       };
     });
 }
@@ -567,9 +623,16 @@ export interface YoutubeDetails {
   durationSec?: number;
   views?: number;
   likes?: number;
+  /** the full description, when asked for (the feed's copy is kept only in part) */
+  description?: string;
 }
 
-export async function fetchYoutubeDetails(ids: string[], timeoutMs: number, scrapeCap = 20): Promise<Map<string, YoutubeDetails>> {
+export async function fetchYoutubeDetails(
+  ids: string[],
+  timeoutMs: number,
+  scrapeCap = 20,
+  withDescription = false
+): Promise<Map<string, YoutubeDetails>> {
   const out = new Map<string, YoutubeDetails>();
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return out;
@@ -578,9 +641,15 @@ export async function fetchYoutubeDetails(ids: string[], timeoutMs: number, scra
     for (let i = 0; i < unique.length; i += 50) {
       const chunk = unique.slice(i, i + 50);
       try {
-        const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${chunk.join(",")}&key=${key}`;
+        const parts = withDescription ? "contentDetails,statistics,snippet" : "contentDetails,statistics";
+        const url = `https://www.googleapis.com/youtube/v3/videos?part=${parts}&id=${chunk.join(",")}&key=${key}`;
         const json = JSON.parse(await fetchText(url, timeoutMs)) as {
-          items?: Array<{ id: string; contentDetails?: { duration?: string }; statistics?: { viewCount?: string; likeCount?: string } }>;
+          items?: Array<{
+            id: string;
+            contentDetails?: { duration?: string };
+            statistics?: { viewCount?: string; likeCount?: string };
+            snippet?: { description?: string };
+          }>;
         };
         for (const v of json.items ?? []) {
           const sec = parseIsoDuration(v.contentDetails?.duration);
@@ -590,6 +659,7 @@ export async function fetchYoutubeDetails(ids: string[], timeoutMs: number, scra
             ...(sec ? { durationSec: sec } : {}),
             ...(Number.isFinite(views) ? { views } : {}),
             ...(Number.isFinite(likes) ? { likes } : {}),
+            ...(withDescription && v.snippet?.description ? { description: v.snippet.description } : {}),
           });
         }
       } catch {
@@ -653,6 +723,13 @@ async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<M
         ...(itunes.image ? { thumbnail: itunes.image } : {}),
         ...(durationSec ? { durationSec } : {}),
         ...(i.enclosure?.url ? { audioUrl: i.enclosure.url } : {}),
+        ...((): Partial<MediaCandidate> => {
+          // podcast feeds carry show notes as HTML in content, plain in the snippet
+          const full = `${i.content ?? ""}\n${i.contentSnippet ?? ""}\n${itunes.summary ?? ""}`;
+          const descriptionLinks = extractDescriptionLinks(full);
+          const chapters = extractChapters(stripHtml(i.content ?? "").replace(/\s(?=\(?\d{1,2}:\d{2})/g, "\n") + "\n" + (i.contentSnippet ?? ""));
+          return { ...(descriptionLinks.length > 0 ? { descriptionLinks } : {}), ...(chapters.length > 0 ? { chapters } : {}) };
+        })(),
       };
     });
 }

@@ -125,10 +125,28 @@ export function ClusterCard({
             farcaster
           </a>
         ) : null}
+        {(cluster.mentions ?? []).slice(0, 2).map((m) => (
+          <Link
+            key={m.mediaId}
+            href={`/podcasts?play=${m.mediaId}${m.at !== undefined ? `&t=${m.at}` : ""}#m-${m.mediaId}`}
+            className="mention-link"
+            title={`${m.show}: ${m.title}`}
+          >
+            {m.at !== undefined ? `discussed at ${fmtMoment(m.at)} on ${m.show}` : `discussed on ${m.show}`}
+          </Link>
+        ))}
         <a href={`/submit?story=${cluster.slug}`} className="suggest-link">
           suggest a link
         </a>
       </div>
     </article>
   );
+}
+
+/** "12:34" or "1:02:33" for a moment inside an episode. */
+function fmtMoment(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
