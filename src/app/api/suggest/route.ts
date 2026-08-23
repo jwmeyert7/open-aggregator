@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       submission.email ? `From: ${submission.email}` : "",
       submission.newSource ? "This domain is not one of your sources." : "",
       "",
-      `Review: ${siteUrl()}/admin#submissions`,
+      `Review: ${siteUrl()}/admin/stories#submissions`,
     ]
       .filter(Boolean)
       .join("\n")

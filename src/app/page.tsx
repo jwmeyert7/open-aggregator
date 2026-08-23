@@ -116,7 +116,7 @@ export default async function HomePage() {
       {preview ? (
         <div className="archive-banner" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>
           Admin preview: showing the {preview} layout in this browser only. Visitors see the scheduled layout (
-          {scheduledWeekend ? "weekend" : "weekday"} right now). Clear it in the <Link href="/admin#layout">admin</Link>.
+          {scheduledWeekend ? "weekend" : "weekday"} right now). Clear it in the <Link href="/admin/layout">admin</Link>.
         </div>
       ) : null}
       {/* editor-model gist of the news cycle; hidden once it goes stale. At

@@ -2175,3 +2175,64 @@ button.status-date {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ----- admin tool pages ----- */
+
+/* the overview page's grid of tool cards */
+.admin-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 10px 0 20px;
+}
+.admin-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  text-decoration: none;
+}
+.admin-tool:hover {
+  border-color: var(--accent);
+}
+.admin-tool .tool-name {
+  font-weight: 700;
+}
+
+/* type-to-find merge target picker (replaces the old giant dropdown) */
+.merge-pick {
+  flex-basis: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 4px;
+}
+.merge-pick .form-row {
+  margin-bottom: 6px;
+}
+.merge-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--rule);
+  padding: 6px 4px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.merge-option:hover .merge-headline {
+  color: var(--accent);
+}
+.merge-option .merge-headline {
+  font-weight: 600;
+}
+.merge-pick .merge-hint {
+  margin: 4px;
+}
