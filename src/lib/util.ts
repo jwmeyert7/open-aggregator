@@ -275,3 +275,15 @@ export function formatMoment(sec: number): string {
   const s = sec % 60;
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
+
+/**
+ * The image an episode row should actually show. "frame" swaps YouTube's
+ * designed card for a plain frame from the video itself (hq1.jpg), for shows
+ * whose cards lead with exaggerated faces; "show" drops the image entirely so
+ * the player renders a flat tile with the show's name instead.
+ */
+export function mediaThumb(m: { thumbnail?: string; thumbStyle?: "frame" | "show" }): string | undefined {
+  if (m.thumbStyle === "show") return undefined;
+  if (m.thumbStyle === "frame" && m.thumbnail) return m.thumbnail.replace(/\/[a-z]*default\.jpg/, "/hq1.jpg");
+  return m.thumbnail;
+}

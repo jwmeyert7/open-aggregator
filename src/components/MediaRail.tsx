@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AgeStamp } from "@/components/AgeStamp";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import type { MediaItem } from "@/lib/types";
-import { formatDuration } from "@/lib/util";
+import { formatDuration, mediaThumb } from "@/lib/util";
 
 /**
  * Podcasts: the newest whitelisted episodes, living in the middle column
@@ -41,7 +41,8 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                 url={m.url}
                 kind={m.kind}
                 title={m.displayTitle ?? m.title}
-                thumbnail={m.thumbnail}
+                thumbnail={mediaThumb(m)}
+                tileText={m.sourceName}
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 compact

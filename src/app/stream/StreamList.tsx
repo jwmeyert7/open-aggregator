@@ -58,6 +58,7 @@ export function StreamList({ items }: { items: StreamItem[] }) {
                     kind={i.episode.kind}
                     title={i.title}
                     thumbnail={i.episode.thumbnail}
+                    tileText={i.sourceName}
                     audioUrl={i.episode.audioUrl}
                     videoUrl={i.episode.videoUrl}
                     compact

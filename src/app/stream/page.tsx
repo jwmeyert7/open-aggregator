@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StreamList, type StreamItem } from "./StreamList";
 import { byPublished, itemDisplayTitle } from "@/lib/rank";
 import { loadState } from "@/lib/state";
+import { mediaThumb } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function StreamPage() {
         url: m.url,
         kind: m.kind,
         title: m.title,
-        ...(m.thumbnail ? { thumbnail: m.thumbnail } : {}),
+        ...(mediaThumb(m) ? { thumbnail: mediaThumb(m) } : {}),
         ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
         ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
       },

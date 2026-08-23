@@ -1895,11 +1895,10 @@ button.status-date {
   min-width: 0;
 }
 .media-rail .media-body a {
+  /* no overflow cap here: a hidden-overflow box refuses to wrap under the
+     floated thumb, and the title must flow beneath it like newsprint */
   display: block;
   line-height: 1.35;
-  /* guardrail: even an endless title stops at three lines */
-  max-height: 4.05em;
-  overflow: hidden;
 }
 .media-item .kicker,
 .media-rail .kicker {
@@ -2242,4 +2241,48 @@ button.status-date {
 }
 .merge-pick .merge-hint {
   margin: 4px;
+}
+
+/* the age stamp never splits across the float edge ("2d" / "ago") */
+.media-rail .days-ago {
+  white-space: nowrap;
+}
+
+/* calm the shouting: episode art renders slightly desaturated, full on hover */
+.media-thumb img {
+  filter: saturate(0.65) contrast(0.97);
+}
+.media-thumb:hover img {
+  filter: none;
+}
+
+/* the flat show tile used when a feed's thumbStyle is "show" */
+.tile-name {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  right: 8px;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  pointer-events: none;
+}
+.media-rail .media-play.no-thumb {
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  background: var(--surface);
+}
+.newest-episode .media-play.no-thumb {
+  width: 64px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  background: var(--surface);
+}
+.stream-episode .media-play.no-thumb {
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  background: var(--surface);
 }

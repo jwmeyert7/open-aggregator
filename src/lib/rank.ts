@@ -1,6 +1,7 @@
 import { loadFeeds } from "./config";
 import type { Cluster, MediaItem, RiverItem, SiteConfig, SiteState, SectionId, WeekendSchedule } from "./types";
 import { hoursAgo } from "./util";
+import { mediaThumb } from "@/lib/util";
 
 /**
  * Open forums are user-generated content: a single uncorroborated forum post
@@ -303,7 +304,7 @@ export function newestEntries(state: SiteState, limit: number, section?: Section
         url: m.url,
         kind: m.kind,
         title: m.title,
-        ...(m.thumbnail ? { thumbnail: m.thumbnail } : {}),
+        ...(mediaThumb(m) ? { thumbnail: mediaThumb(m) } : {}),
         ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
         ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
         ...(m.displayTitle ? { displayTitle: m.displayTitle } : {}),

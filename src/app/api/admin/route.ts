@@ -862,7 +862,7 @@ async function handle(req: NextRequest) {
     }
     if (![...loadFeeds(), ...o.custom].some((f) => f.id === id)) return fail("Unknown source.");
     if (body.action === "editFeed") {
-      const edit: { tier?: 1 | 2; weight?: number; category?: string } = {};
+      const edit: { tier?: 1 | 2; weight?: number; category?: string; thumbStyle?: "episode" | "frame" | "show" } = {};
       if (body.tier !== undefined) edit.tier = String(body.tier) === "2" ? 2 : 1;
       if (body.weight !== undefined) {
         const w = Number(body.weight);
@@ -870,6 +870,9 @@ async function handle(req: NextRequest) {
         edit.weight = Math.max(0.1, Math.min(5, w));
       }
       if (body.category !== undefined) edit.category = String(body.category).slice(0, 24);
+      if (body.thumbStyle !== undefined && ["episode", "frame", "show"].includes(String(body.thumbStyle))) {
+        edit.thumbStyle = String(body.thumbStyle) as "episode" | "frame" | "show";
+      }
       o.edits = { ...(o.edits ?? {}), [id]: { ...(o.edits?.[id] ?? {}), ...edit } };
       await saveState(state);
       return ok("Source updated. Applies from the next pipeline run (existing story scores update immediately).");

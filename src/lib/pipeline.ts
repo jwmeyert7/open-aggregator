@@ -737,6 +737,7 @@ function pairPodcastsWithVideos(items: MediaItem[]): number {
     if (!twin) continue;
     pod.videoUrl = twin.url;
     if (!pod.thumbnail && twin.thumbnail) pod.thumbnail = twin.thumbnail;
+    if (!pod.thumbStyle && twin.thumbStyle) pod.thumbStyle = twin.thumbStyle;
     if (!pod.section && twin.section) pod.section = twin.section;
     twin.twinOf = pod.id;
     twin.hidden = true;
@@ -802,6 +803,9 @@ export async function rejudgeMedia(
     m.title = cleanMediaTitle(rewriteTitle(feedById.get(m.sourceId), m.title, m.publishedAt));
     const hint = feedById.get(m.sourceId)?.sectionHint;
     if (!m.section && hint) m.section = hint;
+    const ts = feedById.get(m.sourceId)?.thumbStyle;
+    if (ts && ts !== "episode") m.thumbStyle = ts;
+    else delete m.thumbStyle;
     const tier = feedById.get(m.sourceId)?.tier;
     if (!m.tier && tier) m.tier = tier;
     // clips shelved before ingest learned to skip them
@@ -1025,6 +1029,10 @@ export async function ingestMedia(
     publishedAt: i.publishedAt,
     ingestedAt: now,
     ...(i.thumbnail ? { thumbnail: i.thumbnail } : {}),
+    ...((): Partial<MediaItem> => {
+      const t = feedById.get(i.sourceId)?.thumbStyle;
+      return t && t !== "episode" ? { thumbStyle: t } : {};
+    })(),
     ...(i.durationSec ? { durationSec: i.durationSec } : {}),
     ...(i.audioUrl ? { audioUrl: i.audioUrl } : {}),
     ...(i.descriptionLinks && i.descriptionLinks.length > 0 ? { links: i.descriptionLinks } : {}),

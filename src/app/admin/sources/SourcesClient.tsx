@@ -12,6 +12,8 @@ export interface SourcesData {
     tier: 1 | 2;
     weight: number;
     category: string;
+    type: string;
+    thumbStyle: string;
     custom: boolean;
     disabled: boolean;
     health: string;
@@ -191,7 +193,7 @@ export function SourcesClient({ chrome, data }: { chrome: AdminChromeData; data:
                     onSubmit={(e) => {
                       e.preventDefault();
                       const f = new FormData(e.currentTarget);
-                      act("editFeed", { id: s.id, tier: f.get("tier"), weight: f.get("weight"), category: f.get("category") });
+                      act("editFeed", { id: s.id, tier: f.get("tier"), weight: f.get("weight"), category: f.get("category"), thumbStyle: f.get("thumbStyle") });
                     }}
                   >
                     <div className="btn-row">
@@ -207,6 +209,19 @@ export function SourcesClient({ chrome, data }: { chrome: AdminChromeData; data:
                           </option>
                         ))}
                       </select>
+                      {s.type === "youtube" || s.type === "podcast" ? (
+                        <select
+                          className="select"
+                          name="thumbStyle"
+                          defaultValue={s.thumbStyle}
+                          style={{ width: "auto" }}
+                          title="What the episode tile shows: the episode's own art, a plain frame from the video, or a flat tile with the show's name"
+                        >
+                          <option value="episode">episode art</option>
+                          <option value="frame">video frame</option>
+                          <option value="show">show tile</option>
+                        </select>
+                      ) : null}
                       <button className="btn" type="submit" disabled={busy}>
                         Save
                       </button>

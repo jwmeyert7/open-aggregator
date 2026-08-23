@@ -6,7 +6,7 @@ import { loadSiteConfig } from "@/lib/config";
 import { adaptiveRanking, episodeStories, rankMedia } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
-import { formatDuration, formatMoment } from "@/lib/util";
+import { formatDuration, formatMoment, mediaThumb } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +61,8 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                 url={m.url}
                 kind={m.kind}
                 title={m.displayTitle ?? m.title}
-                thumbnail={m.thumbnail}
+                thumbnail={mediaThumb(m)}
+                tileText={m.sourceName}
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 autoOpen={play === m.id}

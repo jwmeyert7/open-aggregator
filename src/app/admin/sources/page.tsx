@@ -29,6 +29,8 @@ export default async function AdminSourcesPage() {
           tier: f.tier,
           weight: f.weight,
           category: f.category ?? "other",
+          type: f.type,
+          thumbStyle: f.thumbStyle ?? "episode",
           custom: customIds.has(f.id),
           disabled: o.disabled.includes(f.id),
           health: h?.consecutiveErrors

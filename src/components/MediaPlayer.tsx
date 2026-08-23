@@ -71,6 +71,7 @@ export function MediaPlayer({
   compact = false,
   header,
   startAt,
+  tileText,
   children,
 }: {
   id: string;
@@ -87,6 +88,8 @@ export function MediaPlayer({
   header?: ReactNode;
   /** an explicit moment to start at (a story's "discussed at 12:34" link); beats the remembered playhead */
   startAt?: number;
+  /** shown on the flat tile when the row has no thumbnail (the show's name) */
+  tileText?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -180,6 +183,7 @@ export function MediaPlayer({
             aria-controls={`player-${id}`}
           >
             {thumb}
+            {!thumb && tileText ? <span className="tile-name">{tileText}</span> : null}
             <span className="play-mark" aria-hidden="true">
               {open ? "✕" : "▶"}
             </span>
