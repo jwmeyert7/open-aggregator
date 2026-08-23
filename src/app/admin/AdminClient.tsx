@@ -1365,10 +1365,10 @@ export function AdminClient({
       ))}
 
       {/* the paid listing rail is called Shows on the site, so the free
-          Podcasts shelf above and the paid listings never share a name */}
+          free Podcasts section above and the paid listings never share a bare name */}
       {(["jobs", "events", "podcasts"] as const).map((kind) => (
         <div key={kind}>
-          <h2 id={kind}>{kind === "podcasts" ? "Shows" : kind.charAt(0).toUpperCase() + kind.slice(1)}</h2>
+          <h2 id={kind}>{kind === "podcasts" ? "Sponsored Podcasts" : kind.charAt(0).toUpperCase() + kind.slice(1)}</h2>
           {data[kind].map((l) => (
             <div key={l.id} className={`admin-card${l.hidden ? " is-hidden" : ""}`}>
               {editingId === l.id ? (
