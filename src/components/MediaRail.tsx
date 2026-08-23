@@ -45,10 +45,11 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 compact
+                // same Techmeme-style kicker as the story cards: the show reads first, on its
+                // own line, across the whole row, with thumbnail and title side by side beneath it
+                header={<div className="kicker">{m.sourceName}:</div>}
               >
                 <div className="media-body">
-                  {/* same Techmeme-style kicker as the story cards: the show reads first, on its own line */}
-                  <div className="kicker">{m.sourceName}:</div>
                   <a href={m.videoUrl ?? m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>
                     {m.displayTitle ?? m.title}
                   </a>

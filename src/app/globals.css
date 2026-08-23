@@ -1886,7 +1886,10 @@ button.status-date {
   object-fit: cover;
   border-radius: 4px;
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
+}
+.media-rail li > .kicker {
+  margin-bottom: 3px;
 }
 .media-rail .media-body {
   min-width: 0;

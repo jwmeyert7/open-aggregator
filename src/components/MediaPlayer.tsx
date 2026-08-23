@@ -69,6 +69,7 @@ export function MediaPlayer({
   videoUrl,
   autoOpen = false,
   compact = false,
+  header,
   children,
 }: {
   id: string;
@@ -81,6 +82,8 @@ export function MediaPlayer({
   videoUrl?: string;
   autoOpen?: boolean;
   compact?: boolean;
+  /** rendered above the row, spanning thumbnail and text (the box puts the show's kicker here) */
+  header?: ReactNode;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -161,6 +164,7 @@ export function MediaPlayer({
 
   return (
     <>
+      {header}
       <div className="media-row">
         {playable ? (
           <button
