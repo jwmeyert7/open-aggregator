@@ -60,7 +60,7 @@ export function hasSidebarContent(
 }
 
 /**
- * Middle column: announcement slot + Jobs, Events, and Shows rails (all paid),
+ * Middle column: announcement slot + Jobs, Events, and Sponsored Podcasts rails (all paid),
  * then the free Podcasts shelf. Empty/hidden surfaces render nothing. The
  * paid listing rail is called Shows so it never shares a name with the shelf.
  */
@@ -110,7 +110,7 @@ export function Sidebar({
       ) : null}
       {vJobs.length > 0 ? <Rail title="Jobs" items={vJobs} /> : null}
       {vEvents.length > 0 ? <Rail title="Events" items={vEvents} /> : null}
-      {vPodcasts.length > 0 ? <Rail title="Shows" items={vPodcasts} /> : null}
+      {vPodcasts.length > 0 ? <Rail title="Sponsored Podcasts" items={vPodcasts} /> : null}
       {media.length > 0 ? <MediaRail items={media} limit={mediaLimit} /> : null}
     </aside>
   );

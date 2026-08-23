@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         <h2>Sponsored content</h2>
         <p>
           Slots labeled &ldquo;Sponsored,&rdquo; the announcement box, and featured listings in Jobs, Events, and
-          Shows are paid placements. They are always visually marked and never influence which news stories appear
+          Sponsored Podcasts are paid placements. They are always visually marked and never influence which news stories appear
           or how they are ranked.
         </p>
 

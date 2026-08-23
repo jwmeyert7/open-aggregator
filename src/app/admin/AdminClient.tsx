@@ -234,7 +234,7 @@ export function AdminClient({
           {navLink("candidates", data.sourceCandidates.length > 0 ? `Candidates (${data.sourceCandidates.length})` : "Candidates")}
           {navLink("sources", "Sources")}
           {navLink("markets", "Markets")}
-          {navLink("media", "Podcasts shelf")}
+          {navLink("media", "Podcasts")}
           {navLink("runs", "Runs")}
           {navLink("layout", "Layout")}
           {navLink("email", "Email")}
@@ -244,7 +244,7 @@ export function AdminClient({
             {navLink("sponsored", "Posts")}
             {navLink("jobs", "Jobs")}
             {navLink("events", "Events")}
-            {navLink("podcasts", "Shows")}
+            {navLink("podcasts", "Sponsored Podcasts")}
           </span>
           <a href="/admin/leaderboard">Leaderboard</a>
           <a href="/admin/farcaster">Farcaster</a>
@@ -1303,7 +1303,7 @@ export function AdminClient({
         </div>
       </form>
 
-      <h2 id="media">Podcasts shelf</h2>
+      <h2 id="media">Podcasts</h2>
       <p className="sub">
         Episodes the pipeline aggregated from whitelisted shows onto /podcasts, the front-page box, and each one's
         section box. Unchecking hides an episode from the site (it stays here until it ages out). Re-judge runs the

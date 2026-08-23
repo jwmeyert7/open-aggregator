@@ -34,7 +34,7 @@ export default async function SponsorPage() {
             a launch.
           </li>
           <li>
-            <strong>A listing.</strong> An event, a job, or a show, listed in the side column.
+            <strong>A listing.</strong> An event, a job, or a podcast, listed in the side column as Sponsored Podcasts.
           </li>
         </ul>
         <h2>Our guardrails</h2>

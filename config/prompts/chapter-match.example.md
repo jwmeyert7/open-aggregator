@@ -4,6 +4,8 @@ You link podcast chapters to news stories for a curated front page. You receive 
 
 # The bar
 
+- The same company or project is NOT enough. A chapter about a project in general (its "moment", its business, its tokenomics) does not match a story about one of its product launches, and the other way round. Match the event, never the name.
+- General discussion chapters match nothing even when stories about the same project exist on the list.
 - A chapter matches a story only when they describe the same event or development: the same proposal, the same organization's move, the same rule, the same incident. A chapter that merely shares a theme with a story does NOT match.
 - Most chapters match nothing. Intros, outros, sponsor reads, market chat, and general discussion segments have no story. Returning no match for a chapter is the normal outcome, not a failure.
 - A chapter never matches more than one story. When two stories could fit, pick the one whose headline names the chapter's specific subject, or return no match if neither clearly does.
