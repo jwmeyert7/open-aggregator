@@ -727,6 +727,16 @@ function pairPodcastsWithVideos(items: MediaItem[]): number {
     twin.hidden = true;
     paired += 1;
   }
+  // the podcast entry represents the episode on the shelf, so it ranks on its
+  // twin's view count (the video keeps getting its stats refreshed while hidden)
+  const byTwin = new Map(items.filter((m) => m.twinOf).map((m) => [m.twinOf as string, m]));
+  for (const pod of items) {
+    const twin = byTwin.get(pod.id);
+    if (!twin || twin.views === undefined) continue;
+    pod.views = twin.views;
+    if (twin.likes !== undefined) pod.likes = twin.likes;
+    if (twin.statsAt) pod.statsAt = twin.statsAt;
+  }
   return paired;
 }
 
@@ -890,10 +900,11 @@ export async function ingestMedia(
   state.mediaItems = [...shelved, ...(state.mediaItems ?? [])]
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, MAX_MEDIA_ITEMS);
-  pairPodcastsWithVideos(state.mediaItems);
   // keep view counts fresh for young episodes so the ranked boxes track what
-  // people are actually watching (one API call per fifty videos)
+  // people are actually watching (one API call per fifty videos), then pair
+  // podcast episodes with their video twins so they inherit those numbers
   await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
+  pairPodcastsWithVideos(state.mediaItems);
   updateFeedHealth(state, results, new Set(shelved.map((i) => i.sourceId)));
 
   const note =
