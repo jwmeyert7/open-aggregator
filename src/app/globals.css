@@ -1852,3 +1852,284 @@ button.status-date {
   display: flex;
   gap: 16px;
 }
+
+/* ---- media shelf (/podcasts page; the rail reuses .rail styles) ---- */
+/* Podcasts block in the middle column: a desktop label styled like the
+   column labels (the box's own h3 takes over on mobile), and compact
+   thumbnails beside each title. */
+.media-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: -18px;
+}
+.media-label a,
+.media-rail h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+.media-rail li {
+  display: block;
+}
+.media-rail .media-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.media-rail .media-thumb {
+  flex: 0 0 auto;
+}
+.media-rail .media-thumb img {
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+  margin-top: 2px;
+}
+.media-rail .media-body {
+  min-width: 0;
+}
+.media-item .kicker,
+.media-rail .kicker {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+@media (min-width: 761px) {
+  .media-rail > h3 {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .media-label {
+    display: none;
+  }
+}
+/* Click-to-load players. A thumbnail is a button with a play mark; pressing it
+   swaps in the creator's own player (YouTube nocookie embed) or a native
+   audio element under the row. Nothing third-party loads before that. */
+.media-list li.media-item {
+  display: block;
+}
+.media-list .media-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.media-thumb {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+.media-play {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+.media-play.no-thumb {
+  width: 128px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  background: var(--surface);
+}
+.play-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 30px;
+  text-align: center;
+  text-indent: 2px;
+  pointer-events: none;
+}
+.resume-mark {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  font-size: 0.62rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  pointer-events: none;
+}
+.media-rail .play-mark {
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  font-size: 0.58rem;
+}
+.media-thumb:hover .play-mark,
+.media-play:hover .play-mark {
+  background: rgba(0, 0, 0, 0.8);
+}
+.media-player {
+  margin: 12px 0 4px;
+  max-width: 720px;
+}
+.media-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
+}
+.media-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.media-player audio {
+  width: 100%;
+}
+.media-player-links {
+  margin-top: 6px;
+}
+/* Expanded player: the same element, now a centered overlay on the current
+   page. Clicking the backdrop, Escape, or "shrink" puts it back inline. */
+.media-player.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  margin: 0;
+  max-width: none;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.media-player.expanded .media-player-inner {
+  width: min(1100px, 100%);
+}
+.media-player.expanded .media-frame {
+  width: 100%;
+}
+.media-player.expanded .media-player-links {
+  color: #ddd;
+  font-size: 0.9rem;
+}
+.media-player.expanded .media-player-links a,
+.media-player.expanded .media-player-links .linklike {
+  color: #fff;
+}
+
+.media-player.compact {
+  margin: 8px 0 6px;
+  max-width: none;
+}
+.media-player.compact .media-player-links {
+  font-size: 0.74rem;
+}
+.linklike {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.media-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 720px;
+}
+.media-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.media-thumb img {
+  width: 128px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+.media-item .media-body a {
+  font-weight: 600;
+}
+.media-item .org {
+  margin-top: 2px;
+}
+@media (max-width: 480px) {
+  .media-thumb img {
+    width: 96px;
+  }
+}
+
+/* Episodes inside the Newest rail and the Stream carry a small kind tag, so a
+   podcast in the chronological flow reads as one at a glance. */
+.kind-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+/* episode rows in the Newest rail and the Stream carry the same compact
+   player as the Podcasts box */
+.newest-episode .media-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.newest-episode .media-thumb img {
+  width: 64px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+.newest-episode .media-body {
+  min-width: 0;
+}
+.stream-episode .media-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.stream-episode .media-thumb img {
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+.stream-episode .media-player.compact {
+  max-width: 640px;
+}
+
+/* Top this week on /podcasts: a short ranked strip above the chronological list. */
+.media-top ol {
+  margin: 6px 0 18px 20px;
+  padding: 0;
+}
+.media-top li {
+  margin: 4px 0;
+  font-size: 0.95rem;
+}
+.media-top li a {
+  font-weight: 600;
+}

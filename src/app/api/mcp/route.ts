@@ -1,7 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { loadSiteConfig, navSections, siteUrl } from "@/lib/config";
-import { adaptiveRanking, byPublished, itemDisplayTitle, leadLink, liveClusters, rankClusters, sectionStories, topStories, weekInReview } from "@/lib/rank";
+import { adaptiveRanking, byPublished, itemDisplayTitle, leadLink, liveClusters, rankClusters, rankMedia, sectionStories, topStories, weekInReview } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadDailyDigest, loadState } from "@/lib/state";
 import type { Cluster } from "@/lib/types";
@@ -147,6 +147,52 @@ const handler = createMcpHandler(
                 ...(c && !c.killed ? { storyPermalink: `${base}/story/${c.slug}` } : {}),
               };
             }),
+        });
+      }
+    );
+
+    server.registerTool(
+      "get_podcasts",
+      {
+        title: "Get podcasts shelf",
+        description:
+          `The newest videos and podcast episodes about ${id.topic} from whitelisted shows, newest first: the site's Podcasts shelf. Episodes from broader shows appear only when they are substantially about ${id.topic}.` +
+          (sections.length > 0 ? ` Each carries a section label (${sections.map((s) => s.id).join(", ")}); filter with section.` : "") +
+          " Titles are the shows' own, not rewritten. Use this for 'what should I watch or listen to' questions; for the written news use get_top_stories or get_newest.",
+        annotations: { readOnlyHint: true },
+        inputSchema: z.object({
+          count: countSchema,
+          section: z.string().optional(),
+          order: z.enum(["newest", "top"]).optional().describe("newest (default) or top: ranked by view velocity, show tier, and ties to the current top stories"),
+        }),
+      },
+      async ({ count, section, order }) => {
+        if (section && !sections.some((s) => s.id === section)) {
+          return asText({ error: `Unknown section "${section}".`, sections: sections.map((s) => s.id) });
+        }
+        const state = await loadState();
+        const base = siteUrl();
+        const pool = (state.mediaItems ?? []).filter((m) => !m.hidden && (!section || m.section === section));
+        return asText({
+          site: base,
+          updatedAt: state.updatedAt,
+          shelf: `${base}/podcasts`,
+          order: order ?? "newest",
+          episodes: (order === "top" ? rankMedia(pool, state, loadSiteConfig().ranking) : pool)
+            .slice(0, count ?? 10)
+            .map((m) => ({
+              title: m.displayTitle ?? m.title,
+              ...(m.displayTitle ? { showsTitle: m.title } : {}),
+              url: m.url,
+              show: m.sourceName,
+              kind: m.kind,
+              ...(m.section ? { section: m.section } : {}),
+              publishedAt: m.publishedAt,
+              ...(m.durationSec ? { durationSec: m.durationSec } : {}),
+              ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
+              ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
+              playOnSite: `${base}/podcasts?play=${m.id}`,
+            })),
         });
       }
     );

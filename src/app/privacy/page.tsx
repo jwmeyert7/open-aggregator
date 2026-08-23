@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         <h2>Sponsored content</h2>
         <p>
           Slots labeled &ldquo;Sponsored,&rdquo; the announcement box, and featured listings in Jobs, Events, and
-          Podcasts are paid placements. They are always visually marked and never influence which news stories appear
+          Shows are paid placements. They are always visually marked and never influence which news stories appear
           or how they are ranked.
         </p>
 
@@ -34,8 +34,10 @@ export default function PrivacyPage() {
               We use Google Analytics to understand readership: which pages are visited and roughly where visitors
               come from. It sets cookies only if you accept the analytics banner. If you decline, no analytics run and
               no cookies are set. We collect no personal information, require no accounts, and show no advertising
-              networks. A small amount of local storage is used for your own preferences (theme, clock format, link
-              behavior), which never leaves your browser.
+              networks. Podcast and video players load only when you press play on an episode: a YouTube video then
+              loads from YouTube&apos;s cookieless embed domain, and audio streams from the show&apos;s own host. A
+              small amount of local storage is used for your own preferences (theme, clock format, link behavior,
+              where you left off in an episode), which never leaves your browser.
             </p>
             <p>
               <CookieSettingsLink label="Change your analytics choice" />
@@ -44,8 +46,10 @@ export default function PrivacyPage() {
         ) : (
           <p>
             This site runs no analytics and sets no cookies. We collect no personal information, require no accounts,
-            and show no advertising networks. A small amount of local storage is used for your own preferences (theme,
-            clock format, link behavior), which never leaves your browser.
+            and show no advertising networks. Podcast and video players load only when you press play on an episode:
+            a YouTube video then loads from YouTube&apos;s cookieless embed domain, and audio streams from the
+            show&apos;s own host. A small amount of local storage is used for your own preferences (theme, clock
+            format, link behavior, where you left off in an episode), which never leaves your browser.
           </p>
         )}
 

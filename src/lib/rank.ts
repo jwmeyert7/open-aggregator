@@ -1,5 +1,5 @@
 import { loadFeeds } from "./config";
-import type { Cluster, RiverItem, SiteConfig, SiteState, SectionId, WeekendSchedule } from "./types";
+import type { Cluster, MediaItem, RiverItem, SiteConfig, SiteState, SectionId, WeekendSchedule } from "./types";
 import { hoursAgo } from "./util";
 
 /**
@@ -246,4 +246,111 @@ export function leadLink(cluster: Cluster) {
     if (a.weight !== b.weight) return b.weight - a.weight;
     return new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime();
   })[0];
+}
+
+/** One row of the Newest rail: a river item or a podcast episode, in one chronological flow. */
+export interface NewestEntry {
+  id: string;
+  url: string;
+  title: string;
+  rawTitle?: string;
+  sourceName: string;
+  publishedAt: string;
+  /** set for podcast episodes, which carry a kind tag in the rail */
+  podcast?: boolean;
+  /** episodes: the in-site player link */
+  playHref?: string;
+  /** episodes: what the row needs to play in place (same player as the Podcasts box) */
+  episode?: Pick<MediaItem, "id" | "url" | "kind" | "title" | "thumbnail" | "audioUrl" | "videoUrl" | "displayTitle">;
+}
+
+/**
+ * The Newest flow with podcast episodes merged in at their publish time: the
+ * rail and the Stream are chronological, so that is the one place an episode
+ * has a real time slot among the stories (section lists are ranked, so they
+ * do not).
+ */
+export function newestEntries(state: SiteState, limit: number, section?: SectionId): NewestEntry[] {
+  // a section page's rail keeps to that section: items whose story filed there,
+  // episodes labeled with it; uncategorized items only show on the global rail
+  const inSection = (i: RiverItem) => {
+    if (!section) return true;
+    const c = i.clusterId ? state.clusters[i.clusterId] : undefined;
+    return Boolean(c && !c.killed && c.section === section);
+  };
+  const items: NewestEntry[] = byPublished(state.items).filter(inSection).map((i) => ({
+    id: i.id,
+    url: i.url,
+    title: itemDisplayTitle(state, i),
+    rawTitle: i.title,
+    sourceName: i.sourceName,
+    publishedAt: i.publishedAt,
+  }));
+  const episodes: NewestEntry[] = (state.mediaItems ?? [])
+    .filter((m) => !m.hidden && (!section || m.section === section))
+    .map((m) => ({
+      id: `ep-${m.id}`,
+      url: m.videoUrl ?? m.url,
+      title: m.displayTitle ?? m.title,
+      ...(m.displayTitle ? { rawTitle: m.title } : {}),
+      sourceName: m.sourceName,
+      publishedAt: m.publishedAt,
+      podcast: true,
+      playHref: `/podcasts?play=${m.id}#m-${m.id}`,
+      episode: {
+        id: m.id,
+        url: m.url,
+        kind: m.kind,
+        title: m.title,
+        ...(m.thumbnail ? { thumbnail: m.thumbnail } : {}),
+        ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
+        ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
+        ...(m.displayTitle ? { displayTitle: m.displayTitle } : {}),
+      },
+    }));
+  return [...items, ...episodes].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, limit);
+}
+
+// function words plus the words every episode title carries, which would
+// otherwise tie everything to everything
+const MEDIA_STOP = new Set(["with", "from", "that", "this", "what", "when", "your", "about", "into", "over", "than", "then", "they", "them", "their", "have", "will", "just", "more", "most", "after", "before", "episode", "podcast", "week", "weekly", "news", "live", "show"]);
+function mediaTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !MEDIA_STOP.has(w))
+  );
+}
+
+/** The ranking score behind the Podcasts boxes; exported for the admin view. */
+export function mediaScore(m: MediaItem, topTokens: Set<string>[], now: Date = new Date()): number {
+  const ageH = Math.max(hoursAgo(m.publishedAt, now), 0);
+  // what people are actually watching: views per hour since publish, logged
+  // so a big channel leads without erasing everyone else
+  const velocity = m.views ? m.views / Math.max(ageH, 2) : 0;
+  const watch = Math.log10(1 + velocity);
+  // audio-only episodes have no view count: a modest baseline keeps them in the mix
+  const audioBase = m.kind === "podcast" && !m.views ? 1 : 0;
+  const tier = m.tier === 1 ? 1 : 0;
+  // tied to what the front page is leading with right now
+  const mine = mediaTokens(m.displayTitle ?? m.title);
+  let shared = 0;
+  for (const t of topTokens) for (const w of t) if (mine.has(w)) shared += 1;
+  const overlap = shared >= 2 ? 1.5 : shared === 1 ? 0.5 : 0;
+  const age = 0.35 * (ageH / 24);
+  return watch + audioBase + tier + overlap - age;
+}
+
+/**
+ * Podcasts box order: not newest first, but what is worth a reader's hour
+ * right now. View velocity leads, tier 1 shows and ties to the current top
+ * stories lift, age pulls down. /podcasts itself stays chronological.
+ */
+export function rankMedia(items: MediaItem[], state: SiteState, cfg: SiteConfig["ranking"], now: Date = new Date()): MediaItem[] {
+  const topTokens = topStories(state, cfg, now)
+    .slice(0, 12)
+    .map((c) => mediaTokens(`${c.headline} ${c.keywords?.join(" ") ?? ""}`));
+  return [...items].sort((a, b) => mediaScore(b, topTokens, now) - mediaScore(a, topTokens, now));
 }

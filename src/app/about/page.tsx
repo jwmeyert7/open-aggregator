@@ -42,7 +42,7 @@ export default function AboutPage() {
         <p>
           {site.siteName} is also a remote MCP server. Point any MCP enabled assistant at{" "}
           <code>{siteUrl()}/api/mcp</code> and it can pull the top stories, the newest items, daily and weekly
-          reviews, or search. The connection is read only and needs no account or key.
+          reviews, the podcasts shelf, or search. The connection is read only and needs no account or key.
         </p>
         <h2>Follow and contact</h2>
         <p>

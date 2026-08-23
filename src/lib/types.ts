@@ -14,7 +14,8 @@ export interface FeedConfig {
   id: string;
   name: string;
   url: string;
-  type: "rss" | "discourse" | "reddit" | "listing" | "gnews" | "farcaster";
+  /** youtube and podcast feeds fill the media shelf beside the news flow, never the story pipeline. */
+  type: "rss" | "discourse" | "reddit" | "listing" | "gnews" | "farcaster" | "youtube" | "podcast";
   tier: 1 | 2;
   weight: number;
   sectionHint?: SectionId;
@@ -27,6 +28,10 @@ export interface FeedConfig {
    * LLM gate ever sees it, so a broad feed costs almost nothing.
    */
   includePattern?: string;
+  /** media feeds only: a regex rewrite applied to every title from this feed at ingest (a show that shouts "ROUNDUP:" reads "Roundup:"). */
+  titleRewrite?: { pattern: string; replacement: string };
+  /** media feeds only: episodes whose title matches skip the media gate and shelve with the feed's sectionHint (a recurring show segment that always belongs, like a weekly roundup). */
+  alwaysPattern?: string;
   /** listing type only: regex an href must match to count as a post link. */
   linkPattern?: string;
   /** Admin-facing grouping only; never shown on the public site. */
@@ -150,6 +155,45 @@ export interface RiverItem {
   clusterId?: string;
 }
 
+/**
+ * One episode on the media shelf (a video or a podcast episode from a
+ * whitelisted show). Media lives beside the news pipeline, never inside it:
+ * episodes are commentary by nature, so they are not clustered, never
+ * corroborate a story, and skip the news gate. Tier semantics still apply at
+ * ingest: tier 1 shows pass through, tier 2 shows face the media gate.
+ */
+export interface MediaItem {
+  id: string;
+  kind: "video" | "podcast";
+  url: string;
+  title: string;
+  sourceId: string;
+  sourceName: string;
+  publishedAt: string;
+  ingestedAt: string;
+  thumbnail?: string;
+  durationSec?: number;
+  /** podcast episodes only: the enclosure audio, so the page can play it natively. */
+  audioUrl?: string;
+  /** admin-set site title for the rare episode whose own title misleads; the show's title stays in the tooltip and on the watch link. */
+  displayTitle?: string;
+  /** the show's tier at shelve time: tier 1 shows outrank tier 2 in the ranked boxes. */
+  tier?: 1 | 2;
+  /** YouTube view and like counts at statsAt, refreshed while the episode is young; the ranking's velocity signal. */
+  views?: number;
+  likes?: number;
+  statsAt?: string;
+  /** podcast episodes that also exist as a video on the same show's channel: the video url, which the player prefers. */
+  videoUrl?: string;
+  /** a video hidden because it is the twin of a podcast episode that carries the playback instead. */
+  twinOf?: string;
+  excerpt?: string;
+  /** Section label: the feed's hint for tier 1 shows, the media gate's call for tier 2. A label, not a bucket: the episode lives on /podcasts and also appears in its section's rail. */
+  section?: SectionId;
+  /** Kept in the admin but not rendered publicly. */
+  hidden?: boolean;
+}
+
 export interface FeedHealth {
   lastSuccessAt?: string;
   lastErrorAt?: string;
@@ -261,6 +305,10 @@ export interface SiteState {
     custom: Array<{ slug: string; label: string; section?: SectionId }>;
     disabled: string[];
   };
+  /** The media shelf: whitelisted-show episodes, newest first, capped. */
+  mediaItems?: MediaItem[];
+  /** When the media shelf last ingested; episodes need hourly freshness, not the news cadence. */
+  lastMediaIngestAt?: string;
   /** Recent pipeline run reports, newest first, capped. */
   runLog?: RunLogEntry[];
   /** Reader link suggestions awaiting review, newest first. */

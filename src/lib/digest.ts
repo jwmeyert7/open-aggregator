@@ -4,7 +4,7 @@ import { siteIdentity } from "./site";
 import { leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
 import { loadDailyDigest } from "./state";
 import type { Cluster, DigestSubscriber, SiteConfig, SiteState } from "./types";
-import { parseSummaryLines, utcDay } from "./util";
+import { formatDuration, parseSummaryLines, utcDay } from "./util";
 
 /**
  * The email editions. The daily one is the frozen daily archive page in mail
@@ -57,6 +57,32 @@ function groupStories(clusters: Cluster[]): Array<{ title: string; stories: Mail
   return groups;
 }
 
+/** One podcast or video episode for the Podcasts block of an edition. */
+export interface MailEpisode {
+  show: string;
+  title: string;
+  url: string;
+  length?: string;
+}
+
+/**
+ * The newest shelved episodes published inside a window, for the Podcasts
+ * block: the daily takes the last day, the weekly the last week. Text only
+ * (show, title, length, link): thumbnails are left out on purpose, mail
+ * clients disagree about images and the block should never look broken.
+ */
+export function recentEpisodes(state: SiteState, windowHours: number, limit: number): MailEpisode[] {
+  const since = Date.now() - windowHours * 60 * 60000;
+  return (state.mediaItems ?? [])
+    .filter((m) => !m.hidden && Date.parse(m.publishedAt) >= since)
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, limit)
+    .map((m) => {
+      const length = formatDuration(m.durationSec);
+      return { show: m.sourceName, title: m.displayTitle ?? m.title, url: m.videoUrl ?? m.url, ...(length ? { length } : {}) };
+    });
+}
+
 /**
  * Plain-text and HTML bodies for one edition. The HTML carries a %%UNSUB%%
  * placeholder so each recipient gets their own unsubscribe link.
@@ -67,8 +93,10 @@ function digestEmail(opts: {
   archiveLabel: string;
   summary: string[];
   groups: Array<{ title: string; stories: MailStory[] }>;
+  episodes?: MailEpisode[];
 }): { text: string; html: string } {
   const { heading, archiveUrl, archiveLabel, summary, groups } = opts;
+  const episodes = opts.episodes ?? [];
   const text = [
     heading,
     "",
@@ -79,6 +107,9 @@ function digestEmail(opts: {
       "",
       ...g.stories.flatMap((s) => [`${s.source}: ${s.headline}`, s.explainer || null, s.url, ""]),
     ]),
+    ...(episodes.length > 0
+      ? ["== Podcasts ==", "", ...episodes.flatMap((e) => [`${e.show}: ${e.title}${e.length ? ` (${e.length})` : ""}`, e.url, ""])]
+      : []),
     `${archiveLabel}: ${archiveUrl}`,
     "",
     "Unsubscribe: %%UNSUB%%",
@@ -102,6 +133,19 @@ function digestEmail(opts: {
           `<br/><a href="${escapeHtml(s.permalink)}" style="font-size: 12px; color: #777;">permalink</a></p>`
       ),
     ]),
+    ...(episodes.length > 0
+      ? [
+          `<h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; margin: 22px 0 4px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">Podcasts</h2>`,
+          ...episodes.map(
+            (e) =>
+              `<p style="margin: 12px 0;"><span style="color: #777; font-size: 13px;">${escapeHtml(e.show)}:</span><br/>` +
+              `<a href="${escapeHtml(e.url)}" style="font-size: 15px; font-weight: bold; color: #1a4b8f;">${escapeHtml(e.title)}</a>` +
+              (e.length ? `<span style="font-size: 12px; color: #777;"> · ${escapeHtml(e.length)}</span>` : "") +
+              `</p>`
+          ),
+          `<p style="font-size: 12px; color: #777; margin-top: 4px;"><a href="${escapeHtml(siteUrl())}/podcasts" style="color: #777;">All podcasts on the site</a></p>`,
+        ]
+      : []),
     `<p style="margin-top: 24px;"><a href="${escapeHtml(archiveUrl)}">${escapeHtml(archiveLabel)}</a></p>`,
     `<p style="font-size: 12px; color: #777;">You asked for this email at ${escapeHtml(siteUrl())}. ` +
       `<a href="%%UNSUB%%" style="color: #777;">Unsubscribe</a>.</p>`,
@@ -203,7 +247,10 @@ async function sendToAll(subs: DigestSubscriber[], e: Edition): Promise<{ sent: 
 }
 
 /** The daily edition, assembled from a frozen daily digest. */
-export function buildDailyEdition(digest: { date: string; clusters: Cluster[]; summary?: string }): Edition {
+export function buildDailyEdition(
+  digest: { date: string; clusters: Cluster[]; summary?: string },
+  episodes: MailEpisode[] = []
+): Edition {
   const heading = `${siteIdentity().siteName}, ${editionDateLabel(digest.date)}`;
   return {
     subject: `${siteIdentity().siteName} Daily Digest: ${subjectDateLabel(digest.date)}`,
@@ -213,6 +260,7 @@ export function buildDailyEdition(digest: { date: string; clusters: Cluster[]; s
       archiveLabel: "Read this day on the site",
       summary: digest.summary ? parseSummaryLines(digest.summary).map((l) => l.text) : [],
       groups: groupStories(digest.clusters),
+      episodes,
     }),
   };
 }
@@ -224,7 +272,7 @@ export async function sendDailyEmail(
 ): Promise<string | null> {
   const subs = eligible(state.digestSubscribers, "daily");
   if (subs.length === 0) return null;
-  const r = await sendToAll(subs, buildDailyEdition(digest));
+  const r = await sendToAll(subs, buildDailyEdition(digest, recentEpisodes(state, 24, 3)));
   return `daily email: ${r.sent}/${subs.length} sent${r.errors.length > 0 ? ` (${r.errors.join("; ")})` : ""}`;
 }
 
@@ -304,7 +352,7 @@ export async function buildWeeklyCast(state: SiteState, cfg: SiteConfig): Promis
 }
 
 /** The weekly edition email, assembled from the same weekly top. */
-export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig): Promise<Edition | null> {
+export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig, episodes?: MailEpisode[]): Promise<Edition | null> {
   const week = await weeklyTop(state, cfg);
   if (!week) return null;
   const { top, start, end } = week;
@@ -318,6 +366,7 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig): Pro
       archiveLabel: "Browse the daily archive",
       summary: [],
       groups: groupStories(top),
+      episodes: episodes ?? recentEpisodes(state, 7 * 24, 5),
     }),
   };
 }

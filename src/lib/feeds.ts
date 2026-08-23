@@ -17,6 +17,25 @@ export interface FeedFetchResult {
   error?: string;
 }
 
+/** A media-shelf candidate: a news candidate plus what a video/episode carries. */
+export interface MediaCandidate extends CandidateItem {
+  kind: "video" | "podcast";
+  thumbnail?: string;
+  durationSec?: number;
+  /** podcast episodes: the enclosure audio url. */
+  audioUrl?: string;
+}
+
+export interface MediaFetchResult {
+  feed: FeedConfig;
+  items: MediaCandidate[];
+  error?: string;
+}
+
+export function isMediaFeed(f: FeedConfig): boolean {
+  return f.type === "youtube" || f.type === "podcast";
+}
+
 async function fetchText(url: string, timeoutMs: number): Promise<string> {
   const res = await fetch(url, {
     headers: { "user-agent": userAgent(), accept: "application/rss+xml, application/atom+xml, application/json, text/xml, */*" },
@@ -461,6 +480,222 @@ async function fetchReddit(feed: FeedConfig, timeoutMs: number): Promise<Candida
       const created = new Date((d.created_utc as number) * 1000).toISOString();
       return candidate(feed, url, d.title as string, created, (d.selftext as string) || undefined);
     });
+}
+
+/**
+ * Media episodes may ingest this far back, so a newly whitelisted show fills
+ * the shelf on its first crawl instead of waiting for its next upload. News
+ * items use the much shorter maxItemAgeHours: staleness matters for news,
+ * while a week-old episode is still perfectly watchable.
+ */
+const MEDIA_MAX_AGE_DAYS = 14;
+
+/** Even event channels that dump a whole conference at once ingest gradually. */
+const MEDIA_MAX_PER_FEED_PER_RUN = 10;
+
+/**
+ * YouTube's per-channel feed (youtube.com/feeds/videos.xml?channel_id=UC...):
+ * plain Atom plus a media:group per entry carrying the description and
+ * thumbnail. No API key and no quota, which is the whole reason the media
+ * shelf can exist at zero marginal cost.
+ */
+async function fetchYoutubeMedia(feed: FeedConfig, timeoutMs: number): Promise<MediaCandidate[]> {
+  const xml = await fetchText(feed.url, timeoutMs);
+  const parser: Parser = new Parser({
+    customFields: { item: [["media:group", "mediaGroup"], ["yt:videoId", "videoId"]] },
+  });
+  const parsed = await parser.parseString(xml);
+  return (parsed.items ?? [])
+    .filter((i) => i.link && i.title && !isYoutubeShort(i.link))
+    .map((i) => {
+      const item = i as typeof i & {
+        mediaGroup?: Record<string, Array<string | { $?: { url?: string } }>>;
+        videoId?: string;
+      };
+      const mg = item.mediaGroup ?? {};
+      const descRaw = mg["media:description"]?.[0];
+      const desc = typeof descRaw === "string" ? descRaw : undefined;
+      const thumbRaw = mg["media:thumbnail"]?.[0];
+      const thumbnail =
+        (typeof thumbRaw === "object" ? thumbRaw?.$?.url : undefined) ??
+        (item.videoId ? `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg` : undefined);
+      return {
+        ...candidate(feed, i.link!, i.title!, i.isoDate || new Date().toISOString(), desc),
+        kind: "video" as const,
+        ...(thumbnail ? { thumbnail } : {}),
+      };
+    });
+}
+
+/** The v= id of a YouTube watch URL, or null for anything else. */
+export function youtubeVideoId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (/(^|\.)youtu\.be$/.test(u.hostname)) return u.pathname.slice(1).split("/")[0] || null;
+    if (!/(^|\.)youtube\.com$/.test(u.hostname)) return null;
+    const v = u.searchParams.get("v");
+    if (v) return v;
+    const m = u.pathname.match(/^\/(?:shorts|live|embed)\/([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** YouTube Shorts are clips, not episodes; a shelf called Podcasts does not carry them. */
+export function isYoutubeShort(url: string): boolean {
+  return /youtube\.com\/shorts\//.test(url);
+}
+
+/** ISO 8601 duration (PT1H2M3S) to seconds. */
+function parseIsoDuration(raw?: string): number | undefined {
+  const m = raw?.match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!m) return undefined;
+  const [, d, h, mi, se] = m.map((x) => Number(x ?? 0));
+  return d * 86400 + h * 3600 + mi * 60 + se || undefined;
+}
+
+/**
+ * Episode lengths for YouTube videos, which the RSS feed never carries. With
+ * YOUTUBE_API_KEY set, one Data API call per 50 ids (one quota unit each,
+ * ten thousand a day free). Without it, the watch page is fetched and its
+ * player response read for lengthSeconds: heavier (about a megabyte each), so
+ * capped per call, and best effort throughout (datacenter egress is often
+ * refused). Returns only what it found.
+ */
+export interface YoutubeDetails {
+  durationSec?: number;
+  views?: number;
+  likes?: number;
+}
+
+export async function fetchYoutubeDetails(ids: string[], timeoutMs: number, scrapeCap = 20): Promise<Map<string, YoutubeDetails>> {
+  const out = new Map<string, YoutubeDetails>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return out;
+  const key = process.env.YOUTUBE_API_KEY;
+  if (key) {
+    for (let i = 0; i < unique.length; i += 50) {
+      const chunk = unique.slice(i, i + 50);
+      try {
+        const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${chunk.join(",")}&key=${key}`;
+        const json = JSON.parse(await fetchText(url, timeoutMs)) as {
+          items?: Array<{ id: string; contentDetails?: { duration?: string }; statistics?: { viewCount?: string; likeCount?: string } }>;
+        };
+        for (const v of json.items ?? []) {
+          const sec = parseIsoDuration(v.contentDetails?.duration);
+          const views = Number(v.statistics?.viewCount);
+          const likes = Number(v.statistics?.likeCount);
+          out.set(v.id, {
+            ...(sec ? { durationSec: sec } : {}),
+            ...(Number.isFinite(views) ? { views } : {}),
+            ...(Number.isFinite(likes) ? { likes } : {}),
+          });
+        }
+      } catch {
+        // best effort: a failed chunk just stays unknown
+      }
+    }
+    return out;
+  }
+  for (const id of unique.slice(0, scrapeCap)) {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(`https://www.youtube.com/watch?v=${id}&hl=en`, {
+        signal: controller.signal,
+        redirect: "follow",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+          "Accept-Language": "en",
+        },
+      });
+      clearTimeout(t);
+      if (!res.ok) continue;
+      const html = await res.text();
+      const m = html.match(/"lengthSeconds":"(\d+)"/) ?? html.match(/<meta itemprop="duration" content="([^"]+)"/);
+      const sec = m ? (/^\d+$/.test(m[1]) ? Number(m[1]) : parseIsoDuration(m[1])) : undefined;
+      const vm = html.match(/"viewCount":"(\d+)"/);
+      const views = vm ? Number(vm[1]) : undefined;
+      if (sec || views) out.set(id, { ...(sec ? { durationSec: sec } : {}), ...(views ? { views } : {}) });
+    } catch {
+      // best effort
+    }
+  }
+  return out;
+}
+
+/** "1:02:33", "62:33", or bare seconds: podcast feeds use all three. */
+function parseItunesDuration(raw?: string): number | undefined {
+  if (!raw) return undefined;
+  const parts = raw.trim().split(":").map(Number);
+  if (parts.length === 0 || parts.some((n) => Number.isNaN(n))) return undefined;
+  return parts.reduce((acc, n) => acc * 60 + n, 0) || undefined;
+}
+
+/** Standard podcast RSS: enclosure audio plus the itunes tags rss-parser already reads. */
+async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<MediaCandidate[]> {
+  const parsed = await parseFeedXml(await fetchText(feed.url, timeoutMs));
+  return (parsed.items ?? [])
+    .filter((i) => i.title && (i.link || i.enclosure?.url))
+    .map((i) => {
+      const itunes = (i as { itunes?: { duration?: string; image?: string; summary?: string } }).itunes ?? {};
+      const durationSec = parseItunesDuration(itunes.duration);
+      return {
+        ...candidate(
+          feed,
+          i.link || i.enclosure!.url,
+          i.title!,
+          i.isoDate || (i.pubDate ? new Date(i.pubDate).toISOString() : new Date().toISOString()),
+          i.contentSnippet || itunes.summary
+        ),
+        kind: "podcast" as const,
+        ...(itunes.image ? { thumbnail: itunes.image } : {}),
+        ...(durationSec ? { durationSec } : {}),
+        ...(i.enclosure?.url ? { audioUrl: i.enclosure.url } : {}),
+      };
+    });
+}
+
+/**
+ * All media feeds, each with the same age/pattern filters news feeds get.
+ * Fetched SEQUENTIALLY on purpose: they are almost all youtube.com, and a
+ * parallel burst of a dozen requests trips YouTube's rate limiter into
+ * 404/500s (observed at build time). One at a time stays under it.
+ */
+export async function fetchMediaFeeds(feeds: FeedConfig[], cfg: SiteConfig["ingest"]): Promise<MediaFetchResult[]> {
+  const out: MediaFetchResult[] = [];
+  for (const feed of feeds) {
+    out.push(
+      await (async (): Promise<MediaFetchResult> => {
+        try {
+          let items =
+            feed.type === "youtube"
+              ? await fetchYoutubeMedia(feed, cfg.feedTimeoutMs)
+              : await fetchPodcastMedia(feed, cfg.feedTimeoutMs);
+          items = items.filter((i) => {
+            const age = hoursAgo(i.publishedAt);
+            return age >= -1 && age <= MEDIA_MAX_AGE_DAYS * 24;
+          });
+          if (feed.excludePattern) {
+            const re = new RegExp(feed.excludePattern, "i");
+            items = items.filter((i) => !re.test(i.title));
+          }
+          if (feed.includePattern) {
+            const re = new RegExp(feed.includePattern, "i");
+            items = items.filter((i) => re.test(`${i.title} ${i.excerpt ?? ""}`));
+          }
+          items = items
+            .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+            .slice(0, MEDIA_MAX_PER_FEED_PER_RUN);
+          return { feed, items };
+        } catch (err) {
+          return { feed, items: [], error: err instanceof Error ? err.message : String(err) };
+        }
+      })()
+    );
+  }
+  return out;
 }
 
 export async function fetchFeed(

@@ -6,9 +6,9 @@ import { hasSidebarContent, NewestRail, Sidebar, sidebarSponsored } from "@/comp
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { loadSiteConfig } from "@/lib/config";
 import { maybeDevSeed } from "@/lib/devSeed";
-import { adaptiveRanking, byPublished, itemDisplayTitle, leadLink, liveClusters, topStories, weekendMode, weekInReview } from "@/lib/rank";
+import { adaptiveRanking, leadLink, liveClusters, newestEntries, rankMedia, sectionStories, topStories, weekendMode, weekInReview } from "@/lib/rank";
 import { loadState } from "@/lib/state";
-import { FRONT_SUMMARY_MAX_AGE_HOURS, sponsoredPlacements } from "@/lib/types";
+import { FRONT_SUMMARY_MAX_AGE_HOURS, sponsoredPlacements, type Cluster, type SectionId } from "@/lib/types";
 import { bestMatchIndex, echoesHeadline, hoursAgo, parseSummaryLines } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,20 @@ export default async function HomePage() {
   const week = weekend ? weekInReview(state, ranking, new Set()) : [];
   const leadWithWeek = week.length >= 3;
   const weekIds = new Set(week.map((c) => c.id));
-  const latest = leadWithWeek ? stories.filter((c) => !weekIds.has(c.id)) : stories;
+  const latestRanked = leadWithWeek ? stories.filter((c) => !weekIds.has(c.id)) : stories;
+  // Weekend fallback. Top Stories never pads with weak stories, which is right
+  // on a weekday, but after a quiet stretch the week block can be the only
+  // thing that qualifies and the main column ends after five lines. Rather
+  // than a blank page, show each section's current lead under a "Latest"
+  // label. Weekdays keep the empty state.
+  const weekendFallback =
+    leadWithWeek && latestRanked.length === 0
+      ? cfg.sections
+          .map((sec) => sectionStories(state, sec.id as SectionId, ranking)[0])
+          .filter((c): c is Cluster => Boolean(c) && !weekIds.has(c.id))
+      : [];
+  const latest = latestRanked.length > 0 ? latestRanked : weekendFallback;
+  const belowLabel = latestRanked.length > 0 ? "More stories" : "Latest";
   const summary =
     state.frontSummary?.text && hoursAgo(state.frontSummary.at) <= FRONT_SUMMARY_MAX_AGE_HOURS
       ? state.frontSummary.text
@@ -72,7 +85,10 @@ export default async function HomePage() {
     liveClusters(state).map((c) => [c.id, shownIds.has(c.id) ? `#s-${c.id}` : `/story/${c.slug}`])
   );
 
-  const showSidebar = hasSidebarContent(state);
+  // the Podcasts shelf lives in the middle column (below any sponsored content),
+  // so the column is never blank and the right rail stays Newest
+  const media = rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, ranking).slice(0, 40);
+  const showSidebar = hasSidebarContent(state) || media.length > 0;
   const summaryAt = (aboveNav: boolean) =>
     gistLines.length > 0 ? (
       <SummaryBlock
@@ -134,7 +150,7 @@ export default async function HomePage() {
         ) : null}
         {/* not "also this weekend": stretched decay keeps genuinely older
             stories on the page, so the label must not claim they are new */}
-        {leadWithWeek && latest.length > 0 ? <h2 className="list-label">More stories</h2> : null}
+        {leadWithWeek && latest.length > 0 ? <h2 className="list-label">{belowLabel}</h2> : null}
         {(() => {
           const ad = (state.sponsoredPosts ?? []).find((p) => !p.hidden && sponsoredPlacements(p).includes("top"));
           if (latest.length === 0) {
@@ -173,16 +189,21 @@ export default async function HomePage() {
           podcasts={state.podcasts}
           announcement={state.announcement}
           sponsored={sidebarSponsored(state)}
+          media={media}
         />
       ) : null}
       <NewestRail
         // an item whose story is already a card on this page would show the
         // same news twice (three times when two sources covered it), so the
-        // rail keeps only items the page has not already told
-        items={byPublished(state.items)
-          .filter((i) => !i.clusterId || !shownIds.has(i.clusterId))
-          .slice(0, 12)
-          .map((i) => ({ ...i, rawTitle: i.title, title: itemDisplayTitle(state, i) }))}
+        // rail keeps only items the page has not already told; podcast
+        // episodes ride along at their publish time
+        items={newestEntries(state, 60)
+          .filter((e) => {
+            if (e.podcast) return true;
+            const item = state.items.find((i) => i.id === e.id);
+            return !item?.clusterId || !shownIds.has(item.clusterId);
+          })
+          .slice(0, 12)}
         latestId={state.items[0]?.id}
         top={summaryAt(false)}
       />

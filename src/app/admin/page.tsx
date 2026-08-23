@@ -145,6 +145,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     jobs: state.jobs,
     events: state.events,
     podcasts: state.podcasts ?? [],
+    mediaItems: (state.mediaItems ?? []).slice(0, 60),
     announcement: state.announcement ?? null,
     sponsoredPosts: state.sponsoredPosts ?? [],
     sponsorPageEnabled: Boolean(state.sponsorPageEnabled),

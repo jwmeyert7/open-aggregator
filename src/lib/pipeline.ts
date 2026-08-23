@@ -1,16 +1,16 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
-import { enrichNewItems, fetchAllFeeds, normalizeHost, updateFeedHealth, type FeedFetchResult } from "./feeds";
-import { assessSourceCandidates, classifyAndCluster, dayInReview, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet } from "./llm";
+import { enrichNewItems, fetchAllFeeds, fetchMediaFeeds, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type FeedFetchResult, type MediaCandidate } from "./feeds";
+import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet } from "./llm";
 import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
-import type { SiteConfig } from "./types";
+import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
 import { castRaw, postToFarcaster, farcasterPostedToday } from "./social/farcaster";
 import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from "./social/x";
 import { loadState, saveDailyDigest, saveSnapshot, saveState } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
-import type { CandidateItem, Cluster, DailyDigest, SiteState } from "./types";
+import type { CandidateItem, Cluster, DailyDigest, MediaItem, SiteState } from "./types";
 import { hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, truncate, utcDay } from "./util";
 
 /** Gate counters are kept a little longer than the leaderboard's 30 day window. */
@@ -653,6 +653,244 @@ async function maybeMarketStories(state: SiteState, cfg: SiteConfig): Promise<{ 
   return out;
 }
 
+/** The media shelf keeps a bounded page of recent episodes, nothing more. */
+export const MAX_MEDIA_ITEMS = 200;
+
+/**
+ * YouTube's feed carries no length, so new videos (and, on re-judge, shelved
+ * ones still missing it) get theirs from the Data API or the watch page.
+ * Best effort: an episode without a length just shows none.
+ */
+async function fillVideoDetails(
+  items: Array<{ url: string; kind: string; durationSec?: number; views?: number; likes?: number; statsAt?: string; publishedAt: string }>,
+  timeoutMs: number,
+  refreshStats = false
+): Promise<number> {
+  // lengths once; view counts while the episode is young (a week), at most
+  // every three hours, since velocity is the ranking's main signal
+  const now = Date.now();
+  const stale = (i: { statsAt?: string; publishedAt: string }) =>
+    now - Date.parse(i.publishedAt) <= 7 * 24 * 60 * 60000 &&
+    (!i.statsAt || now - Date.parse(i.statsAt) >= 3 * 60 * 60000);
+  const want = items.filter((i) => i.kind === "video" && (!i.durationSec || (refreshStats && stale(i))));
+  const byId = new Map<string, typeof want>();
+  for (const i of want) {
+    const id = youtubeVideoId(i.url);
+    if (!id) continue;
+    byId.set(id, [...(byId.get(id) ?? []), i]);
+  }
+  if (byId.size === 0) return 0;
+  const found = await fetchYoutubeDetails([...byId.keys()], timeoutMs);
+  let filled = 0;
+  const at = new Date().toISOString();
+  for (const [id, d] of found) {
+    for (const i of byId.get(id) ?? []) {
+      if (d.durationSec && !i.durationSec) {
+        i.durationSec = d.durationSec;
+        filled += 1;
+      }
+      if (d.views !== undefined) {
+        i.views = d.views;
+        if (d.likes !== undefined) i.likes = d.likes;
+        i.statsAt = at;
+      }
+    }
+  }
+  return filled;
+}
+
+/**
+ * A show that publishes the same episode as a podcast and as a video would
+ * shelve it twice under two titles. Pair them: same show, published within
+ * two days, lengths within five percent. The podcast entry keeps its title
+ * and label (it is the one a feed rule may have admitted) and takes the video
+ * url and thumbnail so the player shows video; the video entry is hidden as
+ * the twin. Runs over new and shelved episodes alike.
+ */
+function pairPodcastsWithVideos(items: MediaItem[]): number {
+  let paired = 0;
+  const videos = items.filter((m) => m.kind === "video" && m.durationSec);
+  for (const pod of items) {
+    if (pod.kind !== "podcast" || pod.videoUrl || !pod.durationSec) continue;
+    const twin = videos.find(
+      (v) =>
+        v.sourceName === pod.sourceName &&
+        !v.twinOf &&
+        Math.abs(Date.parse(v.publishedAt) - Date.parse(pod.publishedAt)) <= 48 * 60 * 60000 &&
+        Math.abs(v.durationSec! - pod.durationSec!) / pod.durationSec! <= 0.05
+    );
+    if (!twin) continue;
+    pod.videoUrl = twin.url;
+    if (!pod.thumbnail && twin.thumbnail) pod.thumbnail = twin.thumbnail;
+    if (!pod.section && twin.section) pod.section = twin.section;
+    twin.twinOf = pod.id;
+    twin.hidden = true;
+    paired += 1;
+  }
+  return paired;
+}
+
+/** A feed's titleRewrite, when it has one: one regex pass over the show's own title. */
+function rewriteTitle(feed: { titleRewrite?: { pattern: string; replacement: string } } | undefined, title: string): string {
+  if (!feed?.titleRewrite) return title;
+  try {
+    return title.replace(new RegExp(feed.titleRewrite.pattern, "i"), feed.titleRewrite.replacement);
+  } catch {
+    return title;
+  }
+}
+
+/** Feed titles arrive with stray trailing separators ("Conference 2026 Recap Video |"); drop them. */
+function cleanMediaTitle(title: string): string {
+  return title.replace(/[\s|:\-\u2013\u2014\u00b7]+$/u, "").trim();
+}
+
+/**
+ * Re-run the media gate over what is already on the shelf, so a tightened
+ * rule applies to episodes judged under the old one: tier 2 episodes that
+ * now fail are hidden (kept in the admin), every episode picks up its
+ * section label, and titles get the current cleanup. Tier 1 episodes are
+ * never re-gated, only labeled.
+ */
+export async function rejudgeMedia(
+  state: SiteState,
+  mediaFeeds: ReturnType<typeof effectiveFeeds>,
+  timeoutMs: number = loadSiteConfig().ingest.feedTimeoutMs
+): Promise<{ note: string }> {
+  const items = state.mediaItems ?? [];
+  if (items.length === 0) return { note: "Nothing on the shelf to re-judge." };
+  const feedById = new Map(mediaFeeds.map((f) => [f.id, f]));
+  let clips = 0;
+  for (const m of items) {
+    m.title = cleanMediaTitle(rewriteTitle(feedById.get(m.sourceId), m.title));
+    const hint = feedById.get(m.sourceId)?.sectionHint;
+    if (!m.section && hint) m.section = hint;
+    const tier = feedById.get(m.sourceId)?.tier;
+    if (!m.tier && tier) m.tier = tier;
+    // clips shelved before ingest learned to skip them
+    if (!m.hidden && isYoutubeShort(m.url)) {
+      m.hidden = true;
+      clips += 1;
+    }
+  }
+  // hidden ones too: a hidden video may be the twin of a podcast episode, and pairing needs both lengths
+  const filled = await fillVideoDetails(items, timeoutMs, true);
+  const paired = pairPodcastsWithVideos(items);
+  const gated = items.filter((m) => !m.hidden && (feedById.get(m.sourceId)?.tier ?? 1) !== 1);
+  if (gated.length === 0) return { note: `Shelf re-labeled, ${filled} length(s) filled in; no tier 2 episodes to re-judge.` };
+  if (!llmAvailable()) return { note: "Shelf re-labeled; LLM not configured, so nothing was re-judged." };
+  let hidden = 0;
+  for (let i = 0; i < gated.length; i += 40) {
+    const chunk = gated.slice(i, i + 40);
+    const verdicts = await gateMediaItems(
+      chunk.map((m) => ({ id: m.id, show: m.sourceName, title: m.title, excerpt: m.excerpt }))
+    );
+    for (const m of chunk) {
+      const v = verdicts[m.id];
+      if (!v?.onTopic) {
+        m.hidden = true;
+        hidden += 1;
+      } else if (v.section) m.section = v.section;
+    }
+  }
+  return { note: `Re-judged ${gated.length} tier 2 episode(s): ${hidden} hidden, the rest kept and labeled. ${filled} length(s) filled in.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}${paired > 0 ? ` ${paired} podcast episode(s) paired with their video.` : ""}` };
+}
+
+/**
+ * Fetch, dedupe, gate, and shelve media episodes. Tier 1 shows pass straight
+ * through (whitelisting was the curation); tier 2 shows face the media gate,
+ * because broad shows are only sometimes about the site's topic. A gate
+ * failure holds that batch unseen so the next run retries it, mirroring the
+ * news path.
+ */
+export async function ingestMedia(
+  state: SiteState,
+  mediaFeeds: ReturnType<typeof effectiveFeeds>,
+  cfg: SiteConfig
+): Promise<{ errors: Array<{ feedId: string; error: string }>; note?: string }> {
+  const results = await fetchMediaFeeds(mediaFeeds, cfg.ingest);
+  const feedById = new Map(mediaFeeds.map((f) => [f.id, f]));
+  const errors = results.filter((r) => r.error).map((r) => ({ feedId: r.feed.id, error: r.error! }));
+  const fresh = selectNewItems(state, results.flatMap((r) => r.items)) as Array<MediaCandidate & { id: string }>;
+
+  // a show segment that always belongs (a weekly roundup) skips the gate on
+  // its feed's alwaysPattern and takes the feed's section label
+  const alwaysRe = new Map(mediaFeeds.filter((f) => f.alwaysPattern).map((f) => [f.id, new RegExp(f.alwaysPattern!, "i")]));
+  const always = (i: MediaCandidate) => alwaysRe.get(i.sourceId)?.test(i.title) ?? false;
+  const passthrough = fresh.filter((i) => i.tier === 1 || always(i));
+  const gated = fresh.filter((i) => i.tier !== 1 && !always(i));
+  const kept = [...passthrough];
+  const judged = [...passthrough];
+  let rejected = 0;
+  let held = 0;
+  let heldReason = "";
+  const gateSection = new Map<string, SectionId>();
+
+  if (gated.length > 0) {
+    if (llmAvailable()) {
+      try {
+        const verdicts = await gateMediaItems(
+          gated.map((i) => ({ id: i.id, show: i.sourceName, title: i.title, excerpt: i.excerpt }))
+        );
+        for (const item of gated) {
+          judged.push(item);
+          const v = verdicts[item.id];
+          if (v?.onTopic) {
+            kept.push(item);
+            if (v.section) gateSection.set(item.id, v.section);
+          } else rejected += 1;
+        }
+      } catch (err) {
+        // unseen, so the next run simply retries them
+        held = gated.length;
+        heldReason = err instanceof Error ? err.message : String(err);
+      }
+    } else {
+      // deliberate no-key mode: tier-2 episodes cannot be judged, so they are
+      // dropped (and marked seen) rather than queued forever
+      judged.push(...gated);
+      rejected += gated.length;
+    }
+  }
+
+  for (const item of judged) markSeen(state, item);
+  await fillVideoDetails(kept, cfg.ingest.feedTimeoutMs);
+  const now = new Date().toISOString();
+  const shelved: MediaItem[] = kept.map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    url: i.url,
+    title: cleanMediaTitle(rewriteTitle(feedById.get(i.sourceId), i.title)),
+    tier: i.tier,
+    // a label, not a bucket: tier 1 shows carry the feed's hint, tier 2
+    // episodes get the gate's call, and the episode also shows in that
+    // section's rail
+    ...(gateSection.get(i.id) ?? i.sectionHint ? { section: gateSection.get(i.id) ?? i.sectionHint } : {}),
+    sourceId: i.sourceId,
+    sourceName: i.sourceName,
+    publishedAt: i.publishedAt,
+    ingestedAt: now,
+    ...(i.thumbnail ? { thumbnail: i.thumbnail } : {}),
+    ...(i.durationSec ? { durationSec: i.durationSec } : {}),
+    ...(i.audioUrl ? { audioUrl: i.audioUrl } : {}),
+    ...(i.excerpt ? { excerpt: truncate(i.excerpt, 300) } : {}),
+  }));
+  state.mediaItems = [...shelved, ...(state.mediaItems ?? [])]
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, MAX_MEDIA_ITEMS);
+  pairPodcastsWithVideos(state.mediaItems);
+  // keep view counts fresh for young episodes so the ranked boxes track what
+  // people are actually watching (one API call per fifty videos)
+  await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
+  updateFeedHealth(state, results, new Set(shelved.map((i) => i.sourceId)));
+
+  const note =
+    fresh.length > 0 || held > 0
+      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}.`
+      : undefined;
+  return { errors, note };
+}
+
 function prune(state: SiteState): void {
   const cfg = loadSiteConfig().ingest;
   state.items = state.items
@@ -677,6 +915,10 @@ function prune(state: SiteState): void {
   // never turn into a chore
   if (state.submissions) {
     state.submissions = state.submissions.filter((s) => hoursAgo(s.at) <= 14 * 24);
+  }
+  // the media shelf ages out by ingest time; hidden items expire with the rest
+  if (state.mediaItems) {
+    state.mediaItems = state.mediaItems.filter((m) => hoursAgo(m.ingestedAt) <= 90 * 24).slice(0, MAX_MEDIA_ITEMS);
   }
   // market baselines and cooldowns for slugs no longer configured are dead
   // weight; disabled markets keep theirs so re-enabling resumes cleanly
@@ -854,10 +1096,14 @@ export async function runPipeline(): Promise<RunReport> {
   const cfg = loadSiteConfig();
   // fresh: mutating and saving a stale fallback copy would roll the site back
   const state = await loadState({ fresh: true });
-  const feeds = effectiveFeeds(state);
+  const allFeeds = effectiveFeeds(state);
+  // media feeds fill the shelf beside the news flow; they never enter the
+  // gate/cluster path, so the news fetch only sees the rest
+  const mediaFeeds = allFeeds.filter(isMediaFeed);
+  const feeds = allFeeds.filter((f) => !isMediaFeed(f));
 
   const report: RunReport = {
-    fetchedFeeds: feeds.length,
+    fetchedFeeds: allFeeds.length,
     feedErrors: [],
     newItems: 0,
     usedLlm: false,
@@ -991,6 +1237,22 @@ export async function runPipeline(): Promise<RunReport> {
     report.notes.push(...swings.notes);
   } catch (err) {
     report.notes.push(`Polymarket check failed: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // The media shelf ingests beside the news flow: no clustering, no
+  // corroboration, its own gate. A failure here must never cost a news run,
+  // and shelf changes never trigger snapshots (snapshots are story history).
+  // Hourly, not every run: episodes do not need the news cadence, and the
+  // sequential YouTube fetch is the slowest part of a run.
+  if (mediaFeeds.length > 0 && (!state.lastMediaIngestAt || hoursAgo(state.lastMediaIngestAt) >= 0.9)) {
+    try {
+      const media = await ingestMedia(state, mediaFeeds, cfg);
+      report.feedErrors.push(...media.errors);
+      if (media.note) report.notes.push(media.note);
+      state.lastMediaIngestAt = new Date().toISOString();
+    } catch (err) {
+      report.notes.push(`Media ingest failed: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   prune(state);

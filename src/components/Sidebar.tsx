@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { SponsoredCard } from "@/components/ClusterCard";
+import { MediaPlayer } from "@/components/MediaPlayer";
+import { MediaRail } from "@/components/MediaRail";
 import { NewItemsButton } from "@/components/NewItemsButton";
 import { AgeStamp } from "@/components/AgeStamp";
-import { sponsoredPlacements, type Listing, type RiverItem, type SiteState, type SponsoredPost } from "@/lib/types";
+import type { NewestEntry } from "@/lib/rank";
+import { sponsoredPlacements, type Listing, type MediaItem, type SiteState, type SponsoredPost } from "@/lib/types";
 
 function Rail({ title, items }: { title: string; items: Listing[] }) {
   const featured = items.filter((l) => l.featured);
@@ -56,27 +59,40 @@ export function hasSidebarContent(
   );
 }
 
-/** Middle column: announcement slot + Jobs, Events, and Podcasts rails. Empty/hidden surfaces render nothing. */
+/**
+ * Middle column: announcement slot + Jobs, Events, and Shows rails (all paid),
+ * then the free Podcasts shelf. Empty/hidden surfaces render nothing. The
+ * paid listing rail is called Shows so it never shares a name with the shelf.
+ */
 export function Sidebar({
   jobs,
   events,
   podcasts = [],
   announcement,
   sponsored,
+  media = [],
+  mediaLimit,
 }: {
   jobs: Listing[];
   events: Listing[];
   podcasts?: Listing[];
   announcement?: SiteState["announcement"];
   sponsored?: SponsoredPost;
+  /** Podcasts shelf episodes for this page (the front page passes all, a section page its own). */
+  media?: MediaItem[];
+  mediaLimit?: number;
 }) {
   const vJobs = visible(jobs);
   const vEvents = visible(events);
   const vPodcasts = visible(podcasts);
+  const hasSponsored = Boolean(
+    (announcement?.text && !announcement.hidden) || sponsored || vJobs.length > 0 || vEvents.length > 0 || vPodcasts.length > 0
+  );
   return (
     <aside className="sidebar">
-      {/* desktop column label; hidden on mobile where .sponsored-label takes over */}
-      <div className="col-label">Sponsored</div>
+      {/* desktop column label; hidden on mobile where .sponsored-label takes over. Only
+          when there is sponsored content: otherwise the media block labels the column */}
+      {hasSponsored ? <div className="col-label">Sponsored</div> : null}
       {announcement?.text && !announcement.hidden ? (
         <div className="sponsor-slot">
           {announcement.url ? (
@@ -94,7 +110,8 @@ export function Sidebar({
       ) : null}
       {vJobs.length > 0 ? <Rail title="Jobs" items={vJobs} /> : null}
       {vEvents.length > 0 ? <Rail title="Events" items={vEvents} /> : null}
-      {vPodcasts.length > 0 ? <Rail title="Podcasts" items={vPodcasts} /> : null}
+      {vPodcasts.length > 0 ? <Rail title="Shows" items={vPodcasts} /> : null}
+      {media.length > 0 ? <MediaRail items={media} limit={mediaLimit} /> : null}
     </aside>
   );
 }
@@ -104,11 +121,14 @@ export function NewestRail({
   items,
   latestId,
   top,
+  bottom,
 }: {
-  items: Array<RiverItem & { rawTitle?: string }>;
+  items: NewestEntry[];
   latestId?: string;
   /** Desktop-only block above the list (the front page parks Latest in here). */
   top?: React.ReactNode;
+  /** Block below the list, for anything a page wants to park under Newest. */
+  bottom?: React.ReactNode;
 }) {
   return (
     <aside className="sidebar newest-col">
@@ -120,21 +140,48 @@ export function NewestRail({
         <h3>Newest</h3>
         <ul>
           {items.length === 0 ? <li className="org">Nothing yet.</li> : null}
-          {items.map((i) => (
-            <li key={i.id} className="newest-item">
-              <a href={i.url} rel="noopener" title={i.rawTitle && i.rawTitle !== i.title ? `Source title: ${i.rawTitle}` : undefined}>
-                {i.title}
-              </a>
-              <div className="org">
-                {i.sourceName} · <AgeStamp iso={i.publishedAt} />
-              </div>
-            </li>
-          ))}
+          {items.map((i) =>
+            i.episode ? (
+              // an episode plays right here, same player as the Podcasts box
+              <li key={i.id} className="newest-item newest-episode">
+                <MediaPlayer
+                  id={`newest-${i.episode.id}`}
+                  url={i.episode.url}
+                  kind={i.episode.kind}
+                  title={i.episode.displayTitle ?? i.episode.title}
+                  thumbnail={i.episode.thumbnail}
+                  audioUrl={i.episode.audioUrl}
+                  videoUrl={i.episode.videoUrl}
+                  compact
+                >
+                  <div className="media-body">
+                    <a href={i.url} rel="noopener" title={i.rawTitle && i.rawTitle !== i.title ? `Show's title: ${i.rawTitle}` : undefined}>
+                      {i.title}
+                    </a>
+                    <div className="org">
+                      <span className="kind-tag">podcast</span>
+                      {i.sourceName} · <AgeStamp iso={i.publishedAt} />
+                    </div>
+                  </div>
+                </MediaPlayer>
+              </li>
+            ) : (
+              <li key={i.id} className="newest-item">
+                <a href={i.url} rel="noopener" title={i.rawTitle && i.rawTitle !== i.title ? `Source title: ${i.rawTitle}` : undefined}>
+                  {i.title}
+                </a>
+                <div className="org">
+                  {i.sourceName} · <AgeStamp iso={i.publishedAt} />
+                </div>
+              </li>
+            )
+          )}
         </ul>
         <div className="rail-more">
           <Link href="/stream">full stream →</Link>
         </div>
       </div>
+      {bottom}
     </aside>
   );
 }

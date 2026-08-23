@@ -4,7 +4,7 @@ import { ColumnHeads } from "@/components/ColumnHeads";
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { hasSidebarContent, NewestRail, Sidebar, sidebarSponsored } from "@/components/Sidebar";
 import { loadSiteConfig } from "@/lib/config";
-import { adaptiveRanking, byPublished, itemDisplayTitle, sectionStories } from "@/lib/rank";
+import { adaptiveRanking, newestEntries, rankMedia, sectionStories } from "@/lib/rank";
 import { loadSnapshot, loadState } from "@/lib/state";
 import { sponsoredPlacements, type SectionId } from "@/lib/types";
 
@@ -72,9 +72,17 @@ export default async function SlugPage({
   if (!section) notFound();
 
   const state = await loadState();
-  const stories = sectionStories(state, section.id as SectionId, adaptiveRanking(state, cfg.ranking));
+  const ranking = adaptiveRanking(state, cfg.ranking);
+  const stories = sectionStories(state, section.id as SectionId, ranking);
 
-  const showSidebar = hasSidebarContent(state);
+  // the section's own episodes: section is a label on media, so an episode
+  // lives on /podcasts and also here
+  const sectionMedia = rankMedia(
+    (state.mediaItems ?? []).filter((m) => !m.hidden && m.section === section.id),
+    state,
+    ranking
+  ).slice(0, 40);
+  const showSidebar = hasSidebarContent(state) || sectionMedia.length > 0;
   return (
     <main className={`wrap page${showSidebar ? "" : " no-middle"}`}>
       <ColumnHeads sections={cfg.sections} active={section.id} />
@@ -107,12 +115,17 @@ export default async function SlugPage({
           podcasts={state.podcasts}
           announcement={state.announcement}
           sponsored={sidebarSponsored(state)}
+          media={sectionMedia}
+          mediaLimit={5}
         />
       ) : null}
       <NewestRail
-        items={byPublished(state.items)
-          .slice(0, 12)
-          .map((i) => ({ ...i, rawTitle: i.title, title: itemDisplayTitle(state, i) }))}
+        // this section's own newest; when the section is quiet, the global
+        // rail rather than a three-line box
+        items={(() => {
+          const own = newestEntries(state, 12, section.id as SectionId);
+          return own.length >= 6 ? own : newestEntries(state, 12);
+        })()}
         latestId={state.items[0]?.id}
       />
     </main>

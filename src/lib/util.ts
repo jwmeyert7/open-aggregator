@@ -258,3 +258,12 @@ export function socialSourceName(url: string): string | null {
   } catch {}
   return null;
 }
+
+/** "1h 12m" / "42m" for an episode length; null when unknown or zero. */
+export function formatDuration(sec?: number): string | null {
+  if (!sec || sec <= 0) return null;
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${Math.max(1, m)}m`;
+}

@@ -9,9 +9,31 @@ export const metadata = { title: "Stream" };
 
 export default async function StreamPage() {
   const state = await loadState();
+  const episodes: StreamItem[] = (state.mediaItems ?? [])
+    .filter((m) => !m.hidden)
+    .map((m) => ({
+      id: `ep-${m.id}`,
+      url: m.videoUrl ?? m.url,
+      title: m.displayTitle ?? m.title,
+      ...(m.displayTitle ? { rawTitle: m.title } : {}),
+      sourceName: m.sourceName,
+      publishedAt: m.publishedAt,
+      podcast: true,
+      playHref: `/podcasts?play=${m.id}#m-${m.id}`,
+      ...(m.section ? { section: m.section } : {}),
+      episode: {
+        id: m.id,
+        url: m.url,
+        kind: m.kind,
+        title: m.title,
+        ...(m.thumbnail ? { thumbnail: m.thumbnail } : {}),
+        ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
+        ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
+      },
+    }));
   const items: StreamItem[] = byPublished(state.items)
     .slice(0, 300)
-    .map((i) => {
+    .map((i): StreamItem => {
       const cluster = i.clusterId ? state.clusters[i.clusterId] : undefined;
       const title = itemDisplayTitle(state, i);
       return {
@@ -23,7 +45,11 @@ export default async function StreamPage() {
         publishedAt: i.publishedAt,
         ...(cluster && !cluster.killed ? { storySlug: cluster.slug, section: cluster.section } : {}),
       };
-    });
+    })
+    // episodes join at their publish time: the Stream is the one chronological view
+    .concat(episodes)
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, 300);
 
   return (
     <main className="wrap page single">

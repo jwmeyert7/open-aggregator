@@ -240,6 +240,62 @@ export async function dayInReview(date: string, clusters: Cluster[]): Promise<Su
 }
 
 /**
+ * The media gate: one batched yes/no read over new tier-2 episodes. Cheaper
+ * and blunter than the news gate on purpose: an episode is either
+ * substantially about the site's topic or it is not, and a wrong "no" costs
+ * one invisible episode while a wrong "yes" puts noise on the shelf. The
+ * rulebook (media-gate.md) therefore says to exclude when unsure.
+ */
+export interface MediaVerdict {
+  onTopic: boolean;
+  section?: string;
+}
+
+export async function gateMediaItems(
+  episodes: Array<{ id: string; show: string; title: string; excerpt?: string }>
+): Promise<Record<string, MediaVerdict>> {
+  const sections = navSections();
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: z.object({
+      verdicts: z.array(
+        z.object({
+          id: z.string(),
+          onTopic: z
+            .boolean()
+            .describe("true only when the episode is substantially about the site's topic"),
+          section: enumOf(sections.map((s) => s.id))
+            .optional()
+            .describe("when onTopic is true: the one section from `sections` the episode fits best, a label for where it also appears"),
+        })
+      ),
+    }),
+    messages: [
+      {
+        role: "system",
+        content: loadPrompt("media-gate"),
+        // byte-identical every run, same caching rationale as the cluster rulebook
+        providerOptions: { anthropic: { cacheControl: { type: "ephemeral", ttl: "1h" } } },
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          // the valid section ids with their meanings, so the prompt can stay generic
+          sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+          episodes: episodes.map((e) => ({
+            id: e.id,
+            show: e.show,
+            title: e.title,
+            description: e.excerpt ? truncate(e.excerpt, 400) : undefined,
+          })),
+        }),
+      },
+    ],
+  });
+  return Object.fromEntries(object.verdicts.map((v) => [v.id, { onTopic: v.onTopic, section: v.section }]));
+}
+
+/**
  * One editor read per source candidate: what the domain publishes, why the
  * discovery channel keeps linking it, and where its stories would land. One
  * batched call, best-effort at the call site, written once and kept on the

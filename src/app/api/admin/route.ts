@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, checkPassword, cookieValue, isAdmin, LAYOUT_PREVIEW_COOKIE } from "@/lib/auth";
-import { loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
-import { buildDailyEdition, buildWeeklyEdition, confirmationEmail, sendEditionTo, type Edition } from "@/lib/digest";
-import { discoverFeed, userAgent } from "@/lib/feeds";
+import { effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
+import { buildDailyEdition, buildWeeklyEdition, confirmationEmail, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
+import { discoverFeed, isMediaFeed, userAgent } from "@/lib/feeds";
 import { sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable } from "@/lib/llm";
-import { applyEditorOutput, digestClusters, digestPostText, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
@@ -531,7 +531,7 @@ async function handle(req: NextRequest) {
       if (!date) return fail("No daily digest exists yet. The first freezes at UTC midnight.");
       const digest = await loadDailyDigest(date);
       if (!digest) return fail(`Could not load the ${date} digest.`);
-      edition = buildDailyEdition(digest);
+      edition = buildDailyEdition(digest, recentEpisodes(state, 24, 3));
     }
     const err = await sendEditionTo(to, edition, unsub);
     return err ? fail(`Send failed: ${err}`) : ok(`Test ${body.kind === "weekly" ? "weekly" : "daily"} edition sent to ${to}.`);
@@ -717,6 +717,46 @@ async function handle(req: NextRequest) {
     l.hidden = !l.hidden;
     await saveState(state);
     return ok(l.hidden ? "Hidden from the site (kept here for later)." : "Now shown on the site.");
+  }
+
+  if (body.action === "refreshMedia") {
+    // media-only ingest: fetch + gate + shelve, nothing from the news flow.
+    // The button exists so a fresh deploy (or a new show) fills the shelf
+    // without waiting for the hourly cadence.
+    const mediaFeeds = effectiveFeeds(state).filter(isMediaFeed);
+    if (mediaFeeds.length === 0) return fail("No media feeds configured.");
+    const res = await ingestMedia(state, mediaFeeds, cfg);
+    state.lastMediaIngestAt = new Date().toISOString();
+    await saveState(state);
+    const errs = res.errors.length > 0 ? ` Feed errors: ${res.errors.map((e) => e.feedId).join(", ")}.` : "";
+    return ok(`${res.note ?? "Media shelf refreshed, nothing new."}${errs}`);
+  }
+
+  if (body.action === "rejudgeMedia") {
+    // the gate prompt changed: apply it to what is already shelved
+    const mediaFeeds = effectiveFeeds(state).filter(isMediaFeed);
+    const r = await rejudgeMedia(state, mediaFeeds, cfg.ingest.feedTimeoutMs);
+    await saveState(state);
+    return ok(r.note);
+  }
+
+  if (body.action === "setMediaTitle") {
+    // a site title for the rare episode whose own title misleads; empty clears it
+    const m = (state.mediaItems ?? []).find((x) => x.id === body.id);
+    if (!m) return fail("Unknown media item.");
+    const t = String(body.title ?? "").trim();
+    if (t) m.displayTitle = t.slice(0, 200);
+    else delete m.displayTitle;
+    await saveState(state);
+    return ok(t ? "Site title set. The show's own title stays in the tooltip and on the watch link." : "Site title cleared.");
+  }
+
+  if (body.action === "toggleMediaHidden") {
+    const m = (state.mediaItems ?? []).find((x) => x.id === body.id);
+    if (!m) return fail("Unknown media item.");
+    m.hidden = !m.hidden;
+    await saveState(state);
+    return ok(m.hidden ? "Hidden from the site (kept here until it ages out)." : "Now shown on the site.");
   }
 
   if (body.action === "toggleAnnouncement") {

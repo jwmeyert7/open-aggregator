@@ -79,6 +79,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="footer-row">
               {/* the snapshot archive is reached by clicking the header's date */}
               <Link href="/stream">Stream</Link>
+              <Link href="/podcasts">Podcasts</Link>
               <Link href="/day">Daily Archive</Link>
               <Link href="/sources">Sources</Link>
               <Link href="/about">About</Link>

@@ -13,8 +13,9 @@ This is the platform that powers [ethernews.org](https://ethernews.org).
 - An admin panel: pin, kill, merge, split, re-edit, add a story by URL, review reader submissions, manage sources, and see every pipeline run
 - A source leaderboard, feed health tracking, and automatic source discovery from a Farcaster channel
 - Optional social posting, capped in code and dry-run by default (Farcaster and X built in, the module pattern extends to others)
-- Optional sponsored posts, announcement slot, and jobs/events/podcasts listings, always visually marked as paid
-- A built-in remote MCP server at `/api/mcp` (streamable HTTP, stateless, read-only): AI assistants like Claude can pull your ranked top stories, search them, or fetch a daily edition. It serves the same state the front page renders and makes no LLM calls, so it adds nothing to your costs.
+- A podcasts shelf: videos and podcast episodes from whitelisted YouTube channels and podcast feeds, played in place on the page, with tier 2 shows held to an LLM media gate
+- Optional sponsored posts, announcement slot, and jobs/events/shows listings, always visually marked as paid
+- A built-in remote MCP server at `/api/mcp` (streamable HTTP, stateless, read-only): AI assistants like Claude can pull your ranked top stories, search them, fetch a daily edition, or read the podcasts shelf. It serves the same state the front page renders and makes no LLM calls, so it adds nothing to your costs.
 
 If the LLM is unreachable, tier 1 items become single-link stories flagged "needs review", tier 2 items wait, and the site stays up.
 
@@ -26,6 +27,7 @@ If the LLM is unreachable, tier 1 items become single-link stories flagged "need
 - **`ADMIN_PASSWORD`**, a password you choose for the admin panel, plus a recommended `SESSION_SECRET` (any long random string) to sign admin sessions.
 - **`CRON_SECRET`**, required. The cron route fails closed: without it nothing can trigger the pipeline, so an unconfigured fork can't run anything.
 - **SMTP credentials, only if you want email digests.** The worked example is a Gmail app password sending as a forwarding alias from ImprovMX (free): ImprovMX forwards `hello@yourdomain` to your Gmail, and Gmail's "send mail as" plus an app password lets the site send from that address. Any SMTP server works via `SMTP_HOST` and `SMTP_PORT`.
+- **`YOUTUBE_API_KEY`, optional.** Fills in episode lengths and view counts on the podcasts shelf from the YouTube Data API (one quota unit per video, ten thousand a day free). Without it the pipeline falls back to a best-effort scrape of each watch page, which datacenter egress often cannot do, so lengths and view counts may stay unknown.
 - **Social credentials, only if you want posting.** The built-in modules are Farcaster (`NEYNAR_API_KEY` plus `FARCASTER_SIGNER_UUID`) and X (its four API keys), and the same small-module shape extends to any network. Until credentials exist every post is a logged dry-run.
 
 ## Quickstart (local)
@@ -56,12 +58,13 @@ cp config/prompts/add-by-url.example.md config/prompts/add-by-url.md
 cp config/prompts/day-summary.example.md config/prompts/day-summary.md
 cp config/prompts/source-candidate.example.md config/prompts/source-candidate.md
 cp config/prompts/summary-refresh.example.md config/prompts/summary-refresh.md
+cp config/prompts/media-gate.example.md config/prompts/media-gate.md
 ```
 
 - **`site.json`** is the site's identity: name, tagline, topic, domain, contact address, optional social handles.
-- **`feeds.json`** is the source whitelist: RSS, Discourse forums, subreddits, scraped listing pages, Google News query feeds, and Farcaster discovery channels, each with a trust tier and a ranking weight.
+- **`feeds.json`** is the source whitelist: RSS, Discourse forums, subreddits, scraped listing pages, Google News query feeds, and Farcaster discovery channels, each with a trust tier and a ranking weight. YouTube channel feeds and podcast feeds go in the same list and fill the podcasts shelf instead of the story pipeline.
 - **`sections.json`** defines your sections and every ranking, ingest, weekend-mode, prediction-market, and bot-cap knob.
-- **`prompts/*.md`** hold the editorial rules: gating, clustering, headline and explainer style. The valid section ids are handed to the model automatically, so the prompts stay topic-portable. The examples ban em dashes and semicolons in editorial copy as a house default you are free to change.
+- **`prompts/*.md`** hold the editorial rules: gating, clustering, headline and explainer style, and the media gate for tier 2 shows. The valid section ids are handed to the model automatically, so the prompts stay topic-portable. The examples ban em dashes and semicolons in editorial copy as a house default you are free to change.
 
 Since a deployed site reads the config baked into the deployment, config changes ship like code: commit them to your private fork (or keep a private branch) and push.
 
