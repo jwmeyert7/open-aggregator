@@ -9,7 +9,10 @@ export function MainNav({ sections }: { sections: Array<{ id: string; title: str
   // pages carry their own in-grid header row on desktop, so this nav is
   // purely their mobile furniture; everywhere else it renders nothing.
   // /new is mobile's fifth tab, so the row stays visible there too
-  const gridPage = path === "/" || path === "/new" || sections.some((s) => `/${s.id}` === path);
+  // /podcasts is mobile's sixth: the Podcasts box stacks below the whole story
+  // list on small screens, so the menu is its one-tap reach there
+  const gridPage =
+    path === "/" || path === "/new" || path === "/podcasts" || sections.some((s) => `/${s.id}` === path);
   if (!gridPage) return null;
   return (
     <nav className="main-nav wrap mobile-only">
@@ -24,6 +27,9 @@ export function MainNav({ sections }: { sections: Array<{ id: string; title: str
       {/* only shown at widths where the Newest column has dropped below the stories */}
       <Link href="/new" className={`nav-new${path === "/new" ? " active" : ""}`}>
         New
+      </Link>
+      <Link href="/podcasts" className={`nav-new${path === "/podcasts" ? " active" : ""}`}>
+        Podcasts
       </Link>
     </nav>
   );
