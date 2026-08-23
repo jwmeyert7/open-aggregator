@@ -29,6 +29,7 @@ const SOURCE_CATEGORIES = [
   "newsletter",
   "news",
   "news - mainstream",
+  "media",
   "discovery",
   "other",
 ];
