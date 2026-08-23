@@ -14,3 +14,6 @@ config/feeds.json
 config/sections.json
 config/prompts/*.md
 !config/prompts/*.example.md
+
+# local state backups (never commit state, even copies)
+.data.bak*/
