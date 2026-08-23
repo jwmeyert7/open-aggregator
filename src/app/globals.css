@@ -1872,27 +1872,34 @@ button.status-date {
 .media-rail li {
   display: block;
 }
+/* newspaper float: the thumb sits right, the title starts at the left edge
+   and wraps beneath it, and the meta line gets the full width below */
 .media-rail .media-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  display: flow-root;
 }
 .media-rail .media-thumb {
-  flex: 0 0 auto;
+  float: right;
+  margin: 3px 0 4px 10px;
 }
 .media-rail .media-thumb img {
-  width: 72px;
+  width: 96px;
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: 4px;
   display: block;
-  margin-top: 3px;
 }
 .media-rail li > .kicker {
   margin-bottom: 3px;
 }
 .media-rail .media-body {
   min-width: 0;
+}
+.media-rail .media-body a {
+  display: block;
+  line-height: 1.35;
+  /* guardrail: even an endless title stops at three lines */
+  max-height: 4.05em;
+  overflow: hidden;
 }
 .media-item .kicker,
 .media-rail .kicker {
