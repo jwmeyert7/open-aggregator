@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { useEffect, useState } from "react";
+import { formatViews } from "@/lib/util";
 
 export interface StreamItem {
   id: string;
@@ -16,6 +17,8 @@ export interface StreamItem {
   /** podcast episodes merged into the flow; playHref opens the in-site player */
   podcast?: boolean;
   playHref?: string;
+  /** episodes: the video's view count, when it has one worth saying */
+  views?: number;
   /** episodes: what the row needs to play in place */
   episode?: { id: string; url: string; kind: "video" | "podcast"; title: string; thumbnail?: string; audioUrl?: string; videoUrl?: string };
 }
@@ -69,6 +72,7 @@ export function StreamList({ items }: { items: StreamItem[] }) {
                       </a>{" "}
                       <span className="org">
                         <span className="kind-tag">podcast</span>/ {i.sourceName}
+                        {formatViews(i.views) ? <> · {formatViews(i.views)} views</> : null}
                       </span>
                       {i.section ? (
                         <>

@@ -6,7 +6,7 @@ import { loadSiteConfig } from "@/lib/config";
 import { adaptiveRanking, episodeStories, rankMedia } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
-import { formatDuration, formatMoment, mediaThumb } from "@/lib/util";
+import { formatDuration, formatMoment, formatViews, mediaThumb } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,11 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
             <ol>
               {top.map((m) => (
                 <li key={m.id}>
-                  <a href={`#m-${m.id}`}>{m.displayTitle ?? m.title}</a> <span className="org">· {m.sourceName}</span>
+                  <a href={`#m-${m.id}`}>{m.displayTitle ?? m.title}</a>{" "}
+                  <span className="org">
+                    · {m.sourceName}
+                    {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null}
+                  </span>
                 </li>
               ))}
             </ol>
@@ -82,7 +86,8 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                         <SectionPill section={m.section} />
                       </>
                     ) : null}
-                    {formatDuration(m.durationSec) ? <> · {formatDuration(m.durationSec)}</> : null} ·{" "}
+                    {formatDuration(m.durationSec) ? <> · {formatDuration(m.durationSec)}</> : null}
+                    {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null} ·{" "}
                     <AgeStamp iso={m.publishedAt} />
                   </div>
                   {(covered.get(m.id) ?? []).length > 0 ? (

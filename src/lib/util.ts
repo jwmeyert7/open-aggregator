@@ -305,3 +305,10 @@ function watchId(u?: string): string | undefined {
   const m = u?.match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m?.[1];
 }
+
+/** "9.7k" / "142k" / "1.2m" view counts. Null under a thousand: a small number advertises smallness, so the line simply omits it. */
+export function formatViews(views?: number): string | null {
+  if (!views || views < 1000) return null;
+  if (views >= 1e6) return `${(views / 1e6).toFixed(views >= 1e7 ? 0 : 1)}m`;
+  return `${(views / 1000).toFixed(views >= 10000 ? 0 : 1)}k`;
+}

@@ -22,6 +22,7 @@ export default async function StreamPage() {
       podcast: true,
       playHref: `/podcasts?play=${m.id}#m-${m.id}`,
       ...(m.section ? { section: m.section } : {}),
+      ...(m.views ? { views: m.views } : {}),
       episode: {
         id: m.id,
         url: m.url,
