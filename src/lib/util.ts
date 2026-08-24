@@ -282,11 +282,26 @@ export function formatMoment(sec: number): string {
  * whose cards lead with exaggerated faces; "show" drops the image entirely so
  * the player renders a flat tile with the show's name instead.
  */
-export function mediaThumb(m: { thumbnail?: string; thumbStyle?: "frame" | "frame2" | "frame3" | "show" }): string | undefined {
+export function mediaThumb(m: {
+  thumbnail?: string;
+  thumbStyle?: "frame" | "frame2" | "frame3" | "show";
+  url?: string;
+  videoUrl?: string;
+}): string | undefined {
   if (m.thumbStyle === "show") return undefined;
-  if (m.thumbStyle?.startsWith("frame") && m.thumbnail) {
+  if (m.thumbStyle?.startsWith("frame")) {
     const n = m.thumbStyle === "frame" ? 1 : Number(m.thumbStyle.slice(5));
-    return m.thumbnail.replace(/\/[a-z]*default\.jpg/, `/hq${n}.jpg`);
+    // derive the frame from the video id when there is one: a podcast episode's
+    // stored thumbnail is the show's own artwork (not a YouTube URL), but its
+    // video twin still has honest frames
+    const id = watchId(m.videoUrl) ?? watchId(m.url);
+    if (id) return `https://i.ytimg.com/vi/${id}/hq${n}.jpg`;
+    if (m.thumbnail) return m.thumbnail.replace(/\/[a-z]*default\.jpg/, `/hq${n}.jpg`);
   }
   return m.thumbnail;
+}
+
+function watchId(u?: string): string | undefined {
+  const m = u?.match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m?.[1];
 }
