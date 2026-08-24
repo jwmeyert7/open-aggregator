@@ -58,7 +58,9 @@ export function SummaryBlock({
     );
   };
   return (
-    <div className={`front-summary${aboveNav ? " above-nav" : ""}`}>
+    <>
+      {!aboveNav ? <div className="front-summary-label">{heading}</div> : null}
+      <div className={`front-summary${aboveNav ? " above-nav" : ""}`}>
       <div className="front-summary-head">{heading}</div>
       {untagged.length > 0 ? (
         <ul>
@@ -88,6 +90,7 @@ export function SummaryBlock({
           })}
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   );
 }

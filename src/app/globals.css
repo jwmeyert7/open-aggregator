@@ -2425,23 +2425,29 @@ body:has(.player-page) {
   white-space: nowrap;
 }
 
-/* ----- the Latest in label steps outside its box on desktop ----- */
-/* same outside-label system as PODCASTS and NEWEST: the label sits above the
-   box at the rail-label size; on mobile it stays inside the box, the same
-   fallback the other rails use */
+/* ----- the Latest in label steps outside its box ----- */
+/* the same outside-label system as PODCASTS and NEWEST, aligned to their
+   line by living in the column flow instead of being absolutely positioned.
+   On mobile the label hides and the in-box heading takes over, and the
+   above-nav variant keeps its in-box heading. */
+.front-summary-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.sidebar .front-summary-label {
+  /* the rail stack's 28px gap trims to 10px, exactly like .col-label */
+  margin-bottom: -18px;
+}
+@media (max-width: 760px) {
+  .front-summary-label {
+    display: none;
+  }
+}
 @media (min-width: 761px) {
-  .front-summary {
-    position: relative;
-    margin-top: 26px;
-  }
-  .front-summary.above-nav {
-    margin-top: 26px;
-  }
-  .front-summary-head {
-    position: absolute;
-    top: -22px;
-    left: 0;
-    font-size: 0.78rem;
-    margin-bottom: 0;
+  .front-summary:not(.above-nav) .front-summary-head {
+    display: none;
   }
 }
