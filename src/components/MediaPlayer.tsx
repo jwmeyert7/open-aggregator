@@ -112,6 +112,8 @@ export function MediaPlayer({
   const [expanded, setExpanded] = useState(false);
   const [position, setPosition] = useState(0);
   const [resumeAt, setResumeAt] = useState(0);
+  // total length: seeded from the shelf's data, refined by the player itself
+  const [dur, setDur] = useState(durationSec ?? 0);
   const frame = useRef<HTMLIFrameElement>(null);
   const audio = useRef<HTMLAudioElement>(null);
   const ytId = videoUrl ? youtubeId(videoUrl) : kind === "video" ? youtubeId(url) : null;
@@ -135,6 +137,8 @@ export function MediaPlayer({
         const t = data?.info?.currentTime;
         if (typeof t === "number" && Number.isFinite(t)) {
           setPosition(t);
+          const d = data?.info?.duration;
+          if (typeof d === "number" && Number.isFinite(d) && d > 0) setDur(d);
           if (memoryKey) savePos(memoryKey, t, typeof data?.info?.duration === "number" ? data.info.duration : undefined);
         }
       } catch {
@@ -331,13 +335,18 @@ export function MediaPlayer({
                 }}
                 onTimeUpdate={(e) => {
                   setPosition(e.currentTarget.currentTime);
+                  if (Number.isFinite(e.currentTarget.duration) && e.currentTarget.duration > 0) setDur(e.currentTarget.duration);
                   if (memoryKey) savePos(memoryKey, e.currentTarget.currentTime, e.currentTarget.duration || undefined);
                 }}
               />
             )}
             <div className="org media-player-links">
               <a href={watchHref} rel="noopener" onClick={pauseHere} onAuxClick={pauseHere}>
-                {ytId ? (seconds > 5 ? `watch on YouTube from ${fmt(seconds)}` : "watch on YouTube") : "open episode page"}
+                {ytId
+                ? seconds > 5
+                  ? `watch on YouTube from ${fmt(seconds)} / ${dur > 0 ? `${fmt(Math.round(dur))} (${Math.min(100, Math.round((seconds / dur) * 100))}%)` : "…"}`
+                  : "watch on YouTube"
+                : "open episode page"}
               </a>{" "}
               ·{" "}
               <button type="button" className="linklike" onClick={() => setExpanded((v) => !v)}>
