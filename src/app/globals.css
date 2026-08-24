@@ -2379,9 +2379,41 @@ body:has(.player-page) .header-stack,
 body:has(.player-page) .site-footer {
   display: none;
 }
+/* the detached window fits its content to whatever size the window is: the
+   video flexes to fill (no fixed aspect ratio), the link row sits below on
+   one line, and nothing ever bleeds past the edges */
 .player-page {
   padding: 8px;
+  box-sizing: border-box;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .player-page .media-row {
   display: none;
+}
+.player-page .media-player.compact {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.player-page .media-player-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+.player-page .media-frame {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+.player-page .media-player-links {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
