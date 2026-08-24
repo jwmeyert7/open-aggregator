@@ -2201,7 +2201,7 @@ button.status-date {
   text-decoration: none;
 }
 .admin-tool:hover {
-  border-color: var(--accent);
+  border-color: var(--link);
 }
 .admin-tool .tool-name {
   font-weight: 700;
@@ -2234,7 +2234,7 @@ button.status-date {
   color: inherit;
 }
 .merge-option:hover .merge-headline {
-  color: var(--accent);
+  color: var(--link);
 }
 .merge-option .merge-headline {
   font-weight: 600;
@@ -2299,7 +2299,7 @@ button.status-date {
   left: 0;
   bottom: 0;
   height: 3px;
-  background: var(--accent);
+  background: var(--link);
   border-radius: 0 0 0 4px;
   pointer-events: none;
 }
