@@ -75,6 +75,7 @@ export function MediaPlayer({
   durationSec,
   popOut = true,
   detach = false,
+  closeWindow = false,
   children,
 }: {
   id: string;
@@ -99,6 +100,8 @@ export function MediaPlayer({
   popOut?: boolean;
   /** dock only: offer the float (picture-in-picture) and window detach controls */
   detach?: boolean;
+  /** the player is the whole window (the /player popup page, or the float's inner frame): close closes the window itself */
+  closeWindow?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -215,6 +218,20 @@ export function MediaPlayer({
     if (!ytId) return;
     window.open(`/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`, "_blank", "popup,width=520,height=340");
     pauseHere();
+  };
+
+  // in a detached window the player is the window: closing one closes both.
+  // Inside the float, the /player page is an iframe, so the window to close
+  // is the parent picture-in-picture window.
+  const closePlayer = () => {
+    if (closeWindow) {
+      const w = window.parent === window ? window : window.parent;
+      try {
+        w.close();
+      } catch {}
+      return;
+    }
+    setOpen(false);
   };
 
   const thumb = thumbnail ? (
@@ -335,7 +352,7 @@ export function MediaPlayer({
                 </>
               ) : null}
               ·{" "}
-              <button type="button" className="linklike" onClick={() => setOpen(false)}>
+              <button type="button" className="linklike" onClick={closePlayer}>
                 close
               </button>
             </div>

@@ -28,6 +28,7 @@ export default async function PlayerPage({ searchParams }: { searchParams: Promi
         compact
         autoOpen
         popOut={false}
+        closeWindow
         startAt={Number.isFinite(start) && start > 0 ? start : undefined}
       >
         <span />
