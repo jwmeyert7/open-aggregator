@@ -30,15 +30,57 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function SourcePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const state = await loadState();
-  const feed = effectiveFeeds(state).find((f) => sourceSlug(f.name) === slug);
+  // one display name can cover several feeds, and even both identities at
+  // once: Bankless is a news outlet (its site's RSS) and two show feeds
+  const named = effectiveFeeds(state).filter((f) => sourceSlug(f.name) === slug);
+  const feed = named[0];
   if (!feed) notFound();
+  const hasMedia = named.some((f) => isMediaFeed(f));
+  const hasNews = named.some((f) => !isMediaFeed(f));
+  const episodes = hasMedia
+    ? (state.mediaItems ?? [])
+        .filter((m) => !m.hidden && m.sourceName === feed.name)
+        .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    : [];
+  const episodeItems = episodes.map((m) => (
+    <li key={m.id} className="media-item">
+      <MediaPlayer
+        id={`src-${m.id}`}
+        url={m.url}
+        kind={m.kind}
+        title={m.displayTitle ?? m.title}
+        thumbnail={mediaThumb(m)}
+        tileText={m.sourceName}
+        durationSec={m.durationSec}
+        chapters={m.chapters}
+        audioUrl={m.audioUrl}
+        videoUrl={m.videoUrl}
+        compact
+      >
+        <div className="media-body">
+          <a href={m.videoUrl ?? m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>
+            {m.displayTitle ?? m.title}
+          </a>
+          <div className="org">
+            {m.kind}
+            {m.section ? (
+              <>
+                {" · "}
+                <SectionPill section={m.section} />
+              </>
+            ) : null}
+            {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null} ·{" "}
+            <AgeStamp iso={m.publishedAt} />
+          </div>
+        </div>
+      </MediaPlayer>
+    </li>
+  ));
 
-  // a podcast show's page lists its episodes, playable in place, instead of
-  // article links: the show's output IS its coverage
-  if (isMediaFeed(feed)) {
-    const episodes = (state.mediaItems ?? [])
-      .filter((m) => !m.hidden && m.sourceName === feed.name)
-      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  // a pure show's page lists its episodes, playable in place, instead of
+  // article links: the show's output IS its coverage. An outlet that is also
+  // a show (Bankless) keeps the articles page and gains an Episodes section.
+  if (hasMedia && !hasNews) {
     return (
       <main className="wrap page single roomy">
         <div className="prose">
@@ -52,40 +94,7 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
             {episodes.length === 0 ? (
               <li className="org">No episodes from this show are on the site right now. Its next one will appear here.</li>
             ) : null}
-            {episodes.map((m) => (
-              <li key={m.id} className="media-item">
-                <MediaPlayer
-                  id={`src-${m.id}`}
-                  url={m.url}
-                  kind={m.kind}
-                  title={m.displayTitle ?? m.title}
-                  thumbnail={mediaThumb(m)}
-                  tileText={m.sourceName}
-                  durationSec={m.durationSec}
-                  chapters={m.chapters}
-                  audioUrl={m.audioUrl}
-                  videoUrl={m.videoUrl}
-                  compact
-                >
-                  <div className="media-body">
-                    <a href={m.videoUrl ?? m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>
-                      {m.displayTitle ?? m.title}
-                    </a>
-                    <div className="org">
-                      {m.kind}
-                      {m.section ? (
-                        <>
-                          {" · "}
-                          <SectionPill section={m.section} />
-                        </>
-                      ) : null}
-                      {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null} ·{" "}
-                      <AgeStamp iso={m.publishedAt} />
-                    </div>
-                  </div>
-                </MediaPlayer>
-              </li>
-            ))}
+            {episodeItems}
           </ul>
         </div>
       </main>
@@ -133,6 +142,12 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
             </li>
           ))}
         </ul>
+        {episodes.length > 0 ? (
+          <>
+            <h2>Episodes</h2>
+            <ul className="media-list">{episodeItems}</ul>
+          </>
+        ) : null}
       </div>
     </main>
   );
