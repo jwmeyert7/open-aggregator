@@ -666,6 +666,23 @@ async function handle(req: NextRequest) {
     return ok(message);
   }
 
+  if (body.action === "renameSource") {
+    const cluster = state.clusters[String(body.clusterId ?? "")];
+    if (!cluster) return fail("Unknown story.");
+    const name = truncate(stripHtml(String(body.name ?? "")), 60).trim();
+    if (!name) return fail("A source name is required.");
+    // the kicker link is the one whose name the reader sees
+    const lead = leadLink(cluster);
+    const target = cluster.links.find((l) => l.url === lead?.url) ?? cluster.links[0];
+    if (!target) return fail("The story has no links.");
+    const before = target.sourceName;
+    target.sourceName = name;
+    for (const i of state.items) if (i.url === target.url) i.sourceName = name;
+    await takeSnapshot(state);
+    await saveState(state);
+    return ok(`Kicker source renamed: \u201c${before}\u201d is now \u201c${name}\u201d.`);
+  }
+
   if (body.action === "addUrl") {
     const url = String(body.url ?? "").trim();
     if (!/^https?:\/\//.test(url)) return fail("Paste a full http(s) URL.");

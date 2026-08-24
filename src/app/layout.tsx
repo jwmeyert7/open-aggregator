@@ -8,6 +8,7 @@ import { loadState } from "@/lib/state";
 import { HeaderStatus } from "@/components/HeaderStatus";
 import { LinkPrefToggle } from "@/components/LinkPrefToggle";
 import { MainNav } from "@/components/MainNav";
+import { MiniPlayer } from "@/components/MiniPlayer";
 import { SearchBox } from "@/components/SearchBox";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Wordmark } from "@/components/Wordmark";
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <MainNav sections={sections.map((s) => ({ id: s.id, title: s.title, tooltip: s.tooltip }))} />
         </div>
         {children}
+        <MiniPlayer />
         <footer className="site-footer">
           <div className="wrap">
             {/* row one is places to read, with the bot accounts tucked right */}

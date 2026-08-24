@@ -354,6 +354,18 @@ export function StoriesClient({
                   >
                     Re-edit
                   </button>
+                  <button
+                    className="btn"
+                    disabled={busy}
+                    title="Rename the kicker source (the outlet name the reader sees before the headline)"
+                    onClick={() => {
+                      const name = window.prompt("Source name for the kicker:", c.linkList[0]?.sourceName ?? "");
+                      if (name === null) return;
+                      act("renameSource", { clusterId: c.id, name });
+                    }}
+                  >
+                    Rename source
+                  </button>
                 </div>
                 {/* editor override: attach coverage straight onto this story, skipping
                     the editorial gate (which judges standalone stories, not angles) */}

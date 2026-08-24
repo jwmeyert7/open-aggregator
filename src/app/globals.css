@@ -2337,3 +2337,51 @@ button.status-date {
   font-size: 0.82rem;
   color: var(--muted);
 }
+
+/* ----- corner dock and detached player windows ----- */
+
+/* the corner dock: playback survives in-site navigation because it lives in
+   the layout; the thumb row is hidden, the dock header stands in for it */
+.mini-dock {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 60;
+  width: min(380px, calc(100vw - 28px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  padding: 8px 10px;
+}
+.mini-dock .media-row {
+  display: none;
+}
+.mini-dock .media-player.compact {
+  margin: 0;
+}
+.dock-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+}
+.dock-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the popup window's page: only the player, no site chrome */
+body:has(.player-page) .header-stack,
+body:has(.player-page) .site-footer {
+  display: none;
+}
+.player-page {
+  padding: 8px;
+}
+.player-page .media-row {
+  display: none;
+}
