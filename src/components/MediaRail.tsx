@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AgeStamp } from "@/components/AgeStamp";
+import { SectionPill } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import type { MediaItem } from "@/lib/types";
 import { formatViews, mediaThumb } from "@/lib/util";
@@ -56,7 +57,7 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                     {m.displayTitle ?? m.title}
                   </a>
                   <div className="org">
-                    {m.section ? <>{m.section} · </> : null}
+                    {m.section ? <><SectionPill section={m.section} /> · </> : null}
                     {formatViews(m.views) ? <>{formatViews(m.views)} views · </> : null}
                     <AgeStamp iso={m.publishedAt} />
                   </div>
