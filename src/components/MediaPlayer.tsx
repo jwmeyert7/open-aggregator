@@ -201,7 +201,7 @@ export function MediaPlayer({
     if (!dpp || !ytId) return;
     const pip = await dpp.requestWindow({ width: 480, height: 292 });
     pip.document.title = title;
-    pip.document.body.style.cssText = "margin:0;background:#000";
+    pip.document.body.style.cssText = "margin:0;background:#000;overflow:hidden";
     const f = pip.document.createElement("iframe");
     // the PiP document is effectively about:blank, so a raw embed sends no
     // referrer and YouTube refuses it (error 153). Our own /player page has a
@@ -209,7 +209,9 @@ export function MediaPlayer({
     f.src = `${window.location.origin}/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`;
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.allowFullscreen = true;
-    f.style.cssText = "border:0;width:100vw;height:100vh";
+    // display block: an inline iframe leaves a baseline gap below itself,
+    // which overflows the window by a few pixels and grows scrollbars
+    f.style.cssText = "border:0;display:block;width:100%;height:100%";
     pip.document.body.appendChild(f);
     pauseHere();
   };
