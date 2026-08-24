@@ -14,6 +14,7 @@ export default async function AdminPodcastsPage() {
   const state = await loadState();
   const cfg = loadSiteConfig();
   const data: PodcastsData = {
+    sections: cfg.sections.map((s) => s.id),
     mediaItems: (state.mediaItems ?? []).slice(0, 60),
   };
 

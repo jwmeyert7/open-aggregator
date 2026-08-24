@@ -790,6 +790,55 @@ function cleanMediaTitle(title: string): string {
  * section label, and titles get the current cleanup. Tier 1 episodes are
  * never re-gated, only labeled.
  */
+
+/**
+ * Editor override: put one YouTube video on the shelf directly, skipping the
+ * media gate (which judges a show's stream, not a hand-picked episode). The
+ * details come from the Data API; if the video's channel is one of the
+ * configured shows, the episode adopts that feed's identity so the kicker,
+ * tier, and thumbnail style behave as if it arrived normally.
+ */
+export async function addMediaByUrl(state: SiteState, rawUrl: string, cfg: SiteConfig, section?: SectionId): Promise<string> {
+  const vid = youtubeVideoId(rawUrl);
+  if (!vid) return "Only YouTube links can be added as episodes for now.";
+  const url = `https://www.youtube.com/watch?v=${vid}`;
+  const items = state.mediaItems ?? [];
+  if (items.some((m) => youtubeVideoId(m.videoUrl ?? m.url) === vid)) return "That episode is already on the shelf.";
+  const details = await fetchYoutubeDetails([vid], cfg.ingest.feedTimeoutMs, 0, true);
+  const d = details.get(vid);
+  if (!d?.title) return "Could not read that video from the YouTube API.";
+  if (d.upcoming) return "That video is a scheduled premiere that has not aired yet.";
+  const now = new Date().toISOString();
+  const feed = effectiveFeeds(state).find((f) => d.channelId && f.url.includes(`channel_id=${d.channelId}`));
+  const links = extractDescriptionLinks(d.description);
+  const chapters = extractChapters(d.description ?? "");
+  const item: MediaItem = {
+    id: dedupeKeyUrl(url).slice(0, 12),
+    kind: "video",
+    url,
+    title: cleanMediaTitle(feed ? rewriteTitle(feed, d.title, d.publishedAt ?? now) : d.title),
+    tier: feed?.tier ?? 2,
+    ...(section ? { section } : {}),
+    sourceId: feed?.id ?? "admin-add",
+    sourceName: feed?.name ?? d.channel ?? "YouTube",
+    publishedAt: d.airedAt ?? d.publishedAt ?? now,
+    ingestedAt: now,
+    thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+    ...(feed?.thumbStyle && feed.thumbStyle !== "episode" ? { thumbStyle: feed.thumbStyle } : {}),
+    ...(d.durationSec ? { durationSec: d.durationSec } : {}),
+    ...(d.views !== undefined ? { views: d.views, statsAt: now } : {}),
+    ...(d.likes !== undefined ? { likes: d.likes } : {}),
+    ...(links.length > 0 ? { links } : {}),
+    ...(chapters.length > 0 ? { chapters } : {}),
+  };
+  state.seen[dedupeKeyUrl(url)] = now;
+  state.mediaItems = [item, ...items]
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, MAX_MEDIA_ITEMS);
+  const mentions = await linkEpisodesToStories(state);
+  return `Added \u201c${item.title}\u201d to the shelf${mentions > 0 ? ` with ${mentions} story mention(s) from its notes` : ""}. It ranks like any episode.`;
+}
+
 export async function rejudgeMedia(
   state: SiteState,
   mediaFeeds: ReturnType<typeof effectiveFeeds>,

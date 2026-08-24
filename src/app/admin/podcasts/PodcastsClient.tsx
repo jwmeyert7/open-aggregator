@@ -5,6 +5,7 @@ import { timeAgo } from "@/lib/util";
 import { AdminChrome, type AdminChromeData, Toast, useAdminAct } from "../shared";
 
 export interface PodcastsData {
+  sections: string[];
   mediaItems: MediaItem[];
 }
 
@@ -23,6 +24,32 @@ export function PodcastsClient({ chrome, data }: { chrome: AdminChromeData; data
         current media gate over the tier 2 episodes already shelved, hiding any that no longer pass, and refreshes
         every episode's section label.
       </p>
+      {/* editor override: one hand-picked episode straight onto the shelf, no gate */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          const url = String(f.get("url") ?? "").trim();
+          if (!url) return;
+          act("addMediaUrl", { url, section: f.get("section") });
+          e.currentTarget.reset();
+        }}
+      >
+        <div className="form-row">
+          <input className="text" name="url" placeholder="Add an episode by YouTube link (no gate)…" />
+          <select className="select" name="section" style={{ width: "auto" }}>
+            <option value="">no section label</option>
+            {data.sections.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button className="btn" type="submit" disabled={busy}>
+            Add episode
+          </button>
+        </div>
+      </form>
       <div className="btn-row">
         <button className="btn" disabled={busy} onClick={() => act("refreshMedia")}>
           Refresh shelf now

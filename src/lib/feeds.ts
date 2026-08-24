@@ -627,6 +627,11 @@ export interface YoutubeDetails {
   likes?: number;
   /** the full description, when asked for (the feed's copy is kept only in part) */
   description?: string;
+  /** snippet fields, present when the description was asked for */
+  title?: string;
+  channel?: string;
+  channelId?: string;
+  publishedAt?: string;
   /** a scheduled premiere or live stream that has not aired: not an episode yet */
   upcoming?: boolean;
   /** when a live stream or premiere actually happened, which is its honest publish time */
@@ -656,7 +661,7 @@ export async function fetchYoutubeDetails(
             id: string;
             contentDetails?: { duration?: string };
             statistics?: { viewCount?: string; likeCount?: string };
-            snippet?: { description?: string };
+            snippet?: { description?: string; title?: string; channelTitle?: string; channelId?: string; publishedAt?: string };
             liveStreamingDetails?: { scheduledStartTime?: string; actualStartTime?: string; actualEndTime?: string };
           }>;
         };
@@ -669,6 +674,14 @@ export async function fetchYoutubeDetails(
             ...(Number.isFinite(views) ? { views } : {}),
             ...(Number.isFinite(likes) ? { likes } : {}),
             ...(withDescription && v.snippet?.description ? { description: v.snippet.description } : {}),
+            ...(withDescription && v.snippet
+              ? {
+                  ...(v.snippet.title ? { title: v.snippet.title } : {}),
+                  ...(v.snippet.channelTitle ? { channel: v.snippet.channelTitle } : {}),
+                  ...(v.snippet.channelId ? { channelId: v.snippet.channelId } : {}),
+                  ...(v.snippet.publishedAt ? { publishedAt: v.snippet.publishedAt } : {}),
+                }
+              : {}),
             ...((): Partial<YoutubeDetails> => {
               const live = v.liveStreamingDetails;
               if (!live) return {};

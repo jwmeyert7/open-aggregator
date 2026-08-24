@@ -6,7 +6,7 @@ import { discoverFeed, isMediaFeed, userAgent } from "@/lib/feeds";
 import { sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable } from "@/lib/llm";
-import { applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
@@ -639,6 +639,17 @@ async function handle(req: NextRequest) {
     return ok(
       `Source “${name}” added from ${host} (${found.type} feed ${found.url}, tier 2, weight 1). It's polled starting next pipeline run; tune tier, weight, and category in Sources.`
     );
+  }
+
+  if (body.action === "addMediaUrl") {
+    const url = String(body.url ?? "").trim();
+    if (!/^https?:\/\//.test(url)) return fail("Paste a full http(s) URL.");
+    const section = cfg.sections.some((x) => x.id === String(body.section ?? ""))
+      ? (String(body.section) as SectionId)
+      : undefined;
+    const message = await addMediaByUrl(state, url, cfg, section);
+    await saveState(state);
+    return ok(message);
   }
 
   if (body.action === "addUrl") {
