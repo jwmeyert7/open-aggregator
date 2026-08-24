@@ -209,9 +209,10 @@ export function MediaPlayer({
     f.src = `${window.location.origin}/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`;
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.allowFullscreen = true;
-    // display block: an inline iframe leaves a baseline gap below itself,
-    // which overflows the window by a few pixels and grows scrollbars
-    f.style.cssText = "border:0;display:block;width:100%;height:100%";
+    // display block kills the inline baseline gap that grew scrollbars, and
+    // viewport units size the frame without needing the pip body to declare
+    // a height (a percent height there collapses to the 150px iframe default)
+    f.style.cssText = "border:0;display:block;width:100vw;height:100vh";
     pip.document.body.appendChild(f);
     pauseHere();
   };
