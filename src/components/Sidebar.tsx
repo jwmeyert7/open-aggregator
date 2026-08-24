@@ -151,6 +151,7 @@ export function NewestRail({
                   title={i.episode.displayTitle ?? i.episode.title}
                   thumbnail={i.episode.thumbnail}
                   tileText={i.sourceName}
+                  durationSec={i.episode.durationSec}
                   audioUrl={i.episode.audioUrl}
                   videoUrl={i.episode.videoUrl}
                   compact

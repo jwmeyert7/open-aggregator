@@ -263,7 +263,7 @@ export interface NewestEntry {
   /** episodes: the in-site player link */
   playHref?: string;
   /** episodes: what the row needs to play in place (same player as the Podcasts box) */
-  episode?: Pick<MediaItem, "id" | "url" | "kind" | "title" | "thumbnail" | "audioUrl" | "videoUrl" | "displayTitle">;
+  episode?: Pick<MediaItem, "id" | "url" | "kind" | "title" | "thumbnail" | "durationSec" | "audioUrl" | "videoUrl" | "displayTitle">;
 }
 
 /**
@@ -305,6 +305,7 @@ export function newestEntries(state: SiteState, limit: number, section?: Section
         kind: m.kind,
         title: m.title,
         ...(mediaThumb(m) ? { thumbnail: mediaThumb(m) } : {}),
+        ...(m.durationSec ? { durationSec: m.durationSec } : {}),
         ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
         ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
         ...(m.displayTitle ? { displayTitle: m.displayTitle } : {}),

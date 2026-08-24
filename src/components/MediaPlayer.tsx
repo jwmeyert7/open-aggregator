@@ -72,6 +72,7 @@ export function MediaPlayer({
   header,
   startAt,
   tileText,
+  durationSec,
   children,
 }: {
   id: string;
@@ -90,6 +91,8 @@ export function MediaPlayer({
   startAt?: number;
   /** shown on the flat tile when the row has no thumbnail (the show's name) */
   tileText?: string;
+  /** episode length: shown on the thumbnail chip, after the resume point when one is saved */
+  durationSec?: number;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -187,9 +190,13 @@ export function MediaPlayer({
             <span className="play-mark" aria-hidden="true">
               {open ? "✕" : "▶"}
             </span>
-            {!open && resumeAt > 0 ? (
+            {!open && (resumeAt > 0 || durationSec) ? (
               <span className="resume-mark" aria-hidden="true">
-                {fmt(Math.floor(resumeAt))}
+                {resumeAt > 0 && durationSec
+                  ? `${fmt(Math.floor(resumeAt))} / ${fmt(Math.round(durationSec))}`
+                  : resumeAt > 0
+                    ? fmt(Math.floor(resumeAt))
+                    : fmt(Math.round(durationSec ?? 0))}
               </span>
             ) : null}
           </button>

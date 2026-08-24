@@ -29,6 +29,7 @@ export default async function StreamPage() {
         kind: m.kind,
         title: m.title,
         ...(mediaThumb(m) ? { thumbnail: mediaThumb(m) } : {}),
+        ...(m.durationSec ? { durationSec: m.durationSec } : {}),
         ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
         ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
       },

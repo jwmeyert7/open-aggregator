@@ -20,7 +20,7 @@ export interface StreamItem {
   /** episodes: the video's view count, when it has one worth saying */
   views?: number;
   /** episodes: what the row needs to play in place */
-  episode?: { id: string; url: string; kind: "video" | "podcast"; title: string; thumbnail?: string; audioUrl?: string; videoUrl?: string };
+  episode?: { id: string; url: string; kind: "video" | "podcast"; title: string; thumbnail?: string; durationSec?: number; audioUrl?: string; videoUrl?: string };
 }
 
 /** Client-rendered so dates and times appear in the visitor's own timezone. */
@@ -62,6 +62,7 @@ export function StreamList({ items }: { items: StreamItem[] }) {
                     title={i.title}
                     thumbnail={i.episode.thumbnail}
                     tileText={i.sourceName}
+                    durationSec={i.episode.durationSec}
                     audioUrl={i.episode.audioUrl}
                     videoUrl={i.episode.videoUrl}
                     compact

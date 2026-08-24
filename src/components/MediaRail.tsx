@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AgeStamp } from "@/components/AgeStamp";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import type { MediaItem } from "@/lib/types";
-import { formatDuration, formatViews, mediaThumb } from "@/lib/util";
+import { formatViews, mediaThumb } from "@/lib/util";
 
 /**
  * Podcasts: the newest whitelisted episodes, living in the middle column
@@ -43,6 +43,7 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                 title={m.displayTitle ?? m.title}
                 thumbnail={mediaThumb(m)}
                 tileText={m.sourceName}
+                durationSec={m.durationSec}
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 compact
@@ -56,7 +57,6 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                   </a>
                   <div className="org">
                     {m.section ? <>{m.section} · </> : null}
-                    {formatDuration(m.durationSec) ? <>{formatDuration(m.durationSec)} · </> : null}
                     {formatViews(m.views) ? <>{formatViews(m.views)} views · </> : null}
                     <AgeStamp iso={m.publishedAt} />
                   </div>
