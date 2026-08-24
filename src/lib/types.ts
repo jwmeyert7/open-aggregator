@@ -35,6 +35,8 @@ export interface FeedConfig {
   alwaysPattern?: string;
   /** media feeds only: what an episode row's tile shows. "episode" (the default) uses the episode's own art; "frame", "frame2", and "frame3" swap in a plain frame from the video itself (YouTube's hq1/hq2/hq3.jpg, roughly the quarter points) for shows whose designed cards are unbearable; "show" drops the image for a flat tile carrying the show's name. Applied to shelved episodes on every pipeline run. */
   thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show";
+  /** media feeds only: every episode is a roundup spanning the sections. It wears no section label and appears in every section's rail, because a label that applies to everything selects nothing. */
+  roundup?: boolean;
   /** listing type only: regex an href must match to count as a post link. */
   linkPattern?: string;
   /** Admin-facing grouping only; never shown on the public site. */
@@ -192,6 +194,8 @@ export interface MediaItem {
   thumbnail?: string;
   /** copied from the feed's thumbStyle on every pipeline run and on re-judge; absent means the episode's own art */
   thumbStyle?: "frame" | "frame2" | "frame3" | "show";
+  /** a roundup episode: no section label, shown in every section's rail (synced from the feed like thumbStyle) */
+  roundup?: boolean;
   durationSec?: number;
   /** podcast episodes only: the enclosure audio, so the page can play it natively. */
   audioUrl?: string;

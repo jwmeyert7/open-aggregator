@@ -177,7 +177,7 @@ const handler = createMcpHandler(
         const state = await loadState();
         const base = siteUrl();
         const covered = episodeStories(state);
-        const pool = (state.mediaItems ?? []).filter((m) => !m.hidden && (!section || m.section === section));
+        const pool = (state.mediaItems ?? []).filter((m) => !m.hidden && (!section || m.roundup || m.section === section));
         return asText({
           site: base,
           updatedAt: state.updatedAt,

@@ -289,7 +289,7 @@ export function newestEntries(state: SiteState, limit: number, section?: Section
     publishedAt: i.publishedAt,
   }));
   const episodes: NewestEntry[] = (state.mediaItems ?? [])
-    .filter((m) => !m.hidden && (!section || m.section === section))
+    .filter((m) => !m.hidden && (!section || m.roundup || m.section === section))
     .map((m) => ({
       id: `ep-${m.id}`,
       url: m.videoUrl ?? m.url,

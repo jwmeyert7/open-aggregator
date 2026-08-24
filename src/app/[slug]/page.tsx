@@ -78,7 +78,7 @@ export default async function SlugPage({
   // the section's own episodes: section is a label on media, so an episode
   // lives on /podcasts and also here
   const sectionMedia = rankMedia(
-    (state.mediaItems ?? []).filter((m) => !m.hidden && m.section === section.id),
+    (state.mediaItems ?? []).filter((m) => !m.hidden && (m.roundup || m.section === section.id)),
     state,
     ranking
   ).slice(0, 40);

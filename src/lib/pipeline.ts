@@ -738,7 +738,7 @@ function pairPodcastsWithVideos(items: MediaItem[]): number {
     pod.videoUrl = twin.url;
     if (!pod.thumbnail && twin.thumbnail) pod.thumbnail = twin.thumbnail;
     if (!pod.thumbStyle && twin.thumbStyle) pod.thumbStyle = twin.thumbStyle;
-    if (!pod.section && twin.section) pod.section = twin.section;
+    if (!pod.section && !pod.roundup && twin.section) pod.section = twin.section;
     twin.twinOf = pod.id;
     twin.hidden = true;
     paired += 1;
@@ -802,7 +802,13 @@ export async function rejudgeMedia(
   for (const m of items) {
     m.title = cleanMediaTitle(rewriteTitle(feedById.get(m.sourceId), m.title, m.publishedAt));
     const hint = feedById.get(m.sourceId)?.sectionHint;
-    if (!m.section && hint) m.section = hint;
+    if (feedById.get(m.sourceId)?.roundup) {
+      m.roundup = true;
+      delete m.section;
+    } else {
+      delete m.roundup;
+      if (!m.section && hint) m.section = hint;
+    }
     const ts = feedById.get(m.sourceId)?.thumbStyle;
     if (ts && ts !== "episode") m.thumbStyle = ts;
     else delete m.thumbStyle;
@@ -865,7 +871,7 @@ export async function rejudgeMedia(
       if (!v?.onTopic) {
         m.hidden = true;
         hidden += 1;
-      } else if (v.section) m.section = v.section;
+      } else if (v.section && !m.roundup) m.section = v.section;
     }
   }
   return { note: `Re-judged ${gated.length} tier 2 episode(s): ${hidden} hidden, the rest kept and labeled. ${filled} length(s) filled in.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}${paired > 0 ? ` ${paired} podcast episode(s) paired with their video.` : ""}${upcoming.length > 0 ? ` ${upcoming.length} scheduled premiere(s) removed until they air.` : ""}${mentions > 0 ? ` ${mentions} story mention(s) from show notes.` : ""}` };
@@ -1023,7 +1029,11 @@ export async function ingestMedia(
     // a label, not a bucket: tier 1 shows carry the feed's hint, tier 2
     // episodes get the gate's call, and the episode also shows in that
     // section's rail
-    ...(gateSection.get(i.id) ?? i.sectionHint ? { section: gateSection.get(i.id) ?? i.sectionHint } : {}),
+    ...(feedById.get(i.sourceId)?.roundup
+      ? { roundup: true }
+      : (gateSection.get(i.id) ?? i.sectionHint)
+        ? { section: gateSection.get(i.id) ?? i.sectionHint }
+        : {}),
     sourceId: i.sourceId,
     sourceName: i.sourceName,
     publishedAt: i.publishedAt,
@@ -1049,6 +1059,10 @@ export async function ingestMedia(
     const ts = feedById.get(m.sourceId)?.thumbStyle;
     if (ts && ts !== "episode") m.thumbStyle = ts;
     else delete m.thumbStyle;
+    if (feedById.get(m.sourceId)?.roundup) {
+      m.roundup = true;
+      delete m.section;
+    } else delete m.roundup;
   }
   await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
   pairPodcastsWithVideos(state.mediaItems);
