@@ -62,10 +62,9 @@ export default async function SourcesPage() {
               on-topic episodes appear. The number is how many episodes reached the site in the last 30 days.
             </p>
             <SourcesTable
-              rows={shows.map(([name, count]) => ({ name, slug: "", count }))}
+              rows={shows.map(([name, count]) => ({ name, slug: sourceSlug(name), count }))}
               nameHeader="Show"
               countHeader="Episodes, last 30 days"
-              rowHref="/podcasts"
             />
           </>
         ) : null}

@@ -3,6 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AgeStamp } from "@/components/AgeStamp";
 import { effectiveFeeds } from "@/lib/config";
+import { MediaPlayer } from "@/components/MediaPlayer";
+import { SectionPill } from "@/components/ClusterCard";
+import { isMediaFeed } from "@/lib/feeds";
+import { formatViews, mediaThumb } from "@/lib/util";
 import { liveClusters } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 import { siteIdentity } from "@/lib/site";
@@ -14,6 +18,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const feed = effectiveFeeds(await loadState()).find((f) => sourceSlug(f.name) === slug);
   if (!feed) return {};
+  if (isMediaFeed(feed)) {
+    return { title: feed.name, description: `Episodes from ${feed.name} on the site.` };
+  }
   return {
     title: feed.name,
     description: `Articles from ${feed.name} that ${siteIdentity().siteName} published.`,
@@ -25,6 +32,65 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
   const state = await loadState();
   const feed = effectiveFeeds(state).find((f) => sourceSlug(f.name) === slug);
   if (!feed) notFound();
+
+  // a podcast show's page lists its episodes, playable in place, instead of
+  // article links: the show's output IS its coverage
+  if (isMediaFeed(feed)) {
+    const episodes = (state.mediaItems ?? [])
+      .filter((m) => !m.hidden && m.sourceName === feed.name)
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+    return (
+      <main className="wrap page single roomy">
+        <div className="prose">
+          <h1>{feed.name}</h1>
+          <p>
+            Every episode from {feed.name} on the site right now, newest first. Press a thumbnail to play it here.
+            The full show list is on <Link href="/sources">Sources</Link>, and every show&apos;s episodes mix on the{" "}
+            <Link href="/podcasts">podcasts page</Link>.
+          </p>
+          <ul className="media-list">
+            {episodes.length === 0 ? (
+              <li className="org">No episodes from this show are on the site right now. Its next one will appear here.</li>
+            ) : null}
+            {episodes.map((m) => (
+              <li key={m.id} className="media-item">
+                <MediaPlayer
+                  id={`src-${m.id}`}
+                  url={m.url}
+                  kind={m.kind}
+                  title={m.displayTitle ?? m.title}
+                  thumbnail={mediaThumb(m)}
+                  tileText={m.sourceName}
+                  durationSec={m.durationSec}
+                  chapters={m.chapters}
+                  audioUrl={m.audioUrl}
+                  videoUrl={m.videoUrl}
+                  compact
+                >
+                  <div className="media-body">
+                    <a href={m.videoUrl ?? m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>
+                      {m.displayTitle ?? m.title}
+                    </a>
+                    <div className="org">
+                      {m.kind}
+                      {m.section ? (
+                        <>
+                          {" · "}
+                          <SectionPill section={m.section} />
+                        </>
+                      ) : null}
+                      {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null} ·{" "}
+                      <AgeStamp iso={m.publishedAt} />
+                    </div>
+                  </div>
+                </MediaPlayer>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </main>
+    );
+  }
 
   // matched on display name so an outlet read through two feeds is one page,
   // and so articles survive their feed being swapped for a better one
