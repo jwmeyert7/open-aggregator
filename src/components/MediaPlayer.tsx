@@ -199,6 +199,13 @@ export function MediaPlayer({
                     : fmt(Math.round(durationSec ?? 0))}
               </span>
             ) : null}
+            {!open && resumeAt > 0 && durationSec ? (
+              <span
+                className="watch-bar"
+                aria-hidden="true"
+                style={{ width: `${Math.min(100, (resumeAt / durationSec) * 100)}%` }}
+              />
+            ) : null}
           </button>
         ) : thumb ? (
           <a href={url} rel="noopener" className="media-thumb" tabIndex={-1} aria-hidden="true">

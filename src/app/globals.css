@@ -2292,3 +2292,14 @@ button.status-date {
 .media-rail .media-body .org {
   clear: right;
 }
+
+/* how far through: a thin bar along the thumbnail's bottom edge, YouTube-style */
+.media-thumb .watch-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 0 0 0 4px;
+  pointer-events: none;
+}
