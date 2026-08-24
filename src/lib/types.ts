@@ -417,6 +417,12 @@ export interface Submission {
   storySlug?: string;
   /** URL host wasn't among configured sources at submission time. */
   newSource: boolean;
+  /** the submitter marked it as a news story */
+  asStory?: boolean;
+  /** the submitter marked it as a source to follow */
+  asSource?: boolean;
+  /** the submitter's guess at where it belongs (nav section ids) */
+  sections?: string[];
   at: string;
   status: "pending" | "approved" | "dismissed";
 }

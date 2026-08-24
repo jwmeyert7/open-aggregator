@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { SubmitForm } from "./SubmitForm";
+import { loadSiteConfig } from "@/lib/config";
 import { loadState } from "@/lib/state";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Suggest a link" };
+export const metadata = { title: "Submit a story or source" };
 
 export default async function SubmitPage({ searchParams }: { searchParams: Promise<{ story?: string }> }) {
   const { story } = await searchParams;
@@ -16,7 +17,7 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
   return (
     <main className="wrap page single roomy">
       <div className="prose">
-        <h1>Suggest a link</h1>
+        <h1>Submit a story or source</h1>
         {cluster ? (
           <p>
             Suggesting a link for: <Link href={`/story/${cluster.slug}`}>{cluster.headline}</Link>
@@ -38,7 +39,7 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
             </p>
           </>
         )}
-        <SubmitForm story={cluster?.slug} />
+        <SubmitForm story={cluster?.slug} sections={loadSiteConfig().sections.map((s) => s.id)} />
       </div>
     </main>
   );

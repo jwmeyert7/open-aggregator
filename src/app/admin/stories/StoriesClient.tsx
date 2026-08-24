@@ -40,6 +40,9 @@ export interface StoriesData {
     storyHeadline?: string;
     storySlug?: string;
     newSource: boolean;
+    asStory?: boolean;
+    asSource?: boolean;
+    sections?: string[];
     at: string;
   }>;
 }
@@ -481,46 +484,98 @@ export function StoriesClient({
         </p>
       ) : null}
       {data.submissions.map((s) => (
-        <div key={s.id} className="admin-card">
-          <div className="headline">
-            <a href={s.url} rel="noopener">
-              {s.url.replace(/^https?:\/\/(www\.)?/, "")}
-            </a>
-            {s.newSource ? <span className="pill">new source</span> : null}
-          </div>
-          <div className="sub">
-            {timeAgo(s.at)}
-            {s.storyHeadline ? (
-              <>
-                {" · for story: "}
-                <a href={`/story/${s.storySlug}`}>{s.storyHeadline}</a>
-              </>
-            ) : (
-              " · suggested as a new story"
-            )}
-            {s.email ? ` · from ${s.email}` : ""}
-          </div>
-          {s.note ? <div className="sub">“{s.note}”</div> : null}
-          <div className="btn-row">
-            <button className="btn primary" disabled={busy} onClick={() => act("approveSubmission", { id: s.id })}>
-              Approve
-            </button>
-            <button className="btn" disabled={busy} onClick={() => act("dismissSubmission", { id: s.id })}>
-              Dismiss
-            </button>
-            {s.newSource ? (
-              <button
-                className="btn"
-                disabled={busy}
-                title="Find this domain's feed and add it as a tier 2 source (separate from approving the story)"
-                onClick={() => act("addSubmissionSource", { id: s.id })}
-              >
-                Add as source
-              </button>
-            ) : null}
-          </div>
-        </div>
+        <SubmissionCard key={s.id} s={s} sections={data.sections} busy={busy} act={act} />
       ))}
+    </div>
+  );
+}
+
+
+type SubmissionRow = StoriesData["submissions"][number];
+
+/**
+ * One pending reader suggestion. The submitter may have guessed a section;
+ * the human confirms one here, and it rides along on Approve (for the story)
+ * and Add as source (as the feed's section hint). Empty leaves the call to
+ * the editor model, as before.
+ */
+function SubmissionCard({
+  s,
+  sections,
+  busy,
+  act,
+}: {
+  s: SubmissionRow;
+  sections: string[];
+  busy: boolean;
+  act: (action: string, payload?: Record<string, unknown>, confirmText?: string) => Promise<void>;
+}) {
+  const [section, setSection] = useState(s.sections?.[0] ?? "");
+  const confirmed = section ? { section } : {};
+  return (
+    <div className="admin-card">
+      <div className="headline">
+        <a href={s.url} rel="noopener">
+          {s.url.replace(/^https?:\/\/(www\.)?/, "")}
+        </a>
+        {s.newSource ? <span className="pill">new source</span> : null}
+      </div>
+      <div className="sub">
+        {timeAgo(s.at)}
+        {s.storyHeadline ? (
+          <>
+            {" · for story: "}
+            <a href={`/story/${s.storySlug}`}>{s.storyHeadline}</a>
+          </>
+        ) : (
+          " · suggested as a new story"
+        )}
+        {s.asStory || s.asSource
+          ? ` · submitter: ${[s.asStory ? "new story" : null, s.asSource ? "new source" : null].filter(Boolean).join(" + ")}`
+          : ""}
+        {s.sections && s.sections.length > 0 ? ` · suggested for ${s.sections.join(" + ")}` : ""}
+        {s.email ? ` · from ${s.email}` : ""}
+      </div>
+      {s.note ? <div className="sub">“{s.note}”</div> : null}
+      <div className="btn-row">
+        <button
+          className="btn primary"
+          disabled={busy}
+          onClick={() => act("approveSubmission", { id: s.id, ...confirmed })}
+        >
+          Approve
+        </button>
+        <button className="btn" disabled={busy} onClick={() => act("dismissSubmission", { id: s.id })}>
+          Dismiss
+        </button>
+        {s.newSource ? (
+          <button
+            className="btn"
+            disabled={busy}
+            title="Find this domain's feed and add it as a tier 2 source (separate from approving the story)"
+            onClick={() => act("addSubmissionSource", { id: s.id, ...confirmed })}
+          >
+            Add as source
+          </button>
+        ) : null}
+        {!s.storyHeadline ? (
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={section}
+            disabled={busy}
+            title="Confirm where the approved story or added source lands. Empty leaves it to the editor."
+            onChange={(e) => setSection(e.target.value)}
+          >
+            <option value="">section: editor decides</option>
+            {sections.map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+          </select>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -110,7 +110,7 @@ export function HeaderStatus() {
             {time}
           </button>
           {use24h ? (
-            <button className="clock-part clock-blank" onClick={unlessSelecting(() => set24h(false))} title="Back to 12-hour">
+            <button className="clock-part clock-blank" onClick={unlessSelecting(() => set24h(false))} title="Switch to 12-hour">
               24h
             </button>
           ) : (

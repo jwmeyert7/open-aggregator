@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadSiteConfig } from "@/lib/config";
 import { effectiveFeeds, siteUrl } from "@/lib/config";
 import { sendAdminEmail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
     email?: string;
     story?: string;
     website?: string; // honeypot: real users never see or fill this field
+    asStory?: boolean;
+    asSource?: boolean;
+    sections?: string[];
   } | null;
   if (!body) return NextResponse.json({ ok: false, message: "Bad request." }, { status: 400 });
 
@@ -75,6 +79,15 @@ export async function POST(req: NextRequest) {
     note: String(body.note ?? "").trim().slice(0, 500) || undefined,
     email: String(body.email ?? "").trim().slice(0, 200) || undefined,
     ...(storySlug ? { storySlug } : {}),
+    ...(body.asStory === true ? { asStory: true } : {}),
+    ...(body.asSource === true ? { asSource: true } : {}),
+    ...((): Partial<Submission> => {
+      const valid = new Set<string>(loadSiteConfig().sections.map((x) => x.id));
+      const picked = Array.isArray(body.sections)
+        ? [...new Set((body.sections as unknown[]).map(String))].filter((x) => valid.has(x)).slice(0, 3)
+        : [];
+      return picked.length > 0 ? { sections: picked } : {};
+    })(),
     newSource: !knownHosts.has(url.hostname.replace(/^www\./, "")),
     at: new Date().toISOString(),
     status: "pending",
@@ -91,6 +104,9 @@ export async function POST(req: NextRequest) {
       submission.note ? `Note: ${submission.note}` : "",
       submission.email ? `From: ${submission.email}` : "",
       submission.newSource ? "This domain is not one of your sources." : "",
+      submission.asStory ? "The submitter marked it as a news story." : "",
+      submission.asSource ? "The submitter marked it as a source to follow." : "",
+      submission.sections && submission.sections.length > 0 ? `Suggested for: ${submission.sections.join(", ")}.` : "",
       "",
       `Review: ${siteUrl()}/admin/stories#submissions`,
     ]

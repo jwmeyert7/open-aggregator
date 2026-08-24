@@ -2303,3 +2303,17 @@ button.status-date {
   border-radius: 0 0 0 4px;
   pointer-events: none;
 }
+
+/* the optional what-is-it row on the submit form */
+.submit-kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.submit-kind .kind-check {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}

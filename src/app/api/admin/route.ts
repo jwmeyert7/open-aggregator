@@ -667,6 +667,16 @@ async function handle(req: NextRequest) {
         )
       : undefined;
     const message = target ? await attachLinkToCluster(state, target, sub.url) : await addByUrl(state, sub.url);
+    // the admin's confirmed section overrides the editor's guess for a
+    // new-story approval: the submitter suggested, the human confirms
+    const confirmed = String(body.section ?? "");
+    if (!target && confirmed && [...cfg.sections.map((x) => x.id), "general"].includes(confirmed)) {
+      const normalized = normalizeUrl(sub.url);
+      const c = Object.values(state.clusters).find(
+        (k) => !k.killed && !k.mergedInto && k.links.some((l) => normalizeUrl(l.url) === normalized)
+      );
+      if (c) c.section = confirmed as SectionId;
+    }
     if (target) await takeSnapshot(state);
     sub.status = "approved";
     await saveState(state);
@@ -705,6 +715,7 @@ async function handle(req: NextRequest) {
       tier: 2,
       weight: 1,
       category: "other",
+      ...(cfg.sections.some((x) => x.id === String(body.section ?? "")) ? { sectionHint: String(body.section) as SectionId } : {}),
       added: new Date().toISOString().slice(0, 10),
     };
     o.custom.push(feed);
