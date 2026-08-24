@@ -9,12 +9,16 @@ export const metadata = { title: "Player", robots: { index: false } };
 /**
  * The detached window's page: just the player, the site chrome hidden by
  * CSS. When the video is one of the shelf's episodes, the page carries its
- * real title, length, and chapters, so the window can jump around the
- * episode. Playhead memory shares the same localStorage keys as the main
- * site, so position stays consistent across windows.
+ * real title, length, and chapters. Playhead and play state share the same
+ * localStorage keys as the main site, so the dock can pick up exactly where
+ * this window leaves off.
  */
-export default async function PlayerPage({ searchParams }: { searchParams: Promise<{ v?: string; t?: string }> }) {
-  const { v, t } = await searchParams;
+export default async function PlayerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ v?: string; t?: string; paused?: string }>;
+}) {
+  const { v, t, paused } = await searchParams;
   const id = /^[A-Za-z0-9_-]{11}$/.test(v ?? "") ? v : undefined;
   if (!id) {
     return (
@@ -39,6 +43,7 @@ export default async function PlayerPage({ searchParams }: { searchParams: Promi
         autoOpen
         popOut={false}
         closeWindow
+        startPaused={paused === "1"}
         startAt={Number.isFinite(start) && start > 0 ? start : undefined}
       >
         <span />

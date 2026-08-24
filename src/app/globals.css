@@ -2455,12 +2455,19 @@ body:has(.player-page) {
 /* clickable chapters in the dock and detached windows: the creator's own
    marks, one tap to jump, with their own scroll so the video keeps its room */
 .player-chapters {
-  list-style: none;
   margin: 6px 0 0;
+  font-size: 0.78rem;
+}
+.player-chapters summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.player-chapters ol {
+  list-style: none;
+  margin: 4px 0 0;
   padding: 0;
   max-height: 140px;
   overflow-y: auto;
-  font-size: 0.78rem;
 }
 .player-chapters li {
   padding: 2px 0;

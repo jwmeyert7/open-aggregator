@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MediaPlayer } from "@/components/MediaPlayer";
+import { useEffect, useRef, useState } from "react";
+import { loadPlayhead, loadPlayState, MediaPlayer } from "@/components/MediaPlayer";
 
 interface DockItem {
   url: string;
@@ -11,33 +11,91 @@ interface DockItem {
   videoUrl?: string;
   chapters?: Array<{ at: number; label: string }>;
   startAt?: number;
+  startPaused?: boolean;
 }
 
 /**
  * The corner dock: a small fixed player mounted in the root layout, so an
- * episode keeps playing while the reader browses the site (the App Router
- * keeps the layout mounted across in-site navigation). Players hand playback
- * here through the podcast:dock event at the current second. From the dock
- * the reader can detach further, and the choice is theirs: float (document
- * picture-in-picture, Chromium only) or a plain popup window, because
- * picture-in-picture is one window per browser and this site must never
- * evict whatever a reader already has floating.
+ * episode keeps playing while the reader browses the site. Players hand
+ * playback here through the podcast:dock event. The dock also owns the
+ * detached windows: on podcast:detach it opens the float (document
+ * picture-in-picture, the reader's choice, never forced) or a plain popup,
+ * hides itself while the window lives, and when the window closes it returns
+ * at the window's last second, playing or paused exactly as the window left
+ * it. The play state and playhead travel through the same localStorage keys
+ * every player writes.
  */
 export function MiniPlayer() {
   const [item, setItem] = useState<DockItem | null>(null);
+  // playback lives in a detached window right now: the dock stays out of view
+  const [away, setAway] = useState(false);
+  const watcher = useRef<number | null>(null);
 
   useEffect(() => {
-    const onDock = (e: Event) => setItem((e as CustomEvent<DockItem>).detail);
+    const onDock = (e: Event) => {
+      setAway(false);
+      setItem((e as CustomEvent<DockItem>).detail);
+    };
     window.addEventListener("podcast:dock", onDock);
     return () => window.removeEventListener("podcast:dock", onDock);
   }, []);
 
-  if (!item) return null;
+  useEffect(() => {
+    const onDetach = async (e: Event) => {
+      const d = (
+        e as CustomEvent<{ mode: "float" | "window"; ytId: string; at: number; paused: boolean; title: string }>
+      ).detail;
+      const src = `/player?v=${d.ytId}${d.at > 0 ? `&t=${d.at}` : ""}${d.paused ? "&paused=1" : ""}`;
+      let win: Window | null = null;
+      if (d.mode === "window") {
+        win = window.open(src, "_blank", "popup,width=520,height=340");
+      } else {
+        const dpp = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: object) => Promise<Window> } })
+          .documentPictureInPicture;
+        if (!dpp) return;
+        const pip = await dpp.requestWindow({ width: 480, height: 292 });
+        pip.document.title = d.title;
+        pip.document.body.style.cssText = "margin:0;background:#000;overflow:hidden";
+        const f = pip.document.createElement("iframe");
+        // the PiP document is effectively about:blank, so a raw embed sends
+        // no referrer and YouTube refuses it (error 153): /player is a real
+        // same-origin URL, and wildcard delegation lets autoplay reach the
+        // nested YouTube frame. Block display and viewport units keep the
+        // frame exactly window sized.
+        f.src = `${window.location.origin}${src}`;
+        f.allow = "autoplay *; encrypted-media *; picture-in-picture *; fullscreen *";
+        f.allowFullscreen = true;
+        f.style.cssText = "border:0;display:block;width:100vw;height:100vh";
+        pip.document.body.appendChild(f);
+        win = pip;
+      }
+      if (!win) return;
+      setAway(true);
+      if (watcher.current !== null) window.clearInterval(watcher.current);
+      watcher.current = window.setInterval(() => {
+        if (!win || !win.closed) return;
+        window.clearInterval(watcher.current!);
+        watcher.current = null;
+        // the window is gone: return at its last second, in its last state
+        const pos = Math.floor(loadPlayhead(d.ytId));
+        const paused = loadPlayState(d.ytId) !== 1;
+        setItem((prev) => (prev ? { ...prev, startAt: pos > 0 ? pos : d.at, startPaused: paused } : prev));
+        setAway(false);
+      }, 500);
+    };
+    window.addEventListener("podcast:detach", onDetach);
+    return () => {
+      window.removeEventListener("podcast:detach", onDetach);
+      if (watcher.current !== null) window.clearInterval(watcher.current);
+    };
+  }, []);
+
+  if (!item || away) return null;
   return (
     <div className="mini-dock">
       <MediaPlayer
         id="dock"
-        key={`${item.url}-${item.startAt ?? 0}`}
+        key={`${item.url}-${item.startAt ?? 0}-${item.startPaused ? "p" : "g"}`}
         url={item.url}
         kind={item.kind}
         title={item.title}
@@ -47,6 +105,7 @@ export function MiniPlayer() {
         compact
         autoOpen
         startAt={item.startAt}
+        startPaused={item.startPaused}
         popOut={false}
         detach
         onClose={() => setItem(null)}

@@ -43,6 +43,25 @@ function savePos(key: string, sec: number, total?: number): void {
   }
 }
 
+const PS_SUFFIX = ":state";
+function savePlayState(key: string, state: number): void {
+  try {
+    window.localStorage.setItem(POS_KEY + key + PS_SUFFIX, String(state));
+  } catch {}
+}
+/** 1 = playing, 2 = paused. Defaults to playing so a fresh detach starts. */
+export function loadPlayState(key: string): number {
+  try {
+    const v = Number(window.localStorage.getItem(POS_KEY + key + PS_SUFFIX));
+    return v === 2 ? 2 : 1;
+  } catch {
+    return 1;
+  }
+}
+export function loadPlayhead(key: string): number {
+  return loadPos(key);
+}
+
 /**
  * One episode with click-to-load playback. Nothing from YouTube or a podcast
  * host loads until the reader presses play: then a YouTube video becomes a
@@ -78,6 +97,7 @@ export function MediaPlayer({
   closeWindow = false,
   onClose,
   chapters,
+  startPaused = false,
   children,
 }: {
   id: string;
@@ -108,6 +128,8 @@ export function MediaPlayer({
   onClose?: () => void;
   /** the episode's chapter marks; the dock and detached windows render them as one-tap jumps */
   chapters?: Array<{ at: number; label: string }>;
+  /** open with the player loaded at its second but not playing (a detach that was paused stays paused) */
+  startPaused?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -142,6 +164,8 @@ export function MediaPlayer({
           setPosition(t);
           const d = data?.info?.duration;
           if (typeof d === "number" && Number.isFinite(d) && d > 0) setDur(d);
+          const ps = data?.info?.playerState;
+          if (typeof ps === "number" && memoryKey) savePlayState(memoryKey, ps === 1 || ps === 3 ? 1 : 2);
           if (memoryKey) savePos(memoryKey, t, typeof data?.info?.duration === "number" ? data.info.duration : undefined);
         }
       } catch {
@@ -199,45 +223,18 @@ export function MediaPlayer({
     setOpen(false);
   };
 
-  // float: an always-on-top document picture-in-picture window (Chromium).
-  // An iframe reloads when it moves between documents, so the window gets a
-  // fresh embed starting at the current second instead.
-  const toFloat = async () => {
-    const dpp = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: object) => Promise<Window> } })
-      .documentPictureInPicture;
-    if (!dpp || !ytId) return;
-    // the live tick may not have arrived yet (paused, or just opened): the
-    // remembered playhead still carries the honest second
-    const at = seconds > 0 ? seconds : Math.floor(resumeAt);
-    const pip = await dpp.requestWindow({ width: 480, height: 292 });
-    pip.document.title = title;
-    pip.document.body.style.cssText = "margin:0;background:#000;overflow:hidden";
-    const f = pip.document.createElement("iframe");
-    // the PiP document is effectively about:blank, so a raw embed sends no
-    // referrer and YouTube refuses it (error 153). Our own /player page has a
-    // real same-origin URL, embeds happily, and keeps the playhead memory.
-    f.src = `${window.location.origin}/player?v=${ytId}${at > 0 ? `&t=${at}` : ""}`;
-    // wildcard delegation: the grant must reach the nested YouTube frame
-    // inside /player, not just our own origin
-    f.allow = "autoplay *; encrypted-media *; picture-in-picture *; fullscreen *";
-    f.allowFullscreen = true;
-    // display block kills the inline baseline gap that grew scrollbars, and
-    // viewport units size the frame without needing the pip body to declare
-    // a height (a percent height there collapses to the 150px iframe default)
-    f.style.cssText = "border:0;display:block;width:100vw;height:100vh";
-    pip.document.body.appendChild(f);
-    pauseHere();
-  };
-
-  // window: a plain popup, for when a floating window is unwanted (document
-  // picture-in-picture is one per browser, and this must never evict what a
-  // reader already has floating)
-  const toWindow = () => {
+  // detach: the dock owns the windows (it must hide while one is open and
+  // return when the window closes), so these just announce the wish with the
+  // honest second and the current play state
+  const detachTo = (mode: "float" | "window") => {
     if (!ytId) return;
     const at = seconds > 0 ? seconds : Math.floor(resumeAt);
-    window.open(`/player?v=${ytId}${at > 0 ? `&t=${at}` : ""}`, "_blank", "popup,width=520,height=340");
+    const paused = memoryKey ? loadPlayState(memoryKey) !== 1 : false;
+    window.dispatchEvent(new CustomEvent("podcast:detach", { detail: { mode, ytId, at, paused, title } }));
     pauseHere();
   };
+  const toFloat = () => detachTo("float");
+  const toWindow = () => detachTo("window");
 
   const seekTo = (at: number) => {
     if (ytId) {
@@ -330,7 +327,7 @@ export function MediaPlayer({
               <div className="media-frame">
                 <iframe
                   ref={frame}
-                  src={`${YT_EMBED_ORIGIN}/embed/${ytId}?autoplay=1&rel=0&enablejsapi=1${resumeAt > 0 ? `&start=${Math.floor(resumeAt)}` : ""}`}
+                  src={`${YT_EMBED_ORIGIN}/embed/${ytId}?autoplay=${startPaused ? 0 : 1}&rel=0&enablejsapi=1${resumeAt > 0 ? `&start=${Math.floor(resumeAt)}` : ""}`}
                   title={title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
@@ -341,9 +338,11 @@ export function MediaPlayer({
               <audio
                 ref={audio}
                 controls
-                autoPlay
+                autoPlay={!startPaused}
                 preload="none"
                 src={audioUrl}
+                onPlay={() => memoryKey && savePlayState(memoryKey, 1)}
+                onPause={() => memoryKey && savePlayState(memoryKey, 2)}
                 onLoadedMetadata={(e) => {
                   if (resumeAt > 0) e.currentTarget.currentTime = resumeAt;
                 }}
@@ -396,16 +395,19 @@ export function MediaPlayer({
               </button>
             </div>
           {(detach || closeWindow) && chapters && chapters.length > 0 ? (
-            <ol className="player-chapters">
-              {chapters.map((c) => (
-                <li key={c.at}>
-                  <button type="button" className="linklike" onClick={() => seekTo(c.at)}>
-                    <span className="chap-at">{fmt(c.at)}</span>
-                    {c.label}
-                  </button>
-                </li>
-              ))}
-            </ol>
+            <details className="player-chapters">
+              <summary>chapters ({chapters.length})</summary>
+              <ol>
+                {chapters.map((c) => (
+                  <li key={c.at}>
+                    <button type="button" className="linklike" onClick={() => seekTo(c.at)}>
+                      <span className="chap-at">{fmt(c.at)}</span>
+                      {c.label}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </details>
           ) : null}
           </div>
         </div>
