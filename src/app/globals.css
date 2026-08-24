@@ -2379,6 +2379,13 @@ body:has(.player-page) .header-stack,
 body:has(.player-page) .site-footer {
   display: none;
 }
+/* the player window never scrolls: any transient overflow is clipped, so the
+   scrollbar can never appear and steal width from the video */
+html:has(.player-page),
+body:has(.player-page) {
+  overflow: hidden;
+  height: 100%;
+}
 /* the detached window fits its content to whatever size the window is: the
    video flexes to fill (no fixed aspect ratio), the link row sits below on
    one line, and nothing ever bleeds past the edges */
@@ -2416,4 +2423,25 @@ body:has(.player-page) .site-footer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ----- the Latest in label steps outside its box on desktop ----- */
+/* same outside-label system as PODCASTS and NEWEST: the label sits above the
+   box at the rail-label size; on mobile it stays inside the box, the same
+   fallback the other rails use */
+@media (min-width: 761px) {
+  .front-summary {
+    position: relative;
+    margin-top: 26px;
+  }
+  .front-summary.above-nav {
+    margin-top: 26px;
+  }
+  .front-summary-head {
+    position: absolute;
+    top: -22px;
+    left: 0;
+    font-size: 0.78rem;
+    margin-bottom: 0;
+  }
 }
