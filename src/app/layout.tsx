@@ -70,7 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </div>
           </header>
-          <MainNav sections={sections.map((s) => ({ id: s.id, title: s.title }))} />
+          <MainNav sections={sections.map((s) => ({ id: s.id, title: s.title, tooltip: s.tooltip }))} />
         </div>
         {children}
         <footer className="site-footer">

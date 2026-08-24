@@ -9,7 +9,7 @@ export function ColumnHeads({
   sections,
   active,
 }: {
-  sections: Array<{ id: string; title: string }>;
+  sections: Array<{ id: string; title: string; tooltip?: string }>;
   active: string;
 }) {
   return (
@@ -18,7 +18,7 @@ export function ColumnHeads({
         Top Stories
       </Link>
       {sections.map((s) => (
-        <Link key={s.id} href={`/${s.id}`} className={active === s.id ? "active" : ""}>
+        <Link key={s.id} href={`/${s.id}`} className={active === s.id ? "active" : ""} title={s.tooltip}>
           {s.title}
         </Link>
       ))}

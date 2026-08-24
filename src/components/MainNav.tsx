@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function MainNav({ sections }: { sections: Array<{ id: string; title: string }> }) {
+export function MainNav({ sections }: { sections: Array<{ id: string; title: string; tooltip?: string }> }) {
   const path = usePathname();
   // The tabs belong to the front page and the section pages only. Those
   // pages carry their own in-grid header row on desktop, so this nav is
@@ -20,7 +20,7 @@ export function MainNav({ sections }: { sections: Array<{ id: string; title: str
         Top Stories
       </Link>
       {sections.map((s) => (
-        <Link key={s.id} href={`/${s.id}`} className={path === `/${s.id}` ? "active" : ""}>
+        <Link key={s.id} href={`/${s.id}`} className={path === `/${s.id}` ? "active" : ""} title={s.tooltip}>
           {s.title}
         </Link>
       ))}

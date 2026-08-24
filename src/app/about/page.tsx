@@ -21,6 +21,30 @@ export default function AboutPage() {
           sentence plain language explainer under every headline. The result is one page that answers the question
           "what is happening right now" without a feed to scroll or an account to make.
         </p>
+        <h2>Sections</h2>
+        <p>
+          Stories and podcasts are categorized across the areas of{" "}
+          {sections.map((s, i) => (
+            <span key={s.id}>
+              {i > 0 ? (i === sections.length - 1 ? ", and " : ", ") : ""}
+              <Link href={`/${s.id}`}>{s.title}</Link>
+            </span>
+          ))}
+          .
+        </p>
+        <ul>
+          {sections
+            .filter((s) => s.tagline)
+            .map((s) => (
+              <li key={s.id}>
+                <strong>{s.title}</strong>: {s.tagline!.charAt(0).toLowerCase() + s.tagline!.slice(1)}
+              </li>
+            ))}
+        </ul>
+        <p>
+          A story or podcast related to multiple areas can have two labels while roundup style content will appear in
+          all.
+        </p>
         <h2>How it works</h2>
         <p>
           A pipeline runs around the clock. It reads the whitelisted sources and hands anything new to an editor

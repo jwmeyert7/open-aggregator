@@ -2317,3 +2317,11 @@ button.status-date {
   gap: 5px;
   align-items: center;
 }
+
+/* the one-line answer to what a section means, under its tab row */
+.section-tagline {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}

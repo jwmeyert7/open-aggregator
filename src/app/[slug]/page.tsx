@@ -86,6 +86,7 @@ export default async function SlugPage({
   return (
     <main className={`wrap page${showSidebar ? "" : " no-middle"}`}>
       <ColumnHeads sections={cfg.sections} active={section.id} />
+      {section.tagline ? <p className="section-tagline">{section.tagline}</p> : null}
       <div className="stories-col">
         {(() => {
           const ad = (state.sponsoredPosts ?? []).find(

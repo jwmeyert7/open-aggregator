@@ -49,6 +49,10 @@ export interface SectionConfig {
   id: SectionId;
   title: string;
   description: string;
+  /** reader-facing one-liner shown under the tabs on the section's own page, and reused (lowercased) on the About page */
+  tagline?: string;
+  /** short hover text on the section's nav tab */
+  tooltip?: string;
 }
 
 export interface SiteConfig {
