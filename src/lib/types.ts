@@ -125,6 +125,8 @@ export interface CoverageLink {
   weight: number;
   publishedAt: string;
   addedAt: string;
+  /** the page declared no publish date, so publishedAt is just the moment it was added; such a link never counts toward velocity */
+  undated?: boolean;
 }
 
 export interface Cluster {
@@ -485,6 +487,8 @@ export interface CandidateItem {
   tier: 1 | 2;
   weight: number;
   sectionHint?: SectionId;
+  /** manual adds only: the page declared no publish date, so the link must not rank as breaking */
+  undated?: boolean;
   /**
    * gnews items only: the news.google.com link/title the item arrived with,
    * kept after resolution so markSeen can record both forms and the item

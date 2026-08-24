@@ -91,6 +91,9 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
   let title = url;
   let excerpt = "";
   let publishedAt = new Date().toISOString();
+  let siteName = "";
+  // an undated page must not rank as breaking news off its add time
+  let undated = true;
   try {
     if (isPrivateHost(new URL(url).hostname)) throw new Error("private host");
     const res = await fetch(url, {
@@ -102,6 +105,7 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
     title = stripHtml(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? url);
     const metaDesc =
       /<meta[^>]+(?:name="description"|property="og:description")[^>]+content="([^"]*)"/i.exec(html)?.[1] ?? "";
+    siteName = stripHtml(/<meta[^>]+property="og:site_name"[^>]+content="([^"]*)"/i.exec(html)?.[1] ?? "").trim();
     excerpt = truncate(`${stripHtml(metaDesc)} ${stripHtml(html).slice(0, 2000)}`.trim(), 1500);
     // the page's own publish date beats fetch time: without it a re-added
     // old article wears a NEW badge and ranks as if it broke just now
@@ -110,21 +114,31 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
       /<time[^>]+datetime="([^"]*)"/i.exec(html)?.[1];
     if (rawDate) {
       const d = new Date(rawDate);
-      if (Number.isFinite(d.getTime()) && d.getTime() < Date.now()) publishedAt = d.toISOString();
+      if (Number.isFinite(d.getTime()) && d.getTime() < Date.now()) {
+        publishedAt = d.toISOString();
+        undated = false;
+      }
     }
   } catch {
     // Unreachable pages (e.g. tweet links behind JS walls) still get injected;
     // the LLM works from the URL alone in that case.
   }
+  // the reader cares where a story is from, never how it got in: the kicker
+  // wears the outlet's own name, or its domain when the page declares none
+  let host = url;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {}
   return {
     url,
     title: truncate(title, 300),
     publishedAt,
     excerpt,
     sourceId: "manual",
-    sourceName: "Added by editor",
+    sourceName: truncate(siteName, 60).trim() || host,
     tier: 1,
     weight: 1.5,
+    ...(undated ? { undated: true } : {}),
   };
 }
 

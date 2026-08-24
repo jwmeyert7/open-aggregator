@@ -60,7 +60,7 @@ export function scoreBreakdown(cluster: Cluster, cfg: SiteConfig["ranking"], now
   }
   const sourceWeight = [...bySource.values()].reduce((a, b) => a + b, 0);
   const decayedSourceWeight = [...bySourceDecayed.values()].reduce((a, b) => a + b, 0);
-  const velocityLinks = cluster.links.filter((l) => hoursAgo(l.addedAt, now) <= cfg.velocityWindowHours).length;
+  const velocityLinks = cluster.links.filter((l) => !l.undated && hoursAgo(l.addedAt, now) <= cfg.velocityWindowHours).length;
   const soleSource = bySource.size === 1 ? [...bySource.keys()][0] : undefined;
   const forumSolo = soleSource !== undefined && forumSourceIds().has(soleSource);
   const importanceCapped = forumSolo && cluster.importance > FORUM_IMPORTANCE_CAP;

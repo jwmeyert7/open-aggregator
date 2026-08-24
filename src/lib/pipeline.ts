@@ -355,6 +355,7 @@ export function applyEditorOutput(
         weight: item.weight,
         publishedAt: item.publishedAt,
         addedAt: now,
+        ...(item.undated ? { undated: true } : {}),
       });
     }
     cluster.updatedAt = now;
