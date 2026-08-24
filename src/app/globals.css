@@ -2488,3 +2488,8 @@ body:has(.player-page) {
 .player-page .player-chapters {
   flex: none;
 }
+
+/* the criteria and submit pointer breathes below the tables */
+.sources-foot {
+  margin-top: 30px;
+}

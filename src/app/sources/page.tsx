@@ -61,28 +61,16 @@ export default async function SourcesPage() {
               front page. A show that covers more than the site&apos;s topic faces a per-episode gate, so only its
               on-topic episodes appear. The number is how many episodes reached the site in the last 30 days.
             </p>
-            <table className="leaderboard">
-              <thead>
-                <tr>
-                  <th>Show</th>
-                  <th>Episodes, last 30 days</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shows.map(([name, count]) => (
-                  <tr key={name}>
-                    <td>
-                      <a href="/podcasts">{name}</a>
-                    </td>
-                    <td>{count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SourcesTable
+              rows={shows.map(([name, count]) => ({ name, slug: "", count }))}
+              nameHeader="Show"
+              countHeader="Episodes, last 30 days"
+              href={() => "/podcasts"}
+            />
           </>
         ) : null}
 
-        <p>
+        <p className="sources-foot">
           What gets a source onto this list is described in the <a href="/criteria">criteria</a>. Think something
           belongs here? Suggest it via <a href="/submit">submit</a>.
         </p>

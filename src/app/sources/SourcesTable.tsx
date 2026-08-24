@@ -9,8 +9,19 @@ export interface SourceRow {
   count: number;
 }
 
-/** Two-column public source table, click either header to sort. */
-export function SourcesTable({ rows }: { rows: SourceRow[] }) {
+/** Two-column public table, click either header to sort. The sources page uses it for the news sources and the podcast shows alike. */
+export function SourcesTable({
+  rows,
+  nameHeader = "Source",
+  countHeader = "Items, last 30 days",
+  href,
+}: {
+  rows: SourceRow[];
+  nameHeader?: string;
+  countHeader?: string;
+  /** row link target; defaults to the source's own article page */
+  href?: (r: SourceRow) => string;
+}) {
   const [key, setKey] = useState<"name" | "count">("count");
   const [asc, setAsc] = useState(false);
 
@@ -34,10 +45,12 @@ export function SourcesTable({ rows }: { rows: SourceRow[] }) {
       <thead>
         <tr>
           <th className="sortable" onClick={() => toggle("name")}>
-            Source{arrow("name")}
+            {nameHeader}
+            {arrow("name")}
           </th>
           <th className="sortable" onClick={() => toggle("count")}>
-            Items, last 30 days{arrow("count")}
+            {countHeader}
+            {arrow("count")}
           </th>
         </tr>
       </thead>
@@ -45,7 +58,7 @@ export function SourcesTable({ rows }: { rows: SourceRow[] }) {
         {sorted.map((r) => (
           <tr key={r.name}>
             <td>
-              <Link href={`/sources/${r.slug}`}>{r.name}</Link>
+              <Link href={href ? href(r) : `/sources/${r.slug}`}>{r.name}</Link>
             </td>
             <td>{r.count}</td>
           </tr>
