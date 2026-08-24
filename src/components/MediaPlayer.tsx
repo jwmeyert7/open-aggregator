@@ -199,6 +199,9 @@ export function MediaPlayer({
     const dpp = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: object) => Promise<Window> } })
       .documentPictureInPicture;
     if (!dpp || !ytId) return;
+    // the live tick may not have arrived yet (paused, or just opened): the
+    // remembered playhead still carries the honest second
+    const at = seconds > 0 ? seconds : Math.floor(resumeAt);
     const pip = await dpp.requestWindow({ width: 480, height: 292 });
     pip.document.title = title;
     pip.document.body.style.cssText = "margin:0;background:#000;overflow:hidden";
@@ -206,8 +209,10 @@ export function MediaPlayer({
     // the PiP document is effectively about:blank, so a raw embed sends no
     // referrer and YouTube refuses it (error 153). Our own /player page has a
     // real same-origin URL, embeds happily, and keeps the playhead memory.
-    f.src = `${window.location.origin}/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`;
-    f.allow = "autoplay; encrypted-media; picture-in-picture";
+    f.src = `${window.location.origin}/player?v=${ytId}${at > 0 ? `&t=${at}` : ""}`;
+    // wildcard delegation: the grant must reach the nested YouTube frame
+    // inside /player, not just our own origin
+    f.allow = "autoplay *; encrypted-media *; picture-in-picture *; fullscreen *";
     f.allowFullscreen = true;
     // display block kills the inline baseline gap that grew scrollbars, and
     // viewport units size the frame without needing the pip body to declare
@@ -222,7 +227,8 @@ export function MediaPlayer({
   // reader already has floating)
   const toWindow = () => {
     if (!ytId) return;
-    window.open(`/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`, "_blank", "popup,width=520,height=340");
+    const at = seconds > 0 ? seconds : Math.floor(resumeAt);
+    window.open(`/player?v=${ytId}${at > 0 ? `&t=${at}` : ""}`, "_blank", "popup,width=520,height=340");
     pauseHere();
   };
 
