@@ -1894,7 +1894,7 @@ button.status-date {
 .media-rail .media-body {
   min-width: 0;
 }
-.media-rail .media-body a {
+.media-rail .media-body > a {
   /* no overflow cap here: a hidden-overflow box refuses to wrap under the
      floated thumb, and the title must flow beneath it like newsprint */
   display: block;
