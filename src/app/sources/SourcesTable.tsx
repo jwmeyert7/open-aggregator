@@ -14,13 +14,13 @@ export function SourcesTable({
   rows,
   nameHeader = "Source",
   countHeader = "Items, last 30 days",
-  href,
+  rowHref,
 }: {
   rows: SourceRow[];
   nameHeader?: string;
   countHeader?: string;
-  /** row link target; defaults to the source's own article page */
-  href?: (r: SourceRow) => string;
+  /** one link target for every row (a function prop cannot cross the server to client boundary); defaults to the source's own article page */
+  rowHref?: string;
 }) {
   const [key, setKey] = useState<"name" | "count">("count");
   const [asc, setAsc] = useState(false);
@@ -58,7 +58,7 @@ export function SourcesTable({
         {sorted.map((r) => (
           <tr key={r.name}>
             <td>
-              <Link href={href ? href(r) : `/sources/${r.slug}`}>{r.name}</Link>
+              <Link href={rowHref ?? `/sources/${r.slug}`}>{r.name}</Link>
             </td>
             <td>{r.count}</td>
           </tr>

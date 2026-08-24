@@ -65,7 +65,7 @@ export default async function SourcesPage() {
               rows={shows.map(([name, count]) => ({ name, slug: "", count }))}
               nameHeader="Show"
               countHeader="Episodes, last 30 days"
-              href={() => "/podcasts"}
+              rowHref="/podcasts"
             />
           </>
         ) : null}
