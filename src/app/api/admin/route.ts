@@ -679,6 +679,44 @@ async function handle(req: NextRequest) {
     return ok(state.sponsorPageEnabled ? "Sponsor page is live (footer link included)." : "Sponsor page hidden.");
   }
 
+  if (body.action === "addSubmissionSource") {
+    const sub = (state.submissions ?? []).find((s) => s.id === String(body.id ?? ""));
+    if (!sub) return fail("Unknown submission.");
+    const host = new URL(sub.url).hostname.replace(/^www\./, "");
+    const o = (state.feedOverrides ??= { custom: [], disabled: [] });
+    const found = await discoverFeed(host, cfg.ingest.feedTimeoutMs);
+    if (!found) {
+      return fail(
+        `No feed found on ${host}: not a Discourse forum, no feed link on the homepage, none of the usual feed paths. Add it manually in Sources (possibly as a listing scrape).`
+      );
+    }
+    const name = truncate(stripHtml(found.title ?? ""), 60).trim() || host;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "source";
+    if (loadFeeds().some((f) => f.id === id) || o.custom.some((f) => f.id === id)) {
+      return fail(`A source with the id \u201c${id}\u201d already exists.`);
+    }
+    // tier 2 on purpose: a reader-suggested domain faces the gate until a
+    // human decides it has earned pass-through
+    const feed: FeedConfig = {
+      id,
+      name,
+      url: found.url,
+      type: found.type,
+      tier: 2,
+      weight: 1,
+      category: "other",
+      added: new Date().toISOString().slice(0, 10),
+    };
+    o.custom.push(feed);
+    // covered now: the same domain must not resurface as a Farcaster candidate
+    const cand = ownEntry(state.sourceCandidates, host);
+    if (cand) cand.dismissed = true;
+    await saveState(state);
+    return ok(
+      `Source \u201c${name}\u201d added from ${host} (${found.type} feed ${found.url}, tier 2, weight 1). It's polled starting next pipeline run; tune tier, weight, and category in Sources. The submission itself still needs Approve or Dismiss.`
+    );
+  }
+
   if (body.action === "setAnnouncement") {
     const text = String(body.text ?? "").trim();
     const url = ensureHttp(body.url);

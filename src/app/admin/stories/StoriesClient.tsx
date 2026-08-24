@@ -508,6 +508,16 @@ export function StoriesClient({
             <button className="btn" disabled={busy} onClick={() => act("dismissSubmission", { id: s.id })}>
               Dismiss
             </button>
+            {s.newSource ? (
+              <button
+                className="btn"
+                disabled={busy}
+                title="Find this domain's feed and add it as a tier 2 source (separate from approving the story)"
+                onClick={() => act("addSubmissionSource", { id: s.id })}
+              >
+                Add as source
+              </button>
+            ) : null}
           </div>
         </div>
       ))}
