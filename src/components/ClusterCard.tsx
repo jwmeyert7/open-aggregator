@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MentionLink } from "@/components/MentionLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import type { Cluster, SponsoredPost } from "@/lib/types";
 import { leadLink } from "@/lib/rank";
@@ -126,14 +127,15 @@ export function ClusterCard({
           </a>
         ) : null}
         {(cluster.mentions ?? []).slice(0, 2).map((m) => (
-          <Link
+          <MentionLink
             key={m.mediaId}
+            mediaId={m.mediaId}
+            at={m.at}
             href={`/podcasts?play=${m.mediaId}${m.at !== undefined ? `&t=${m.at}` : ""}#m-${m.mediaId}`}
-            className="mention-link"
             title={`${m.show}: ${m.title}`}
           >
             {m.at !== undefined ? `discussed at ${fmtMoment(m.at)} on ${m.show}` : `discussed on ${m.show}`}
-          </Link>
+          </MentionLink>
         ))}
         <a href={`/submit?story=${cluster.slug}`} className="suggest-link">
           suggest a link

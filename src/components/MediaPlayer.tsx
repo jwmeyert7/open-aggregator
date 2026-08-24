@@ -73,6 +73,8 @@ export function MediaPlayer({
   startAt,
   tileText,
   durationSec,
+  popOut = true,
+  detach = false,
   children,
 }: {
   id: string;
@@ -93,6 +95,10 @@ export function MediaPlayer({
   tileText?: string;
   /** episode length: shown on the thumbnail chip, after the resume point when one is saved */
   durationSec?: number;
+  /** offer the pop-out control that hands playback to the corner dock */
+  popOut?: boolean;
+  /** dock only: offer the float (picture-in-picture) and window detach controls */
+  detach?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -164,6 +170,48 @@ export function MediaPlayer({
   const pauseHere = () => {
     frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), YT_EMBED_ORIGIN);
     audio.current?.pause();
+  };
+
+  const pipSupported = typeof window !== "undefined" && "documentPictureInPicture" in window;
+
+  // pop out: hand playback to the corner dock (mounted in the layout) at the
+  // current second, then close here so only one copy plays
+  const toDock = () => {
+    window.dispatchEvent(
+      new CustomEvent("podcast:dock", {
+        detail: { url, kind, title, audioUrl, videoUrl, startAt: Math.floor(position) },
+      })
+    );
+    pauseHere();
+    setOpen(false);
+  };
+
+  // float: an always-on-top document picture-in-picture window (Chromium).
+  // An iframe reloads when it moves between documents, so the window gets a
+  // fresh embed starting at the current second instead.
+  const toFloat = async () => {
+    const dpp = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: object) => Promise<Window> } })
+      .documentPictureInPicture;
+    if (!dpp || !ytId) return;
+    const pip = await dpp.requestWindow({ width: 480, height: 292 });
+    pip.document.title = title;
+    pip.document.body.style.cssText = "margin:0;background:#000";
+    const f = pip.document.createElement("iframe");
+    f.src = `${YT_EMBED_ORIGIN}/embed/${ytId}?autoplay=1&rel=0${seconds > 0 ? `&start=${seconds}` : ""}`;
+    f.allow = "autoplay; encrypted-media; picture-in-picture";
+    f.allowFullscreen = true;
+    f.style.cssText = "border:0;width:100vw;height:100vh";
+    pip.document.body.appendChild(f);
+    pauseHere();
+  };
+
+  // window: a plain popup, for when a floating window is unwanted (document
+  // picture-in-picture is one per browser, and this must never evict what a
+  // reader already has floating)
+  const toWindow = () => {
+    if (!ytId) return;
+    window.open(`/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`, "_blank", "popup,width=520,height=340");
+    pauseHere();
   };
 
   const thumb = thumbnail ? (
@@ -259,6 +307,30 @@ export function MediaPlayer({
               <button type="button" className="linklike" onClick={() => setExpanded((v) => !v)}>
                 {expanded ? "shrink" : "expand"}
               </button>{" "}
+              {popOut ? (
+                <>
+                  ·{" "}
+                  <button type="button" className="linklike" onClick={toDock} title="Keep playing in a corner dock while you browse the site">
+                    pop out
+                  </button>{" "}
+                </>
+              ) : null}
+              {detach && ytId ? (
+                <>
+                  ·{" "}
+                  {pipSupported ? (
+                    <>
+                      <button type="button" className="linklike" onClick={toFloat} title="An always-on-top mini window (replaces any other floating window you have)">
+                        float
+                      </button>{" "}
+                      ·{" "}
+                    </>
+                  ) : null}
+                  <button type="button" className="linklike" onClick={toWindow} title="A separate small browser window">
+                    window
+                  </button>{" "}
+                </>
+              ) : null}
               ·{" "}
               <button type="button" className="linklike" onClick={() => setOpen(false)}>
                 close
