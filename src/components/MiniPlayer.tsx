@@ -47,6 +47,7 @@ export function MiniPlayer() {
         startAt={item.startAt}
         popOut={false}
         detach
+        onClose={() => setItem(null)}
         header={
           <div className="dock-head">
             <span className="dock-title">{item.title}</span>

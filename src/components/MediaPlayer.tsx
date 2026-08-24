@@ -76,6 +76,7 @@ export function MediaPlayer({
   popOut = true,
   detach = false,
   closeWindow = false,
+  onClose,
   children,
 }: {
   id: string;
@@ -102,6 +103,8 @@ export function MediaPlayer({
   detach?: boolean;
   /** the player is the whole window (the /player popup page, or the float's inner frame): close closes the window itself */
   closeWindow?: boolean;
+  /** dock: close dismisses the whole dock instead of leaving a player-less stub */
+  onClose?: () => void;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -224,6 +227,10 @@ export function MediaPlayer({
   // Inside the float, the /player page is an iframe, so the window to close
   // is the parent picture-in-picture window.
   const closePlayer = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
     if (closeWindow) {
       const w = window.parent === window ? window : window.parent;
       try {
