@@ -197,7 +197,10 @@ export function MediaPlayer({
     pip.document.title = title;
     pip.document.body.style.cssText = "margin:0;background:#000";
     const f = pip.document.createElement("iframe");
-    f.src = `${YT_EMBED_ORIGIN}/embed/${ytId}?autoplay=1&rel=0${seconds > 0 ? `&start=${seconds}` : ""}`;
+    // the PiP document is effectively about:blank, so a raw embed sends no
+    // referrer and YouTube refuses it (error 153). Our own /player page has a
+    // real same-origin URL, embeds happily, and keeps the playhead memory.
+    f.src = `${window.location.origin}/player?v=${ytId}${seconds > 0 ? `&t=${seconds}` : ""}`;
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.allowFullscreen = true;
     f.style.cssText = "border:0;width:100vw;height:100vh";
