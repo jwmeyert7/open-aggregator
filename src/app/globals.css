@@ -1082,14 +1082,22 @@ body:has(.notfound) .main-nav {
   color: var(--muted);
 }
 
-/* day picker on the archive and daily index */
+/* day picker on the archive and daily index: label above a compact input,
+   with air between the intro text and the date list */
 .day-select {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 20px 0 16px;
   font-size: 0.85rem;
   color: var(--muted);
+}
+.day-select span {
+  white-space: nowrap;
+}
+.day-select input.text {
+  width: 180px;
 }
 .day-select select {
   width: auto;
