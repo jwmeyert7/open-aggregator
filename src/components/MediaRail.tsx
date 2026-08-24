@@ -45,6 +45,7 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                 thumbnail={mediaThumb(m)}
                 tileText={m.sourceName}
                 durationSec={m.durationSec}
+                chapters={m.chapters}
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 compact

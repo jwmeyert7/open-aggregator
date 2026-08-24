@@ -77,6 +77,7 @@ export function MediaPlayer({
   detach = false,
   closeWindow = false,
   onClose,
+  chapters,
   children,
 }: {
   id: string;
@@ -105,6 +106,8 @@ export function MediaPlayer({
   closeWindow?: boolean;
   /** dock: close dismisses the whole dock instead of leaving a player-less stub */
   onClose?: () => void;
+  /** the episode's chapter marks; the dock and detached windows render them as one-tap jumps */
+  chapters?: Array<{ at: number; label: string }>;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(autoOpen);
@@ -189,7 +192,7 @@ export function MediaPlayer({
   const toDock = () => {
     window.dispatchEvent(
       new CustomEvent("podcast:dock", {
-        detail: { url, kind, title, audioUrl, videoUrl, startAt: Math.floor(position) },
+        detail: { url, kind, title, audioUrl, videoUrl, chapters, startAt: Math.floor(position) },
       })
     );
     pauseHere();
@@ -234,6 +237,17 @@ export function MediaPlayer({
     const at = seconds > 0 ? seconds : Math.floor(resumeAt);
     window.open(`/player?v=${ytId}${at > 0 ? `&t=${at}` : ""}`, "_blank", "popup,width=520,height=340");
     pauseHere();
+  };
+
+  const seekTo = (at: number) => {
+    if (ytId) {
+      frame.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "command", func: "seekTo", args: [at, true] }),
+        YT_EMBED_ORIGIN
+      );
+    } else if (audio.current) {
+      audio.current.currentTime = at;
+    }
   };
 
   // in a detached window the player is the window: closing one closes both.
@@ -381,6 +395,18 @@ export function MediaPlayer({
                 close
               </button>
             </div>
+          {(detach || closeWindow) && chapters && chapters.length > 0 ? (
+            <ol className="player-chapters">
+              {chapters.map((c) => (
+                <li key={c.at}>
+                  <button type="button" className="linklike" onClick={() => seekTo(c.at)}>
+                    <span className="chap-at">{fmt(c.at)}</span>
+                    {c.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : null}
           </div>
         </div>
       ) : null}

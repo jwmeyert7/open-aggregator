@@ -9,6 +9,7 @@ interface DockItem {
   title: string;
   audioUrl?: string;
   videoUrl?: string;
+  chapters?: Array<{ at: number; label: string }>;
   startAt?: number;
 }
 
@@ -42,6 +43,7 @@ export function MiniPlayer() {
         title={item.title}
         audioUrl={item.audioUrl}
         videoUrl={item.videoUrl}
+        chapters={item.chapters}
         compact
         autoOpen
         startAt={item.startAt}

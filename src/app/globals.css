@@ -2451,3 +2451,33 @@ body:has(.player-page) {
     display: none;
   }
 }
+
+/* clickable chapters in the dock and detached windows: the creator's own
+   marks, one tap to jump, with their own scroll so the video keeps its room */
+.player-chapters {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+}
+.player-chapters li {
+  padding: 2px 0;
+}
+.player-chapters button {
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+}
+.player-chapters button:hover {
+  color: var(--hover-blue);
+}
+.player-chapters .chap-at {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+.player-page .player-chapters {
+  flex: none;
+}

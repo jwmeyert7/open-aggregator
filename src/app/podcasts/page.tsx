@@ -68,6 +68,7 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                 thumbnail={mediaThumb(m)}
                 tileText={m.sourceName}
                 durationSec={m.durationSec}
+                chapters={m.chapters}
                 audioUrl={m.audioUrl}
                 videoUrl={m.videoUrl}
                 autoOpen={play === m.id}

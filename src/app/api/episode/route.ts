@@ -17,6 +17,7 @@ export async function GET(req: Request) {
       title: m.displayTitle ?? m.title,
       ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
       ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
+      ...(m.chapters && m.chapters.length > 0 ? { chapters: m.chapters.map((c) => ({ at: c.at, label: c.label })) } : {}),
     },
     { headers: { "cache-control": "public, max-age=60" } }
   );

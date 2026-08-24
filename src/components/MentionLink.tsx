@@ -46,6 +46,7 @@ export function MentionLink({
                   title: d.title,
                   audioUrl: d.audioUrl,
                   videoUrl: d.videoUrl,
+                  chapters: d.chapters,
                   startAt: at ?? 0,
                 },
               })
