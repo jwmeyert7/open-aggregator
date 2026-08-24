@@ -2286,3 +2286,9 @@ button.status-date {
   border-radius: 4px;
   background: var(--surface);
 }
+
+/* the meta line never squeezes in beside the floated thumb: it always starts
+   below it and runs the full width of the row */
+.media-rail .media-body .org {
+  clear: right;
+}
