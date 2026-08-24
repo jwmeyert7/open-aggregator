@@ -356,7 +356,7 @@ export function MediaPlayer({
             <div className="org media-player-links">
               <a href={watchHref} rel="noopener" onClick={pauseHere} onAuxClick={pauseHere}>
                 {ytId
-                ? seconds > 5
+                ? seconds > 0
                   ? `watch on YouTube from ${fmt(seconds)} / ${dur > 0 ? `${fmt(Math.round(dur))} (${Math.min(100, Math.round((seconds / dur) * 100))}%)` : "…"}`
                   : "watch on YouTube"
                 : "open episode page"}
@@ -394,7 +394,7 @@ export function MediaPlayer({
                 close
               </button>
             </div>
-          {(detach || closeWindow) && chapters && chapters.length > 0 ? (
+          {chapters && chapters.length > 0 ? (
             <details className="player-chapters">
               <summary>chapters ({chapters.length})</summary>
               <ol>
