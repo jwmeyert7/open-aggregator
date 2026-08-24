@@ -2318,10 +2318,14 @@ button.status-date {
   align-items: center;
 }
 
-/* the one-line answer to what a section means, under its tab row */
+/* the one-line answer to what a section means. It lives inside the tab-row
+   nav (a flex row), taking the full width so it wraps onto its own line. */
+.main-nav.in-grid {
+  flex-wrap: wrap;
+}
 .section-tagline {
-  grid-column: 1 / -1;
-  margin: 0 0 4px;
+  flex-basis: 100%;
+  margin: 2px 0 0;
   font-size: 0.82rem;
   color: var(--muted);
 }

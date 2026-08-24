@@ -8,9 +8,12 @@ import Link from "next/link";
 export function ColumnHeads({
   sections,
   active,
+  tagline,
 }: {
   sections: Array<{ id: string; title: string; tooltip?: string }>;
   active: string;
+  /** the active section's one-liner, rendered inside the nav so it rides the tab row's grid placement */
+  tagline?: string;
 }) {
   return (
     <nav className="main-nav in-grid">
@@ -22,6 +25,7 @@ export function ColumnHeads({
           {s.title}
         </Link>
       ))}
+      {tagline ? <span className="section-tagline">{tagline}</span> : null}
     </nav>
   );
 }

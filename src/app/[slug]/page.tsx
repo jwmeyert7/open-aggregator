@@ -85,8 +85,7 @@ export default async function SlugPage({
   const showSidebar = hasSidebarContent(state) || sectionMedia.length > 0;
   return (
     <main className={`wrap page${showSidebar ? "" : " no-middle"}`}>
-      <ColumnHeads sections={cfg.sections} active={section.id} />
-      {section.tagline ? <p className="section-tagline">{section.tagline}</p> : null}
+      <ColumnHeads sections={cfg.sections} active={section.id} tagline={section.tagline} />
       <div className="stories-col">
         {(() => {
           const ad = (state.sponsoredPosts ?? []).find(
