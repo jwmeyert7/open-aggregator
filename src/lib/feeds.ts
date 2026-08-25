@@ -468,9 +468,14 @@ async function enrichListingPages(items: CandidateItem[], feeds: FeedConfig[], t
         if (meta.desc && !i.excerpt) i.excerpt = truncate(decodeEntities(stripHtml(meta.desc)), 500);
         if (meta.published && !Number.isNaN(Date.parse(meta.published))) {
           i.publishedAt = new Date(meta.published).toISOString();
+        } else {
+          // the page declares no date, so the cast's timestamp stands in: the
+          // item must not count as breaking news off a re-share (a month-old
+          // Uniswap explainer once resurrected its story to the top this way)
+          i.undated = true;
         }
       } catch {
-        // best-effort
+        i.undated = true;
       }
     })
   );
