@@ -964,7 +964,10 @@ async function linkEpisodesToStories(state: SiteState, only?: MediaItem[]): Prom
     }
     list.push({ mediaId: m.id, show: m.sourceName, title: m.displayTitle ?? m.title, kind: m.kind, ...(at !== undefined ? { at } : {}), addedAt: now });
     if (list.length > 6) list.splice(0, list.length - 6);
-    c.updatedAt = now;
+    // deliberately NOT bumping c.updatedAt: a podcast chapter discussing a
+    // story is not new coverage, and updatedAt doubles as the "recently
+    // active" clock for the editor's context window, so a mention pass can
+    // resurrect old stories into the front summary.
     added += 1;
   };
   const unresolved: Array<{ id: string; show: string; title: string; chapters: Array<{ at: number; label: string }> }> = [];
