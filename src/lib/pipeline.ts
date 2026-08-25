@@ -34,9 +34,22 @@ export interface RunReport {
  * bounded in count, so the per-run token cost stays flat as the archive grows.
  */
 export function digestClusters(state: SiteState, cfg: SiteConfig["ingest"]): Cluster[] {
+  // "recently active" means recent COVERAGE: when the newest link arrived.
+  // updatedAt also moves on admin actions and other passes, and any phantom
+  // bump here walks a weeks-old story into the editor's context and from
+  // there into the front summary as if it were news.
+  const activity = new Map(
+    liveClusters(state).map((c) => [
+      c.id,
+      c.links.reduce((max, l) => {
+        const at = l.addedAt || l.publishedAt;
+        return at > max ? at : max;
+      }, c.createdAt),
+    ])
+  );
   return liveClusters(state)
-    .filter((c) => hoursAgo(c.updatedAt) <= cfg.digestClusterDays * 24)
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .filter((c) => hoursAgo(activity.get(c.id)!) <= cfg.digestClusterDays * 24)
+    .sort((a, b) => activity.get(b.id)!.localeCompare(activity.get(a.id)!))
     .slice(0, cfg.digestMaxClusters);
 }
 
