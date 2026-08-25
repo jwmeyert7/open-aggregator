@@ -637,6 +637,18 @@ a.pill:hover {
   visibility: visible;
 }
 
+/* the admin's on-page jump to a story's or episode's admin entry; rendered
+   only with the admin cookie plus the footer edit links pref */
+.edit-link {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  border-bottom: 1px dotted color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.edit-link:hover {
+  color: var(--hover-peach);
+}
+
 .empty-state {
   color: var(--muted);
   font-size: 0.9rem;
@@ -808,34 +820,39 @@ a.pill:hover {
    one does not fit beside the wordmark.
    (must come AFTER the base .header-status and .tagline rules to win) */
 @media (max-width: 760px) {
+  /* rows anchor to the TOP: the status block is the only piece whose height
+     varies, so it goes bottom-right where extra lines grow downward.
+     Anchoring end made the wordmark and tagline jump when it grew. */
   .site-header .wrap {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
+    align-items: start;
     gap: 4px 12px;
   }
   .logo {
     grid-row: 1;
     grid-column: 1;
+    align-self: center;
   }
   .tagline {
     display: block;
     grid-row: 2;
     grid-column: 1;
+    align-self: start;
     font-size: 0.7rem;
     white-space: nowrap;
   }
   .header-status {
     position: static;
     transform: none;
-    grid-row: 1;
+    grid-row: 2;
     grid-column: 2;
     justify-self: end;
     align-items: flex-end;
     gap: 1px;
   }
   .header-right {
-    grid-row: 2;
+    grid-row: 1;
     grid-column: 2;
     justify-self: end;
     margin-left: 0;
@@ -1140,8 +1157,14 @@ body:has(.notfound) .main-nav {
   gap: 8px;
   margin-left: auto;
 }
-.footer-pref {
+.footer-prefs {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.footer-pref {
   cursor: pointer;
   user-select: none;
   display: flex;
@@ -1152,9 +1175,20 @@ body:has(.notfound) .main-nav {
   accent-color: var(--muted);
   cursor: pointer;
 }
-/* only the first pref pushes right; later ones sit beside it */
-.footer-pref ~ .footer-pref {
-  margin-left: 0;
+/* phones: everything in the footer reads left to right, top to bottom. The
+   right-pushed groups (social icons, pref checkboxes) each take their own
+   full line, still anchored right, instead of floating beside a wrapped row. */
+@media (max-width: 760px) {
+  .footer-social {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+  .footer-prefs {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
 }
 
 /* ---------- public submit form ---------- */
@@ -1839,6 +1873,12 @@ button.status-date {
 .lead-btn {
   font-size: 0.72rem;
   white-space: nowrap;
+}
+/* per-link dates ride on their own quiet line under the title */
+.link-check .link-when {
+  display: block;
+  margin-left: 22px;
+  font-size: 0.72rem;
 }
 
 /* subscribe page: the form breathes between the two copy paragraphs, a

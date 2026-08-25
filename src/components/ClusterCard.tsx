@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { MentionLink } from "@/components/MentionLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import type { Cluster, SponsoredPost } from "@/lib/types";
@@ -137,6 +138,7 @@ export function ClusterCard({
             {m.at !== undefined ? `discussed at ${fmtMoment(m.at)} on ${m.show}` : `discussed on ${m.show}`}
           </MentionLink>
         ))}
+        <AdminEditLink href={`/admin/stories?story=${cluster.id}`} />
         <a href={`/submit?story=${cluster.slug}`} className="suggest-link">
           suggest a link
         </a>

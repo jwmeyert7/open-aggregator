@@ -20,8 +20,10 @@ export interface StoryRow {
   sectionRank: number | null;
   farcasterUrl: string | null;
   links: number;
-  linkList: Array<{ url: string; sourceName: string; title: string }>;
+  linkList: Array<{ url: string; sourceName: string; title: string; publishedAt: string; addedAt: string; undated: boolean }>;
   leadUrl: string | null;
+  /** the link the reader actually sees as the kicker right now, pinned or automatic */
+  currentLeadUrl: string | null;
   pinned: boolean;
   needsReview: boolean;
   postedX: boolean;
@@ -139,14 +141,18 @@ export function StoriesClient({
   chrome,
   data,
   initialFilter = "",
+  initialStoryId,
 }: {
   chrome: AdminChromeData;
   data: StoriesData;
   initialFilter?: string;
+  /** the site's edit links land here: show exactly this story until cleared */
+  initialStoryId?: string;
 }) {
   const { busy, status, setStatus, act } = useAdminAct();
   const [storyQuery, setStoryQuery] = useState(initialFilter);
   const [showAllStories, setShowAllStories] = useState(false);
+  const [pinnedId, setPinnedId] = useState(initialStoryId);
 
   return (
     <div>
@@ -159,7 +165,10 @@ export function StoriesClient({
           className="text"
           placeholder="Filter stories by headline, section, or source…"
           value={storyQuery}
-          onChange={(e) => setStoryQuery(e.target.value)}
+          onChange={(e) => {
+            setStoryQuery(e.target.value);
+            setPinnedId(undefined);
+          }}
         />
       </div>
       {(() => {
@@ -172,9 +181,18 @@ export function StoriesClient({
                 c.linkList.some((l) => l.sourceName.toLowerCase().includes(q))
             )
           : data.clusters;
-        const shown = showAllStories || q ? filtered : filtered.slice(0, 15);
+        const pinned = !q && pinnedId ? data.clusters.filter((c) => c.id === pinnedId) : null;
+        const shown = pinned ?? (showAllStories || q ? filtered : filtered.slice(0, 15));
         return (
           <>
+            {pinned ? (
+              <p className="status-line">
+                Showing one story, straight from its edit link.{" "}
+                <button className="btn" onClick={() => setPinnedId(undefined)}>
+                  Show the list
+                </button>
+              </p>
+            ) : null}
             {shown.map((c) => (
               <div key={c.id} className="admin-card">
                 <div className="headline">
@@ -432,6 +450,27 @@ export function StoriesClient({
                           <label className="link-check">
                             <input type="checkbox" name="url" value={l.url} /> <span className="src">{l.sourceName}</span>:{" "}
                             {l.title}
+                            <span className="sub link-when">
+                              {l.undated ? (
+                                "no publish date"
+                              ) : (
+                                <span title={new Date(l.publishedAt).toUTCString().replace("GMT", "UTC")}>
+                                  published {timeAgo(l.publishedAt)}
+                                </span>
+                              )}
+                              {l.addedAt ? (
+                                <>
+                                  {" · "}
+                                  <span title={new Date(l.addedAt).toUTCString().replace("GMT", "UTC")}>
+                                    added {timeAgo(l.addedAt)}
+                                  </span>
+                                </>
+                              ) : null}
+                              {" · "}
+                              <a href={l.url} target="_blank" rel="noopener">
+                                view ↗
+                              </a>
+                            </span>
                           </label>
                           <button
                             type="button"
@@ -440,11 +479,13 @@ export function StoriesClient({
                             title={
                               c.leadUrl === l.url
                                 ? "Pinned as the lead. Click to return to automatic."
-                                : "Pin this link as the story's lead (the kicker source)"
+                                : c.currentLeadUrl === l.url
+                                  ? "The automatic lead right now, chosen by tier and weight. Click to pin it so it stays."
+                                  : "Pin this link as the story's lead (the kicker source)"
                             }
                             onClick={() => act("setLead", { clusterId: c.id, url: c.leadUrl === l.url ? "" : l.url })}
                           >
-                            {c.leadUrl === l.url ? "lead ✓" : "make lead"}
+                            {c.leadUrl === l.url ? "lead ✓ pinned" : c.currentLeadUrl === l.url ? "lead ✓ auto" : "make lead"}
                           </button>
                         </div>
                       ))}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import { effectiveFeeds } from "@/lib/config";
 import { MediaPlayer } from "@/components/MediaPlayer";
@@ -70,7 +71,8 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
               </>
             ) : null}
             {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null} ·{" "}
-            <AgeStamp iso={m.publishedAt} />
+            <AgeStamp iso={m.publishedAt} />{" "}
+            <AdminEditLink href={`/admin/podcasts?episode=${m.id}`} />
           </div>
         </div>
       </MediaPlayer>

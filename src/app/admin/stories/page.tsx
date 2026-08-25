@@ -2,7 +2,7 @@ import { StoriesClient, type StoriesData } from "./StoriesClient";
 import { buildChrome, NotLoggedIn } from "../server";
 import { isAdmin } from "@/lib/auth";
 import { loadSiteConfig } from "@/lib/config";
-import { liveClusters, rankClusters, score, scoreBreakdown, topStories } from "@/lib/rank";
+import { leadLink, liveClusters, rankClusters, score, scoreBreakdown, topStories } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
 
@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Admin · Stories", robots: { index: false } };
 
-export default async function AdminStoriesPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
-  const { filter } = await searchParams;
+export default async function AdminStoriesPage({ searchParams }: { searchParams: Promise<{ filter?: string; story?: string }> }) {
+  const { filter, story } = await searchParams;
   if (!(await isAdmin())) return <NotLoggedIn />;
 
   const state = await loadState();
@@ -48,8 +48,16 @@ export default async function AdminStoriesPage({ searchParams }: { searchParams:
         c.posted?.farcasterHash && siteIdentity().social?.farcasterHandle
           ? `https://farcaster.xyz/${siteIdentity().social!.farcasterHandle}/${c.posted.farcasterHash.slice(0, 10)}`
           : null,
-      linkList: c.links.map((l) => ({ url: l.url, sourceName: l.sourceName, title: l.title })),
+      linkList: c.links.map((l) => ({
+        url: l.url,
+        sourceName: l.sourceName,
+        title: l.title,
+        publishedAt: l.publishedAt,
+        addedAt: l.addedAt,
+        undated: Boolean(l.undated),
+      })),
       leadUrl: c.leadUrl ?? null,
+      currentLeadUrl: leadLink(c)?.url ?? null,
       links: c.links.length,
       pinned: Boolean(c.pinned),
       needsReview: Boolean(c.needsReview),
@@ -78,7 +86,7 @@ export default async function AdminStoriesPage({ searchParams }: { searchParams:
 
   return (
     <main className="wrap page single admin">
-      <StoriesClient chrome={buildChrome(state, cfg)} data={data} initialFilter={filter ?? ""} />
+      <StoriesClient chrome={buildChrome(state, cfg)} data={data} initialFilter={filter ?? ""} initialStoryId={story} />
     </main>
   );
 }

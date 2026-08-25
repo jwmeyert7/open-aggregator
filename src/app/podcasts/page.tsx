@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import { SectionPill } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
@@ -89,7 +90,8 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                       </>
                     ) : null}
                     {formatViews(m.views) ? <> · {formatViews(m.views)} views</> : null} ·{" "}
-                    <AgeStamp iso={m.publishedAt} />
+                    <AgeStamp iso={m.publishedAt} />{" "}
+                    <AdminEditLink href={`/admin/podcasts?episode=${m.id}`} />
                   </div>
                   {(covered.get(m.id) ?? []).length > 0 ? (
                     <ul className="episode-stories">

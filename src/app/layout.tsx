@@ -123,8 +123,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/privacy">Privacy</Link>
               <Link href="/contact">Contact</Link>
               <AdminLink />
-              <LinkPrefToggle />
-              <EditLinksToggle />
+              {/* the pref checkboxes travel together: right of the links on
+                  desktop, their own right-anchored line on phones */}
+              <span className="footer-prefs">
+                <LinkPrefToggle />
+                <EditLinksToggle />
+              </span>
             </div>
           </div>
         </footer>

@@ -3,14 +3,26 @@
 import type { MediaItem } from "@/lib/types";
 import { timeAgo } from "@/lib/util";
 import { AdminChrome, type AdminChromeData, Toast, useAdminAct } from "../shared";
+import { useState } from "react";
 
 export interface PodcastsData {
   sections: string[];
   mediaItems: MediaItem[];
 }
 
-export function PodcastsClient({ chrome, data }: { chrome: AdminChromeData; data: PodcastsData }) {
+export function PodcastsClient({
+  chrome,
+  data,
+  initialEpisodeId,
+}: {
+  chrome: AdminChromeData;
+  data: PodcastsData;
+  /** the site's edit links land here: show exactly this episode until cleared */
+  initialEpisodeId?: string;
+}) {
   const { busy, status, setStatus, act } = useAdminAct();
+  const [pinnedId, setPinnedId] = useState(initialEpisodeId);
+  const shownItems = pinnedId ? data.mediaItems.filter((m) => m.id === pinnedId) : data.mediaItems;
 
   return (
     <div>
@@ -58,8 +70,16 @@ export function PodcastsClient({ chrome, data }: { chrome: AdminChromeData; data
           Re-judge shelf
         </button>
       </div>
-      {data.mediaItems.length === 0 ? <p className="empty-state">Nothing on the shelf yet.</p> : null}
-      {data.mediaItems.map((m) => (
+      {pinnedId ? (
+        <p className="status-line">
+          Showing one episode, straight from its edit link.{" "}
+          <button className="btn" onClick={() => setPinnedId(undefined)}>
+            Show the shelf
+          </button>
+        </p>
+      ) : null}
+      {shownItems.length === 0 ? <p className="empty-state">Nothing on the shelf yet.</p> : null}
+      {shownItems.map((m) => (
         <div key={m.id} className={`admin-card${m.hidden ? " is-hidden" : ""}`}>
           <div className="headline">
             <a href={m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import { SectionPill } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
@@ -60,7 +61,8 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                   <div className="org">
                     {m.section ? <><SectionPill section={m.section} /> · </> : null}
                     {formatViews(m.views) ? <>{formatViews(m.views)} views · </> : null}
-                    <AgeStamp iso={m.publishedAt} />
+                    <AgeStamp iso={m.publishedAt} />{" "}
+                    <AdminEditLink href={`/admin/podcasts?episode=${m.id}`} />
                   </div>
                 </div>
               </MediaPlayer>
