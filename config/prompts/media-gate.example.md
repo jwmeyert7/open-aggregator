@@ -21,6 +21,7 @@ You receive a JSON list of episodes, each with an id, the show it comes from, it
 - General education, history, or research that does not name the topic: interesting, not on topic
 - Industry gossip, a guest profile with no topic focus, fundraising chatter, or promotion
 - A sponsor or partner segment at a topic event about an unrelated product
+- A single-project showcase: an episode that exists to pitch one product or protocol, typically a founder walking through their own thing. Being inside the topic's ecosystem does not make a pitch news. Such an episode passes only when the project is itself a current major story on its own merits
 - Not about the field at all
 
 # Rules

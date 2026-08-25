@@ -34,7 +34,7 @@ export function ColumnHeads({
           {taglineNote ? (
             <>
               {" "}
-              {taglineNote.text}
+              {taglineNote.text}{" "}
               <a href={taglineNote.href} rel="noopener">
                 {taglineNote.linkText}
               </a>

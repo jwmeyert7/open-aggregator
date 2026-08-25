@@ -2377,6 +2377,15 @@ button.status-date {
   font-size: 0.82rem;
   color: var(--muted);
 }
+/* a link inside the tagline (the taglineNote) reads as prose, not as a nav tab */
+.section-tagline a {
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  border-bottom: none;
+  white-space: normal;
+}
 
 /* ----- corner dock and detached player windows ----- */
 
