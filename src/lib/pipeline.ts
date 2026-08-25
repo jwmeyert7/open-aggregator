@@ -1,4 +1,4 @@
-import { effectiveFeeds, effectiveMarkets, loadSiteConfig } from "./config";
+import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
@@ -531,6 +531,12 @@ function routeCastLinks(
 
   const feedById = new Map(effectiveFeeds(state).map((f) => [f.id, f]));
   const sourceByHost = knownSourceHosts(state);
+  // the site's own domain is never a source candidate: the digest bot casts
+  // a link to it every day, and the discovery loop must not eat its own tail
+  let selfHost = "";
+  try {
+    selfHost = normalizeHost(new URL(siteUrl()).hostname);
+  } catch {}
 
   const now = new Date().toISOString();
   const candidates = (state.sourceCandidates ??= {});
@@ -560,6 +566,7 @@ function routeCastLinks(
     // show notes link to sponsors and shops as a matter of course: an unknown
     // host from an episode is not a source candidate
     if (link.mediaId) continue;
+    if (selfHost && (link.host === selfHost || link.host.endsWith("." + selfHost))) continue;
     if (!candidates[link.host]) newHosts.push(link.host);
     const entry = (candidates[link.host] ??= {
       host: link.host,
