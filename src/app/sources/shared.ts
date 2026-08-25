@@ -13,6 +13,13 @@ export function sourceLink(feed: FeedConfig): string {
     const site = /site:([a-z0-9.-]+)/i.exec(feed.url)?.[1];
     if (site) return `https://${site}`;
   }
+  if (feed.type === "youtube") {
+    // the feed URL is RSS machinery: link the channel (or playlist) itself
+    const channel = /channel_id=(UC[\w-]{22})/.exec(feed.url)?.[1];
+    if (channel) return `https://www.youtube.com/channel/${channel}`;
+    const playlist = /playlist_id=([\w-]+)/.exec(feed.url)?.[1];
+    if (playlist) return `https://www.youtube.com/playlist?list=${playlist}`;
+  }
   try {
     return new URL(feed.url).origin;
   } catch {

@@ -81,12 +81,14 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
   // article links: the show's output IS its coverage. An outlet that is also
   // a show (Bankless) keeps the articles page and gains an Episodes section.
   if (hasMedia && !hasNews) {
+    const show = sourceLink(named.find((f) => isMediaFeed(f)) ?? feed);
     return (
       <main className="wrap page single roomy">
         <div className="prose">
           <h1>{feed.name}</h1>
           <p>
-            Every episode from {feed.name} on the site right now, newest first. Press a thumbnail to play it here.
+            Every episode from <a href={show} rel="noopener">{feed.name}</a> on the site right now, newest first.
+            Press a thumbnail to play it here.
             The full show list is on <Link href="/sources">Sources</Link>, and every show&apos;s episodes mix on the{" "}
             <Link href="/podcasts">podcasts page</Link>.
           </p>
