@@ -6,6 +6,7 @@ import { loadSiteConfig, siteUrl } from "@/lib/config";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
 import { HeaderStatus } from "@/components/HeaderStatus";
+import { EditLinksToggle } from "@/components/EditLinksToggle";
 import { LinkPrefToggle } from "@/components/LinkPrefToggle";
 import { MainNav } from "@/components/MainNav";
 import { MiniPlayer } from "@/components/MiniPlayer";
@@ -123,6 +124,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/contact">Contact</Link>
               <AdminLink />
               <LinkPrefToggle />
+              <EditLinksToggle />
             </div>
           </div>
         </footer>

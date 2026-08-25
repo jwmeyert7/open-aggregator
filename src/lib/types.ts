@@ -51,6 +51,12 @@ export interface SectionConfig {
   description: string;
   /** reader-facing one-liner shown under the tabs on the section's own page, and reused (lowercased) on the About page */
   tagline?: string;
+  /**
+   * Short linked addendum after the tagline, on the section's own page ONLY
+   * (never the nav tabs or About). For transient notes, like a coming
+   * upgrade: remove it from config when the moment passes.
+   */
+  taglineNote?: { text: string; linkText: string; href: string };
   /** short hover text on the section's nav tab */
   tooltip?: string;
 }
