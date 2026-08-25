@@ -79,7 +79,7 @@ export function recentEpisodes(state: SiteState, windowHours: number, limit: num
     .slice(0, limit)
     .map((m) => {
       const length = formatDuration(m.durationSec);
-      return { show: m.sourceName, title: m.displayTitle ?? m.title, url: m.videoUrl ?? m.url, ...(length ? { length } : {}) };
+      return { show: m.sourceName, title: m.displayTitle ?? m.title, url: `${siteUrl()}/podcasts?play=${m.id}#m-${m.id}`, ...(length ? { length } : {}) };
     });
 }
 
@@ -105,7 +105,7 @@ function digestEmail(opts: {
     ...groups.flatMap((g) => [
       `== ${g.title} ==`,
       "",
-      ...g.stories.flatMap((s) => [`${s.source}: ${s.headline}`, s.explainer || null, s.url, ""]),
+      ...g.stories.flatMap((s) => [`${s.source}: ${s.headline}`, s.explainer || null, s.permalink, ""]),
     ]),
     ...(episodes.length > 0
       ? ["== Podcasts ==", "", ...episodes.flatMap((e) => [`${e.show}: ${e.title}${e.length ? ` (${e.length})` : ""}`, e.url, ""])]
@@ -128,9 +128,9 @@ function digestEmail(opts: {
       ...g.stories.map(
         (s) =>
           `<p style="margin: 16px 0;"><span style="color: #777; font-size: 13px;">${escapeHtml(s.source)}:</span><br/>` +
-          `<a href="${escapeHtml(s.url)}" style="font-size: 16px; font-weight: bold; color: #1a4b8f;">${escapeHtml(s.headline)}</a>` +
+          `<a href="${escapeHtml(s.permalink)}" style="font-size: 16px; font-weight: bold; color: #1a4b8f;">${escapeHtml(s.headline)}</a>` +
           (s.explainer ? `<br/><span style="font-size: 14px;">${escapeHtml(s.explainer)}</span>` : "") +
-          `<br/><a href="${escapeHtml(s.permalink)}" style="font-size: 12px; color: #777;">permalink</a></p>`
+          `<br/><a href="${escapeHtml(s.url)}" style="font-size: 12px; color: #777;">read at ${escapeHtml(s.source)}</a></p>`
       ),
     ]),
     ...(episodes.length > 0
