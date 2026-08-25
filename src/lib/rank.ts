@@ -33,6 +33,10 @@ export interface ScoreBreakdown {
   decayedSourceWeight: number;
   velocityLinks: number;
   velocityBoostPerLink: number;
+  /** The velocity bonus actually applied: each fresh link's boost scaled by its lateness discount. */
+  velocityBoost: number;
+  latenessGraceHours: number;
+  latenessHalfLifeHours: number;
   importance: number;
   importanceCapped: boolean;
   importanceFactor: number;
@@ -51,16 +55,35 @@ export function scoreBreakdown(cluster: Cluster, cfg: SiteConfig["ranking"], now
   // contributes its own fresh weight but cannot resurrect the old links'
   // weight, so a days-old story with one new link resurfaces modestly
   // instead of leaping back to the top as if brand new.
+  //
+  // On top of that, coverage is discounted by how LATE it is relative to the
+  // story's first report: same-day pickup counts in full (the grace window),
+  // then a late link's contribution halves per lateness half-life. Day-two
+  // corroboration still lifts a story; a burst of coverage about two-day-old
+  // news no longer sends it back to the top as if the event just happened.
+  const eventStartMs = cluster.links.reduce((min, l) => {
+    if (l.undated) return min;
+    const t = new Date(l.publishedAt).getTime();
+    return t < min ? t : min;
+  }, new Date(cluster.createdAt).getTime());
+  const latenessGraceHours = cfg.latenessGraceHours ?? 12;
+  const latenessHalfLifeHours = cfg.latenessHalfLifeHours ?? 36;
+  const lateFactor = (l: Cluster["links"][number]): number => {
+    const latenessHours = Math.max(0, (new Date(l.publishedAt).getTime() - eventStartMs) / 3600000);
+    return Math.pow(0.5, Math.max(0, latenessHours - latenessGraceHours) / latenessHalfLifeHours);
+  };
   const bySource = new Map<string, number>();
   const bySourceDecayed = new Map<string, number>();
   for (const l of cluster.links) {
     bySource.set(l.sourceId, Math.max(bySource.get(l.sourceId) ?? 0, l.weight));
     const linkDecay = Math.pow(0.5, Math.max(0, hoursAgo(l.publishedAt, now)) / cfg.decayHalfLifeHours);
-    bySourceDecayed.set(l.sourceId, Math.max(bySourceDecayed.get(l.sourceId) ?? 0, l.weight * linkDecay));
+    bySourceDecayed.set(l.sourceId, Math.max(bySourceDecayed.get(l.sourceId) ?? 0, l.weight * linkDecay * lateFactor(l)));
   }
   const sourceWeight = [...bySource.values()].reduce((a, b) => a + b, 0);
   const decayedSourceWeight = [...bySourceDecayed.values()].reduce((a, b) => a + b, 0);
-  const velocityLinks = cluster.links.filter((l) => !l.undated && hoursAgo(l.addedAt, now) <= cfg.velocityWindowHours).length;
+  const freshLinks = cluster.links.filter((l) => !l.undated && hoursAgo(l.addedAt, now) <= cfg.velocityWindowHours);
+  const velocityLinks = freshLinks.length;
+  const velocityBoost = freshLinks.reduce((a, l) => a + cfg.velocityBoostPerLink * lateFactor(l), 0);
   const soleSource = bySource.size === 1 ? [...bySource.keys()][0] : undefined;
   const forumSolo = soleSource !== undefined && forumSourceIds().has(soleSource);
   const importanceCapped = forumSolo && cluster.importance > FORUM_IMPORTANCE_CAP;
@@ -83,6 +106,9 @@ export function scoreBreakdown(cluster: Cluster, cfg: SiteConfig["ranking"], now
     decayedSourceWeight,
     velocityLinks,
     velocityBoostPerLink: cfg.velocityBoostPerLink,
+    velocityBoost,
+    latenessGraceHours,
+    latenessHalfLifeHours,
     importance: cluster.importance,
     importanceCapped,
     importanceFactor,
@@ -93,7 +119,7 @@ export function scoreBreakdown(cluster: Cluster, cfg: SiteConfig["ranking"], now
     decayHalfLifeHours: cfg.decayHalfLifeHours,
     decay,
     total:
-      (decayedSourceWeight + velocityLinks * cfg.velocityBoostPerLink) *
+      (decayedSourceWeight + velocityBoost) *
       importanceFactor *
       centralityFactor *
       forumFactor,

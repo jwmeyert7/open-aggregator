@@ -71,6 +71,10 @@ export interface SiteConfig {
     decayHalfLifeHours: number;
     velocityWindowHours: number;
     velocityBoostPerLink: number;
+    /** Pickup within this many hours of the story's first report counts in full (default 12). */
+    latenessGraceHours?: number;
+    /** Past the grace window, a late link's contribution halves per this many hours of lateness (default 36). */
+    latenessHalfLifeHours?: number;
     minTopScore: number;
     maxTopStories: number;
     maxSectionStories: number;

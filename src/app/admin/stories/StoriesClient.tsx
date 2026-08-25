@@ -213,14 +213,16 @@ export function StoriesClient({
                         <strong>Coverage:</strong> {c.breakdown.uniqueSources} source
                         {c.breakdown.uniqueSources === 1 ? "" : "s"} contributing {c.breakdown.sourceWeight.toFixed(1)} raw
                         weight, {c.breakdown.decayedSourceWeight.toFixed(2)} after age. Each link&apos;s weight halves every{" "}
-                        {c.breakdown.decayHalfLifeHours}h from its own publish time, so a late follow-up adds fresh weight
-                        without resurrecting old links (newest coverage {Math.round(c.breakdown.freshestAgeHours)}h ago).
+                        {c.breakdown.decayHalfLifeHours}h from its own publish time, and coverage arriving more than{" "}
+                        {c.breakdown.latenessGraceHours}h after the story&apos;s first report is discounted further (halving
+                        per {c.breakdown.latenessHalfLifeHours}h of lateness), so late pickup lifts a story without making
+                        old news new (newest coverage {Math.round(c.breakdown.freshestAgeHours)}h ago).
                       </span>
                       <span className="score-line">
                         <strong>Velocity:</strong> {c.breakdown.velocityLinks} link
                         {c.breakdown.velocityLinks === 1 ? "" : "s"} arrived in the last 6h, adding{" "}
-                        {(c.breakdown.velocityLinks * c.breakdown.velocityBoostPerLink).toFixed(2)}. A story gathering
-                        coverage right now surges.
+                        {c.breakdown.velocityBoost.toFixed(2)} (a late link adds less). A story gathering coverage of
+                        fresh news surges.
                       </span>
                       <span className="score-line">
                         <strong>Importance:</strong> the editor rated it {c.breakdown.importance}/5
@@ -244,8 +246,8 @@ export function StoriesClient({
                         <span title="Coverage: source weight after per-link age decay">
                           {c.breakdown.decayedSourceWeight.toFixed(2)}
                         </span>{" "}
-                        + <span title="Velocity: bonus from links in the last 6h">
-                          {(c.breakdown.velocityLinks * c.breakdown.velocityBoostPerLink).toFixed(2)}
+                        + <span title="Velocity: bonus from links in the last 6h, discounted for lateness">
+                          {c.breakdown.velocityBoost.toFixed(2)}
                         </span>
                         ) × <span title="Importance multiplier (editor's 1-5 rating)">{c.breakdown.importanceFactor.toFixed(2)}</span> ×{" "}
                         <span title="Topic centrality multiplier (how specifically about the site's topic)">
