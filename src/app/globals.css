@@ -2382,6 +2382,12 @@ button.status-date {
   display: block;
   margin-top: 2px;
 }
+/* an emoji glyph can draw wider than its advance and swallow a plain space,
+   so the gap before the link is guaranteed in CSS */
+.section-tagline .tagline-note a {
+  display: inline-block;
+  margin-left: 0.3em;
+}
 /* a link inside the tagline (the taglineNote) reads as prose, not as a nav tab */
 .section-tagline a {
   padding: 0;
