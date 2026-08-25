@@ -2377,6 +2377,11 @@ button.status-date {
   font-size: 0.82rem;
   color: var(--muted);
 }
+/* the transient note sits on its own line under the tagline */
+.section-tagline .tagline-note {
+  display: block;
+  margin-top: 2px;
+}
 /* a link inside the tagline (the taglineNote) reads as prose, not as a nav tab */
 .section-tagline a {
   padding: 0;

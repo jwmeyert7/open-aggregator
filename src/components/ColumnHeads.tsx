@@ -32,13 +32,12 @@ export function ColumnHeads({
         <span className="section-tagline">
           {tagline}
           {taglineNote ? (
-            <>
-              {" "}
+            <span className="tagline-note">
               {taglineNote.text}{" "}
               <a href={taglineNote.href} rel="noopener">
                 {taglineNote.linkText}
               </a>
-            </>
+            </span>
           ) : null}
         </span>
       ) : null}
