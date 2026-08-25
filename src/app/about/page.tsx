@@ -37,7 +37,12 @@ export default function AboutPage() {
             .filter((s) => s.tagline)
             .map((s) => (
               <li key={s.id}>
-                <strong>{s.title}</strong>: {s.tagline!.charAt(0).toLowerCase() + s.tagline!.slice(1)}
+                {/* the tagline flows after the bolded name, so a function-word
+                    opener drops its capital; a proper noun keeps it */}
+                <strong>{s.title}</strong>:{" "}
+                {/^(The|A|An|What|What's|How|Where|Who|News|Stories|Everything)\s/.test(s.tagline!)
+                  ? s.tagline!.charAt(0).toLowerCase() + s.tagline!.slice(1)
+                  : s.tagline!}
               </li>
             ))}
         </ul>
