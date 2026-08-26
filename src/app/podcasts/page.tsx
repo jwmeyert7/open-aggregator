@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
-import { SectionPill } from "@/components/ClusterCard";
+import { SectionPill, SourceKicker } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { loadSiteConfig } from "@/lib/config";
 import { adaptiveRanking, episodeStories, rankMedia } from "@/lib/rank";
@@ -77,7 +77,7 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
               >
                 <div className="media-body">
                   {/* the show reads first, on its own line, like the story cards */}
-                  <div className="kicker">{m.sourceName}:</div>
+                  <SourceKicker name={m.sourceName} />
                   <a href={m.videoUrl ?? m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>
                     {m.displayTitle ?? m.title}
                   </a>

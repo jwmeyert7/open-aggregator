@@ -2,7 +2,7 @@ import Link from "next/link";
 import { adminLayoutPreview } from "@/lib/auth";
 import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
-import { ClusterCard, SectionPill, SponsoredCard } from "@/components/ClusterCard";
+import { ClusterCard, SectionPill, SourceKicker, SponsoredCard } from "@/components/ClusterCard";
 import { ColumnHeads } from "@/components/ColumnHeads";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { hasSidebarContent, NewestRail, Sidebar, sidebarSponsored } from "@/components/Sidebar";
@@ -113,7 +113,7 @@ export default async function HomePage() {
             audioUrl={topEpisode.audioUrl}
             videoUrl={topEpisode.videoUrl}
             compact
-            header={<div className="kicker">{topEpisode.sourceName}:</div>}
+            header={<SourceKicker name={topEpisode.sourceName} />}
           >
             <div className="media-body">
               <a
@@ -182,7 +182,7 @@ export default async function HomePage() {
                   <li key={c.id} id={`s-${c.id}`}>
                     {/* same Techmeme-style kicker as every story card: the
                         vouching source reads first, on its own line */}
-                    <div className="kicker">{lead.sourceName}:</div>
+                    <SourceKicker name={lead.sourceName} />
                     <a href={lead.url} rel="noopener">
                       {c.headline}
                     </a>{" "}

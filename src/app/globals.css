@@ -2398,6 +2398,16 @@ button.status-date {
   display: inline-block;
   margin-left: 0.3em;
 }
+/* the kicker's source name links its on-site source page, quietly: it keeps
+   the muted masthead color so the headline stays the loud click (late in the
+   file on purpose, to outrank context link colors like .week-review a) */
+div.kicker a {
+  color: inherit;
+  text-decoration: none;
+}
+div.kicker a:hover {
+  color: var(--hover-peach);
+}
 /* a link inside the tagline (the taglineNote) reads as prose, not as a nav tab */
 .section-tagline a {
   padding: 0;

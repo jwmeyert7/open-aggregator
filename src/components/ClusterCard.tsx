@@ -5,6 +5,23 @@ import { AgeStamp } from "@/components/AgeStamp";
 import type { Cluster, SponsoredPost } from "@/lib/types";
 import { leadLink } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
+import { sourceSlug } from "@/app/sources/shared";
+
+/**
+ * The Techmeme-style kicker masthead: the vouching source's name reads first,
+ * quietly linking its on-site source page (its articles or episodes here).
+ * The headline below stays the loud click.
+ */
+export function SourceKicker({ name }: { name: string }) {
+  return (
+    <div className="kicker">
+      <Link href={`/sources/${sourceSlug(name)}`} title={`${name} on ${siteIdentity().siteName}`}>
+        {name}
+      </Link>
+      :
+    </div>
+  );
+}
 
 /**
  * Section tag linking to that section's page. "general" (multi-topic
@@ -80,7 +97,7 @@ export function ClusterCard({
       {/* Techmeme-style kicker: the source vouching for the story reads first,
           on its own line, so trust anchors the headline without breaking its
           left edge for scanning */}
-      <div className="kicker">{lead.sourceName}:</div>
+      <SourceKicker name={lead.sourceName} />
       <h2>
         <a href={lead.url} rel="noopener">
           {cluster.headline}

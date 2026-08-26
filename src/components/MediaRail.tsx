@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
-import { SectionPill } from "@/components/ClusterCard";
+import { SectionPill, SourceKicker } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import type { MediaItem } from "@/lib/types";
 import { formatViews, mediaThumb } from "@/lib/util";
@@ -52,7 +52,7 @@ export function MediaRail({ items, limit = 6, perShow = 2 }: { items: MediaItem[
                 compact
                 // same Techmeme-style kicker as the story cards: the show reads first, on its
                 // own line, across the whole row, with thumbnail and title side by side beneath it
-                header={<div className="kicker">{m.sourceName}:</div>}
+                header={<SourceKicker name={m.sourceName} />}
               >
                 <div className="media-body">
                   <a href={m.videoUrl ?? m.url} rel="noopener" title={m.displayTitle ? `Show's title: ${m.title}` : undefined}>
