@@ -36,8 +36,8 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
           <p>
             New podcast episodes and videos about {site.topic} from whitelisted shows, newest first. Episodes from
             broader shows appear only when they are substantially about {site.topic}. Press a thumbnail to play it
-            here, or the title to open it at the source. The written news lives on the{" "}
-            <Link href="/">front page</Link>.
+            here, or the title to open it at the source. The full <Link href="/sources#podcasts">show list</Link> is on
+            Sources, and the written news lives on the <Link href="/">front page</Link>.
           </p>
         </div>
         {items.length === 0 ? <p className="empty-state">Nothing on the shelf yet.</p> : null}

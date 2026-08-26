@@ -52,6 +52,10 @@ export default async function SourcesPage() {
           how many of each source&apos;s items were published to the site in the last 30 days. Click a source to see
           its articles here.
         </p>
+        <p className="org">
+          On this page: <a href="#news">news sources</a> · <a href="#podcasts">podcast shows</a>
+        </p>
+        <h2 id="news">News sources</h2>
         <SourcesTable rows={sorted.map(([name, r]) => ({ name, slug: sourceSlug(name), count: r.count }))} />
         {shows.length > 0 ? (
           <>

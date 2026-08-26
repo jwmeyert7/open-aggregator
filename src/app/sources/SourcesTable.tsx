@@ -22,8 +22,10 @@ export function SourcesTable({
   /** one link target for every row (a function prop cannot cross the server to client boundary); defaults to the source's own article page */
   rowHref?: string;
 }) {
-  const [key, setKey] = useState<"name" | "count">("count");
-  const [asc, setAsc] = useState(false);
+  // alphabetical by default: readers scan for a name; the count column is one
+  // click away for the curious
+  const [key, setKey] = useState<"name" | "count">("name");
+  const [asc, setAsc] = useState(true);
 
   const sorted = [...rows].sort((a, b) => {
     const d = key === "name" ? a.name.localeCompare(b.name) : a.count - b.count;

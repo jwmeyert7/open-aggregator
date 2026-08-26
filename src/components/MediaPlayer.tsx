@@ -135,6 +135,9 @@ export function MediaPlayer({
   const [open, setOpen] = useState(autoOpen);
   // expanded: the same player element enlarged into an overlay on this page
   const [expanded, setExpanded] = useState(false);
+  // direct-file episodes with an audio rendition: the reader may swap the
+  // heavy video for the light audio (and back), keeping the playhead
+  const [audioOnly, setAudioOnly] = useState(false);
   const [position, setPosition] = useState(0);
   const [resumeAt, setResumeAt] = useState(0);
   // total length: seeded from the shelf's data, refined by the player itself
@@ -341,7 +344,7 @@ export function MediaPlayer({
                   referrerPolicy="strict-origin-when-cross-origin"
                 />
               </div>
-            ) : fileVideo ? (
+            ) : fileVideo && !audioOnly ? (
               <div className="media-frame">
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                 <video
@@ -395,6 +398,23 @@ export function MediaPlayer({
               <button type="button" className="linklike" onClick={() => setExpanded((v) => !v)}>
                 {expanded ? "shrink" : "expand"}
               </button>{" "}
+              {fileVideo && audioUrl ? (
+                <>
+                  ·{" "}
+                  <button
+                    type="button"
+                    className="linklike"
+                    title={audioOnly ? "Back to the video" : "Audio only: a far smaller download than the raw video file"}
+                    onClick={() => {
+                      if (position > 0) setResumeAt(Math.floor(position));
+                      pauseHere();
+                      setAudioOnly((v) => !v);
+                    }}
+                  >
+                    {audioOnly ? "watch video" : "listen instead"}
+                  </button>{" "}
+                </>
+              ) : null}
               {popOut ? (
                 <>
                   ·{" "}
