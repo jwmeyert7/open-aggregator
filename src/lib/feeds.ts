@@ -743,27 +743,28 @@ function parseItunesDuration(raw?: string): number | undefined {
 async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<MediaCandidate[]> {
   const parsed = await parseFeedXml(await fetchText(feed.url, timeoutMs));
   const manifest = await fetchVideoManifest(feed, timeoutMs);
-  return (parsed.items ?? [])
+  // the manifest keys on the episode slug: the enclosure's filename stem
+  // and the item link's last path segment are both tried
+  const stem = (u?: string): string | null => {
+    if (!u) return null;
+    try {
+      const parsedUrl = new URL(u);
+      const fname = parsedUrl.searchParams.get("filename");
+      if (fname) return fname.replace(/\.[a-z0-9]+$/i, "");
+      return parsedUrl.pathname.split("/").filter(Boolean).pop() ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const matched = new Set<string>();
+  const fromRss = (parsed.items ?? [])
     .filter((i) => i.title && (i.link || i.enclosure?.url))
     .map((i) => {
       const itunes = (i as { itunes?: { duration?: string; image?: string; summary?: string } }).itunes ?? {};
       const durationSec = parseItunesDuration(itunes.duration);
-      // the manifest keys on the episode slug: the enclosure's filename stem
-      // and the item link's last path segment are both tried
-      const stem = (u?: string): string | null => {
-        if (!u) return null;
-        try {
-          const parsedUrl = new URL(u);
-          const fname = parsedUrl.searchParams.get("filename");
-          if (fname) return fname.replace(/\.[a-z0-9]+$/i, "");
-          return parsedUrl.pathname.split("/").filter(Boolean).pop() ?? null;
-        } catch {
-          return null;
-        }
-      };
-      const extra = manifest
-        ? (stem(i.enclosure?.url) && manifest.get(stem(i.enclosure?.url)!)) || (stem(i.link) && manifest.get(stem(i.link)!)) || null
-        : null;
+      const key = [stem(i.enclosure?.url), stem(i.link)].find((k) => k && manifest?.has(k)) ?? null;
+      const extra = key ? manifest!.get(key)! : null;
+      if (key) matched.add(key);
       return {
         ...candidate(
           feed,
@@ -787,34 +788,66 @@ async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<M
         // RSS-derived ones; with a video the episode IS a video on the site
         ...(extra?.videoUrl ? { kind: "video" as const, videoUrl: extra.videoUrl } : {}),
         ...(extra?.thumbnail ? { thumbnail: extra.thumbnail } : {}),
-        ...(extra?.chapters ? { chapters: extra.chapters } : {}),
+        ...(extra?.chapters && extra.chapters.length > 0 ? { chapters: extra.chapters } : {}),
       };
     });
+  // video-only episodes never reach the RSS (it lists audio enclosures), so
+  // the manifest is a first-class source for the rest: anything published
+  // with a video that no RSS item claimed becomes its own candidate
+  const fromManifest = manifest
+    ? [...manifest.values()]
+        .filter((e) => !matched.has(e.slug) && e.videoUrl && e.publishedAt)
+        .map((e) => ({
+          ...candidate(feed, e.pageUrl ?? e.videoUrl!, e.title ?? e.slug, e.publishedAt!, e.excerpt),
+          kind: "video" as const,
+          videoUrl: e.videoUrl!,
+          ...(e.thumbnail ? { thumbnail: e.thumbnail } : {}),
+          ...(e.chapters && e.chapters.length > 0 ? { chapters: e.chapters } : {}),
+        }))
+    : [];
+  return [...fromRss, ...fromManifest];
+}
+
+export interface ManifestEpisode {
+  slug: string;
+  title?: string;
+  /** the episode's air time (the manifest's unix datetime) */
+  publishedAt?: string;
+  /** the episode's page on the show's own site */
+  pageUrl?: string;
+  excerpt?: string;
+  videoUrl?: string;
+  thumbnail?: string;
+  chapters?: Array<{ at: number; label: string }>;
 }
 
 /**
  * A podcast feed's optional episodes.json sidecar (the slop.computer schema):
- * per-episode direct video files, card art, and chapter marks that the RSS
- * does not carry. Best-effort: any failure leaves the RSS-only ingest intact.
+ * per-episode direct video files, card art, chapter marks, and the
+ * video-only episodes the RSS never lists. Best-effort: any failure leaves
+ * the RSS-only ingest intact.
  */
-export async function fetchVideoManifest(
-  feed: FeedConfig,
-  timeoutMs: number
-): Promise<Map<string, { videoUrl?: string; thumbnail?: string; chapters?: Array<{ at: number; label: string }> }> | null> {
+export async function fetchVideoManifest(feed: FeedConfig, timeoutMs: number): Promise<Map<string, ManifestEpisode> | null> {
   if (!feed.videoManifest) return null;
   try {
     const json = JSON.parse(await fetchText(feed.videoManifest, timeoutMs)) as {
       source?: { gateway?: string };
       episodes?: Array<{
         slug?: string;
+        title?: string;
+        description?: string;
+        datetime?: number;
+        live?: boolean;
+        page?: string;
         chapters?: Array<{ tStart?: number; title?: string }>;
         media?: { video?: { url?: string }; card?: { url?: string; previewCid?: string } };
       }>;
     };
     const gateway = json.source?.gateway?.replace(/\/$/, "");
-    const map = new Map<string, { videoUrl?: string; thumbnail?: string; chapters?: Array<{ at: number; label: string }> }>();
+    const map = new Map<string, ManifestEpisode>();
     for (const e of json.episodes ?? []) {
-      if (!e.slug) continue;
+      // an episode currently live (or not yet aired, no pinned video) waits
+      if (!e.slug || e.live) continue;
       const video = e.media?.video?.url;
       // the card's preview rendition when the gateway is known (the full card
       // runs megabytes); the full card as fallback
@@ -826,6 +859,13 @@ export async function fetchVideoManifest(
         .filter((c) => typeof c.tStart === "number" && c.title)
         .map((c) => ({ at: Math.max(0, Math.round(c.tStart!)), label: String(c.title) }));
       map.set(e.slug, {
+        slug: e.slug,
+        ...(e.title ? { title: e.title } : {}),
+        ...(typeof e.datetime === "number" && e.datetime > 0
+          ? { publishedAt: new Date(e.datetime * 1000).toISOString() }
+          : {}),
+        ...(e.page ? { pageUrl: e.page } : {}),
+        ...(e.description ? { excerpt: e.description } : {}),
         ...(video ? { videoUrl: video } : {}),
         ...(thumbnail ? { thumbnail } : {}),
         ...(chapters.length > 0 ? { chapters } : {}),
