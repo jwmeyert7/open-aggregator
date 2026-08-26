@@ -2053,7 +2053,8 @@ button.status-date {
   overflow: hidden;
   background: #000;
 }
-.media-frame iframe {
+.media-frame iframe,
+.media-frame video {
   position: absolute;
   inset: 0;
   width: 100%;

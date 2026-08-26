@@ -37,6 +37,13 @@ export interface FeedConfig {
   thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show";
   /** media feeds only: every episode is a roundup spanning the sections. It wears no section label and appears in every section's rail, because a label that applies to everything selects nothing. */
   roundup?: boolean;
+  /**
+   * podcast feeds only: URL of a slop.computer-style episodes.json sidecar.
+   * When the RSS only carries audio, the manifest supplies each episode's
+   * direct video file, card thumbnail, and chapter marks, matched by the
+   * enclosure filename stem or the item link's last path segment = slug.
+   */
+  videoManifest?: string;
   /** listing type only: regex an href must match to count as a post link. */
   linkPattern?: string;
   /** Admin-facing grouping only; never shown on the public site. */

@@ -141,15 +141,19 @@ export function MediaPlayer({
   const [dur, setDur] = useState(durationSec ?? 0);
   const frame = useRef<HTMLIFrameElement>(null);
   const audio = useRef<HTMLAudioElement>(null);
+  const fileFrame = useRef<HTMLVideoElement>(null);
   const ytId = videoUrl ? youtubeId(videoUrl) : kind === "video" ? youtubeId(url) : null;
-  const memoryKey = ytId ?? (audioUrl ? `audio:${audioUrl}` : "");
+  // a non-YouTube videoUrl is a direct video file (an IPFS-pinned mp4, say),
+  // played in a native video element instead of an embed
+  const fileVideo = !ytId && videoUrl ? videoUrl : null;
+  const memoryKey = ytId ?? (fileVideo ? `video:${fileVideo}` : audioUrl ? `audio:${audioUrl}` : "");
 
   // the remembered spot is read on the client only (no storage on the server)
   useEffect(() => {
     if (startAt !== undefined && startAt > 0) setResumeAt(startAt);
     else if (memoryKey) setResumeAt(loadPos(memoryKey));
   }, [memoryKey, open, startAt]);
-  const playable = Boolean(ytId || (kind === "podcast" && audioUrl));
+  const playable = Boolean(ytId || fileVideo || (kind === "podcast" && audioUrl));
 
   // Ask the YouTube player to stream its state, and keep the playhead. The
   // embed only talks once it is listening, so the handshake repeats briefly.
@@ -207,6 +211,7 @@ export function MediaPlayer({
   const pauseHere = () => {
     frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), YT_EMBED_ORIGIN);
     audio.current?.pause();
+    fileFrame.current?.pause();
   };
 
   const pipSupported = typeof window !== "undefined" && "documentPictureInPicture" in window;
@@ -242,6 +247,8 @@ export function MediaPlayer({
         JSON.stringify({ event: "command", func: "seekTo", args: [at, true] }),
         YT_EMBED_ORIGIN
       );
+    } else if (fileFrame.current) {
+      fileFrame.current.currentTime = at;
     } else if (audio.current) {
       audio.current.currentTime = at;
     }
@@ -332,6 +339,29 @@ export function MediaPlayer({
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                   referrerPolicy="strict-origin-when-cross-origin"
+                />
+              </div>
+            ) : fileVideo ? (
+              <div className="media-frame">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  ref={fileFrame}
+                  controls
+                  autoPlay={!startPaused}
+                  preload="metadata"
+                  playsInline
+                  src={fileVideo}
+                  poster={thumbnail}
+                  onPlay={() => memoryKey && savePlayState(memoryKey, 1)}
+                  onPause={() => memoryKey && savePlayState(memoryKey, 2)}
+                  onLoadedMetadata={(e) => {
+                    if (resumeAt > 0) e.currentTarget.currentTime = resumeAt;
+                  }}
+                  onTimeUpdate={(e) => {
+                    setPosition(e.currentTarget.currentTime);
+                    if (Number.isFinite(e.currentTarget.duration) && e.currentTarget.duration > 0) setDur(e.currentTarget.duration);
+                    if (memoryKey) savePos(memoryKey, e.currentTarget.currentTime, e.currentTarget.duration || undefined);
+                  }}
                 />
               </div>
             ) : (

@@ -740,11 +740,28 @@ function parseItunesDuration(raw?: string): number | undefined {
 /** Standard podcast RSS: enclosure audio plus the itunes tags rss-parser already reads. */
 async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<MediaCandidate[]> {
   const parsed = await parseFeedXml(await fetchText(feed.url, timeoutMs));
+  const manifest = await fetchVideoManifest(feed, timeoutMs);
   return (parsed.items ?? [])
     .filter((i) => i.title && (i.link || i.enclosure?.url))
     .map((i) => {
       const itunes = (i as { itunes?: { duration?: string; image?: string; summary?: string } }).itunes ?? {};
       const durationSec = parseItunesDuration(itunes.duration);
+      // the manifest keys on the episode slug: the enclosure's filename stem
+      // and the item link's last path segment are both tried
+      const stem = (u?: string): string | null => {
+        if (!u) return null;
+        try {
+          const parsedUrl = new URL(u);
+          const fname = parsedUrl.searchParams.get("filename");
+          if (fname) return fname.replace(/\.[a-z0-9]+$/i, "");
+          return parsedUrl.pathname.split("/").filter(Boolean).pop() ?? null;
+        } catch {
+          return null;
+        }
+      };
+      const extra = manifest
+        ? (stem(i.enclosure?.url) && manifest.get(stem(i.enclosure?.url)!)) || (stem(i.link) && manifest.get(stem(i.link)!)) || null
+        : null;
       return {
         ...candidate(
           feed,
@@ -764,8 +781,58 @@ async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<M
           const chapters = extractChapters(stripHtml(i.content ?? "").replace(/\s(?=\(?\d{1,2}:\d{2})/g, "\n") + "\n" + (i.contentSnippet ?? ""));
           return { ...(descriptionLinks.length > 0 ? { descriptionLinks } : {}), ...(chapters.length > 0 ? { chapters } : {}) };
         })(),
+        // the manifest's video file, card art, and chapter marks win over the
+        // RSS-derived ones; with a video the episode IS a video on the site
+        ...(extra?.videoUrl ? { kind: "video" as const, videoUrl: extra.videoUrl } : {}),
+        ...(extra?.thumbnail ? { thumbnail: extra.thumbnail } : {}),
+        ...(extra?.chapters ? { chapters: extra.chapters } : {}),
       };
     });
+}
+
+/**
+ * A podcast feed's optional episodes.json sidecar (the slop.computer schema):
+ * per-episode direct video files, card art, and chapter marks that the RSS
+ * does not carry. Best-effort: any failure leaves the RSS-only ingest intact.
+ */
+async function fetchVideoManifest(
+  feed: FeedConfig,
+  timeoutMs: number
+): Promise<Map<string, { videoUrl?: string; thumbnail?: string; chapters?: Array<{ at: number; label: string }> }> | null> {
+  if (!feed.videoManifest) return null;
+  try {
+    const json = JSON.parse(await fetchText(feed.videoManifest, timeoutMs)) as {
+      source?: { gateway?: string };
+      episodes?: Array<{
+        slug?: string;
+        chapters?: Array<{ tStart?: number; title?: string }>;
+        media?: { video?: { url?: string }; card?: { url?: string; previewCid?: string } };
+      }>;
+    };
+    const gateway = json.source?.gateway?.replace(/\/$/, "");
+    const map = new Map<string, { videoUrl?: string; thumbnail?: string; chapters?: Array<{ at: number; label: string }> }>();
+    for (const e of json.episodes ?? []) {
+      if (!e.slug) continue;
+      const video = e.media?.video?.url;
+      // the card's preview rendition when the gateway is known (the full card
+      // runs megabytes); the full card as fallback
+      const thumbnail =
+        e.media?.card?.previewCid && gateway
+          ? `${gateway}/${e.media.card.previewCid}?filename=${encodeURIComponent(e.slug)}.png`
+          : e.media?.card?.url;
+      const chapters = (e.chapters ?? [])
+        .filter((c) => typeof c.tStart === "number" && c.title)
+        .map((c) => ({ at: Math.max(0, Math.round(c.tStart!)), label: String(c.title) }));
+      map.set(e.slug, {
+        ...(video ? { videoUrl: video } : {}),
+        ...(thumbnail ? { thumbnail } : {}),
+        ...(chapters.length > 0 ? { chapters } : {}),
+      });
+    }
+    return map;
+  } catch {
+    return null;
+  }
 }
 
 /**
