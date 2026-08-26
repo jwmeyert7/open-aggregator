@@ -425,12 +425,32 @@ async function makeDailyDigest(
     clusters: JSON.parse(JSON.stringify(top)) as Cluster[],
   };
 
-  if (llmAvailable()) {
-    try {
-      digest.summary = joinSummaryLines(await dayInReview(yesterday, top)) || undefined;
-    } catch {
-      // the day page reads fine without its review bullets
+  {
+    // The review bullets look at every story ACTIVE that day (any link
+    // published then), not only the ones that broke then: readers experience
+    // day-two coverage as the day's news, and the box would claim "a quiet
+    // day" in sections that were busy all day just because their stories
+    // happened to break the evening before. The story LIST below keeps the
+    // broke-day rule so each story files to exactly one page.
+    const active = liveClusters(state).filter((c) =>
+      c.links.some((l) => !l.undated && utcDay(l.publishedAt) === yesterday)
+    );
+    const reviewPool = [...active].sort((a, b) => mag(b) - mag(a)).slice(0, 12);
+    let bullets: SummaryBullet[] = [];
+    if (llmAvailable()) {
+      // the day page reads fine without the model's review bullets
+      bullets = await dayInReview(yesterday, reviewPool).catch(() => []);
     }
+    // "A quiet day here." may only appear for a section that truly had no
+    // active stories: any section the model skipped (or the model failing
+    // entirely) falls back to its biggest active story as its bullet
+    const covered = new Set(bullets.map((b) => b.section));
+    for (const sec of cfg.sections.map((s) => s.id)) {
+      if (covered.has(sec)) continue;
+      const biggest = reviewPool.find((c) => c.section === sec || c.alsoIn === sec);
+      if (biggest) bullets.push({ section: sec, ref: biggest.id, text: biggest.headline });
+    }
+    digest.summary = joinSummaryLines(bullets) || undefined;
   }
 
   const url = `${cfg.bots.siteUrl}/day/${yesterday}`;
