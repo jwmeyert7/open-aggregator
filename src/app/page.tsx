@@ -97,8 +97,8 @@ export default async function HomePage() {
   // rail. The desktop rail copy never renders it (the rail sits right there).
   const topEpisode = media[0];
   const episodeRow = topEpisode ? (
-    <div className="summary-episode">
-      <div className="front-summary-sec">Top podcast</div>
+    <div className="front-summary-group summary-episode">
+      <div className="front-summary-sec podcasts">Podcasts</div>
       <ul className="media-list">
         <li className="media-item">
           <MediaPlayer
@@ -126,7 +126,7 @@ export default async function HomePage() {
               <div className="org">
                 {topEpisode.section ? <><SectionPill section={topEpisode.section} /> · </> : null}
                 {formatViews(topEpisode.views) ? <>{formatViews(topEpisode.views)} views · </> : null}
-                <AgeStamp iso={topEpisode.publishedAt} /> · <Link href="/podcasts">all podcasts →</Link>{" "}
+                <AgeStamp iso={topEpisode.publishedAt} />{" "}
                 <AdminEditLink href={`/admin/podcasts?episode=${topEpisode.id}`} />
               </div>
             </div>

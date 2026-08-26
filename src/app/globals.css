@@ -591,14 +591,20 @@ a:hover {
 .front-summary.above-nav {
   margin: 0;
 }
-/* mobile-only top-podcast row at the bottom of the above-nav summary box */
+/* mobile-only top-podcast box at the bottom of the above-nav summary: the
+   same compact box treatment as the section groups above it */
 .summary-episode {
-  margin-top: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
+  margin-top: 8px;
 }
 .summary-episode .media-list {
-  margin-top: 4px;
+  margin-top: 2px;
+}
+/* the thumbnail tops align with the episode title */
+.summary-episode .media-row {
+  align-items: flex-start;
+}
+.front-summary-sec.podcasts {
+  color: var(--hover-peach);
 }
 /* one fixed box per configured section, side by side on desktop */
 .front-summary-groups {
@@ -1184,16 +1190,28 @@ body:has(.notfound) .main-nav {
   accent-color: var(--muted);
   cursor: pointer;
 }
-/* phones: everything in the footer reads left to right, top to bottom. The
-   right-pushed groups (social icons, pref checkboxes) each take their own
-   full line, still anchored right, instead of floating beside a wrapped row. */
+/* phones: the two link rows merge into one left-aligned flow up top, and the
+   right-anchored groups (social icons, then pref checkboxes) sit below all of
+   it, each on its own right-aligned line. display:contents lifts every link
+   into one wrapping row so the rows read as a single group. */
 @media (max-width: 760px) {
+  .site-footer .wrap {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+  }
+  .site-footer .footer-row {
+    display: contents;
+  }
   .footer-social {
+    order: 2;
     flex-basis: 100%;
     margin-left: 0;
     justify-content: flex-end;
   }
   .footer-prefs {
+    order: 3;
     flex-basis: 100%;
     margin-left: 0;
     justify-content: flex-end;
