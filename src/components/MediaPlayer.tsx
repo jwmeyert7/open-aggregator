@@ -235,10 +235,14 @@ export function MediaPlayer({
   // return when the window closes), so these just announce the wish with the
   // honest second and the current play state
   const detachTo = (mode: "float" | "window") => {
-    if (!ytId) return;
+    if (!ytId && !fileVideo) return;
     const at = seconds > 0 ? seconds : Math.floor(resumeAt);
     const paused = memoryKey ? loadPlayState(memoryKey) !== 1 : false;
-    window.dispatchEvent(new CustomEvent("podcast:detach", { detail: { mode, ytId, at, paused, title } }));
+    window.dispatchEvent(
+      new CustomEvent("podcast:detach", {
+        detail: { mode, ytId: ytId ?? undefined, fileUrl: fileVideo ?? undefined, at, paused, title },
+      })
+    );
     pauseHere();
   };
   const toFloat = () => detachTo("float");
@@ -423,7 +427,7 @@ export function MediaPlayer({
                   </button>{" "}
                 </>
               ) : null}
-              {detach && ytId ? (
+              {detach && (ytId || fileVideo) ? (
                 <>
                   ·{" "}
                   {pipSupported ? (

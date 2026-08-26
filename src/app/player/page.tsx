@@ -16,11 +16,13 @@ export const metadata = { title: "Player", robots: { index: false } };
 export default async function PlayerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ v?: string; t?: string; paused?: string }>;
+  searchParams: Promise<{ v?: string; f?: string; t?: string; paused?: string }>;
 }) {
-  const { v, t, paused } = await searchParams;
+  const { v, f, t, paused } = await searchParams;
   const id = /^[A-Za-z0-9_-]{11}$/.test(v ?? "") ? v : undefined;
-  if (!id) {
+  // a direct-file episode detaches by its https file URL instead of a YouTube id
+  const fileUrl = !id && f && /^https:\/\//.test(f) ? f : undefined;
+  if (!id && !fileUrl) {
     return (
       <main className="player-page">
         <p className="empty-state">Nothing to play.</p>
@@ -28,17 +30,20 @@ export default async function PlayerPage({
     );
   }
   const state = await loadState();
-  const m = (state.mediaItems ?? []).find((x) => !x.hidden && youtubeVideoId(x.videoUrl ?? x.url) === id);
+  const m = (state.mediaItems ?? []).find((x) =>
+    !x.hidden && (id ? youtubeVideoId(x.videoUrl ?? x.url) === id : x.videoUrl === fileUrl)
+  );
   const start = Number(t);
   return (
     <main className="player-page">
       <MediaPlayer
-        id={`win-${id}`}
-        url={`https://www.youtube.com/watch?v=${id}`}
+        id={id ? `win-${id}` : "win-file"}
+        url={id ? `https://www.youtube.com/watch?v=${id}` : m?.url ?? fileUrl!}
         kind="video"
         title={m?.displayTitle ?? m?.title ?? "Episode"}
         durationSec={m?.durationSec}
         chapters={m?.chapters}
+        {...(fileUrl ? { videoUrl: fileUrl, audioUrl: m?.audioUrl } : {})}
         compact
         autoOpen
         popOut={false}

@@ -43,9 +43,15 @@ export function MiniPlayer() {
   useEffect(() => {
     const onDetach = async (e: Event) => {
       const d = (
-        e as CustomEvent<{ mode: "float" | "window"; ytId: string; at: number; paused: boolean; title: string }>
+        e as CustomEvent<{ mode: "float" | "window"; ytId?: string; fileUrl?: string; at: number; paused: boolean; title: string }>
       ).detail;
-      const src = `/player?v=${d.ytId}${d.at > 0 ? `&t=${d.at}` : ""}${d.paused ? "&paused=1" : ""}`;
+      if (!d.ytId && !d.fileUrl) return;
+      // a direct-file episode detaches by its file URL; /player resolves the
+      // episode (title, chapters) from state by that URL
+      const who = d.ytId ? `v=${d.ytId}` : `f=${encodeURIComponent(d.fileUrl!)}`;
+      const src = `/player?${who}${d.at > 0 ? `&t=${d.at}` : ""}${d.paused ? "&paused=1" : ""}`;
+      // playhead and state round-trip on the same key every player uses
+      const memKey = d.ytId ?? `video:${d.fileUrl}`;
       let win: Window | null = null;
       if (d.mode === "window") {
         win = window.open(src, "_blank", "popup,width=520,height=340");
@@ -77,8 +83,8 @@ export function MiniPlayer() {
         window.clearInterval(watcher.current!);
         watcher.current = null;
         // the window is gone: return at its last second, in its last state
-        const pos = Math.floor(loadPlayhead(d.ytId));
-        const paused = loadPlayState(d.ytId) !== 1;
+        const pos = Math.floor(loadPlayhead(memKey));
+        const paused = loadPlayState(memKey) !== 1;
         setItem((prev) => (prev ? { ...prev, startAt: pos > 0 ? pos : d.at, startPaused: paused } : prev));
         setAway(false);
       }, 500);
