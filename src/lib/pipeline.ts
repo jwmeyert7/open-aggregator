@@ -1,6 +1,6 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
 import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
-import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
+import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
 import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
@@ -1138,6 +1138,7 @@ export async function ingestMedia(
     })(),
     ...(i.durationSec ? { durationSec: i.durationSec } : {}),
     ...(i.audioUrl ? { audioUrl: i.audioUrl } : {}),
+    ...(i.videoUrl ? { videoUrl: i.videoUrl } : {}),
     ...(i.descriptionLinks && i.descriptionLinks.length > 0 ? { links: i.descriptionLinks } : {}),
     ...(i.chapters && i.chapters.length > 0 ? { chapters: i.chapters } : {}),
     ...(i.excerpt ? { excerpt: truncate(i.excerpt, 300) } : {}),
@@ -1156,6 +1157,35 @@ export async function ingestMedia(
       m.roundup = true;
       delete m.section;
     } else delete m.roundup;
+  }
+  // a videoManifest is the live source of truth for its show's video file,
+  // card art, and chapters: shelved episodes re-sync every ingest, so a
+  // rendition or chapter list the show adds later reaches episodes that
+  // already shelved
+  for (const f of mediaFeeds.filter((x) => x.videoManifest)) {
+    const manifest = await fetchVideoManifest(f, cfg.ingest.feedTimeoutMs);
+    if (!manifest) continue;
+    const stem = (u?: string): string | null => {
+      if (!u) return null;
+      try {
+        const p = new URL(u);
+        const fname = p.searchParams.get("filename");
+        if (fname) return fname.replace(/\.[a-z0-9]+$/i, "");
+        return p.pathname.split("/").filter(Boolean).pop() ?? null;
+      } catch {
+        return null;
+      }
+    };
+    for (const m of state.mediaItems.filter((x) => x.sourceId === f.id)) {
+      const entry = (stem(m.audioUrl) && manifest.get(stem(m.audioUrl)!)) || (stem(m.url) && manifest.get(stem(m.url)!)) || null;
+      if (!entry) continue;
+      if (entry.videoUrl) {
+        m.videoUrl = entry.videoUrl;
+        m.kind = "video";
+      }
+      if (entry.thumbnail) m.thumbnail = entry.thumbnail;
+      if (entry.chapters) m.chapters = entry.chapters;
+    }
   }
   await fillVideoDetails(state.mediaItems, cfg.ingest.feedTimeoutMs, true);
   pairPodcastsWithVideos(state.mediaItems);

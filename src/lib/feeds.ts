@@ -24,6 +24,8 @@ export interface MediaCandidate extends CandidateItem {
   durationSec?: number;
   /** podcast episodes: the enclosure audio url. */
   audioUrl?: string;
+  /** direct video file from the feed's videoManifest sidecar */
+  videoUrl?: string;
   /** a scheduled premiere or live stream that has not aired */
   upcoming?: boolean;
   /** show notes read from the full description */
@@ -795,7 +797,7 @@ async function fetchPodcastMedia(feed: FeedConfig, timeoutMs: number): Promise<M
  * per-episode direct video files, card art, and chapter marks that the RSS
  * does not carry. Best-effort: any failure leaves the RSS-only ingest intact.
  */
-async function fetchVideoManifest(
+export async function fetchVideoManifest(
   feed: FeedConfig,
   timeoutMs: number
 ): Promise<Map<string, { videoUrl?: string; thumbnail?: string; chapters?: Array<{ at: number; label: string }> }> | null> {
