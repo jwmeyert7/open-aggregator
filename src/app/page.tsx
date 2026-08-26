@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { adminLayoutPreview } from "@/lib/auth";
-import { ClusterCard, SponsoredCard } from "@/components/ClusterCard";
+import { AdminEditLink } from "@/components/AdminEditLink";
+import { AgeStamp } from "@/components/AgeStamp";
+import { ClusterCard, SectionPill, SponsoredCard } from "@/components/ClusterCard";
 import { ColumnHeads } from "@/components/ColumnHeads";
+import { MediaPlayer } from "@/components/MediaPlayer";
 import { hasSidebarContent, NewestRail, Sidebar, sidebarSponsored } from "@/components/Sidebar";
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { loadSiteConfig } from "@/lib/config";
@@ -9,7 +12,7 @@ import { maybeDevSeed } from "@/lib/devSeed";
 import { adaptiveRanking, leadLink, liveClusters, newestEntries, rankMedia, sectionStories, topStories, weekendMode, weekInReview } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS, sponsoredPlacements, type Cluster, type SectionId } from "@/lib/types";
-import { bestMatchIndex, echoesHeadline, hoursAgo, parseSummaryLines } from "@/lib/util";
+import { bestMatchIndex, echoesHeadline, formatViews, hoursAgo, mediaThumb, parseSummaryLines } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +92,49 @@ export default async function HomePage() {
   // so the column is never blank and the right rail stays Newest
   const media = rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, ranking).slice(0, 40);
   const showSidebar = hasSidebarContent(state) || media.length > 0;
+  // mobile only: the top-ranked episode rides at the bottom of the above-nav
+  // summary box, so podcasts have a presence before the long scroll to the
+  // rail. The desktop rail copy never renders it (the rail sits right there).
+  const topEpisode = media[0];
+  const episodeRow = topEpisode ? (
+    <div className="summary-episode">
+      <div className="front-summary-sec">Top podcast</div>
+      <ul className="media-list">
+        <li className="media-item">
+          <MediaPlayer
+            id={`gist-${topEpisode.id}`}
+            url={topEpisode.url}
+            kind={topEpisode.kind}
+            title={topEpisode.displayTitle ?? topEpisode.title}
+            thumbnail={mediaThumb(topEpisode)}
+            tileText={topEpisode.sourceName}
+            durationSec={topEpisode.durationSec}
+            chapters={topEpisode.chapters}
+            audioUrl={topEpisode.audioUrl}
+            videoUrl={topEpisode.videoUrl}
+            compact
+            header={<div className="kicker">{topEpisode.sourceName}:</div>}
+          >
+            <div className="media-body">
+              <a
+                href={topEpisode.videoUrl ?? topEpisode.url}
+                rel="noopener"
+                title={topEpisode.displayTitle ? `Show's title: ${topEpisode.title}` : undefined}
+              >
+                {topEpisode.displayTitle ?? topEpisode.title}
+              </a>
+              <div className="org">
+                {topEpisode.section ? <><SectionPill section={topEpisode.section} /> · </> : null}
+                {formatViews(topEpisode.views) ? <>{formatViews(topEpisode.views)} views · </> : null}
+                <AgeStamp iso={topEpisode.publishedAt} /> · <Link href="/podcasts">all podcasts →</Link>{" "}
+                <AdminEditLink href={`/admin/podcasts?episode=${topEpisode.id}`} />
+              </div>
+            </div>
+          </MediaPlayer>
+        </li>
+      </ul>
+    </div>
+  ) : null;
   const summaryAt = (aboveNav: boolean) =>
     gistLines.length > 0 ? (
       <SummaryBlock
@@ -97,6 +143,7 @@ export default async function HomePage() {
         heading={leadWithWeek ? "Week in review" : "Latest in"}
         quietText={leadWithWeek ? "A quiet week here." : undefined}
         text={gistLines.join("\n")}
+        footer={aboveNav ? episodeRow : undefined}
         // a bullet's story jumps in page when its card is below, and falls
         // back to the story permalink when it ranks off the front page
         storyHrefs={storyHref}

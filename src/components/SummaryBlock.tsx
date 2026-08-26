@@ -15,6 +15,7 @@ export function SummaryBlock({
   quietText = "Nothing notable right now.",
   storyHrefs,
   fallbackHref,
+  footer,
 }: {
   text: string;
   /** The configured nav sections, in display order. */
@@ -39,6 +40,8 @@ export function SummaryBlock({
    * matches the frozen text.
    */
   fallbackHref?: (section: SummarySection, text: string) => string | undefined;
+  /** Extra content at the bottom of the box (the mobile top-podcast row). */
+  footer?: React.ReactNode;
 }) {
   const lines = parseSummaryLines(text);
   if (lines.length === 0) return null;
@@ -90,6 +93,7 @@ export function SummaryBlock({
           })}
         </div>
       ) : null}
+      {footer}
       </div>
     </>
   );

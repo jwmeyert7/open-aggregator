@@ -591,6 +591,15 @@ a:hover {
 .front-summary.above-nav {
   margin: 0;
 }
+/* mobile-only top-podcast row at the bottom of the above-nav summary box */
+.summary-episode {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.summary-episode .media-list {
+  margin-top: 4px;
+}
 /* one fixed box per configured section, side by side on desktop */
 .front-summary-groups {
   display: grid;
