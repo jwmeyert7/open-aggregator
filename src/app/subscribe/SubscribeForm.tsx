@@ -22,6 +22,7 @@ export function SubscribeForm() {
               email: f.get("email"),
               daily: f.get("daily") === "on",
               weekly: f.get("weekly") === "on",
+              monthly: f.get("monthly") === "on",
               website: f.get("website"),
             }),
           });
@@ -42,6 +43,9 @@ export function SubscribeForm() {
         </label>
         <label className="shown-check">
           <input type="checkbox" name="weekly" defaultChecked /> weekly
+        </label>
+        <label className="shown-check">
+          <input type="checkbox" name="monthly" /> monthly
         </label>
       </div>
       <button className="btn primary" type="submit" disabled={busy}>

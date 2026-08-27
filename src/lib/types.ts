@@ -434,6 +434,12 @@ export interface DigestSubscriber {
   email: string;
   daily: boolean;
   weekly: boolean;
+  /**
+   * Absent on subscribers from before the monthly checkbox existed: they are
+   * grandfathered to their weekly choice, since the monthly used to ride the
+   * weekly list.
+   */
+  monthly?: boolean;
   /** Unsubscribe/confirmation token carried in the email links. */
   token: string;
   addedAt: string;

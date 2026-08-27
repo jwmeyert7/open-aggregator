@@ -230,8 +230,10 @@ export async function sendEditionTo(email: string, e: Edition, unsubUrl?: string
 }
 
 /** Subscribers eligible to receive anything: the confirmation link was clicked (or they predate double opt-in). */
-function eligible(subs: DigestSubscriber[] | undefined, kind: "daily" | "weekly"): DigestSubscriber[] {
-  return (subs ?? []).filter((s) => s[kind] && s.confirmed !== false);
+function eligible(subs: DigestSubscriber[] | undefined, kind: "daily" | "weekly" | "monthly"): DigestSubscriber[] {
+  // monthly's grandfather rule: subscribers from before the monthly checkbox
+  // follow their weekly choice, since the monthly used to ride the weekly list
+  return (subs ?? []).filter((s) => (kind === "monthly" ? (s.monthly ?? s.weekly) : s[kind]) && s.confirmed !== false);
 }
 
 /** Sequential sends (Gmail dislikes bursts); every failure is reported. */
@@ -398,9 +400,9 @@ export async function buildMonthlyEdition(state: SiteState, cfg: SiteConfig, mon
   };
 }
 
-/** Send the monthly edition. It rides the weekly list: no third checkbox. */
+/** Send the monthly edition to confirmed monthly subscribers. */
 export async function sendMonthlyEmail(state: SiteState, cfg: SiteConfig, month: string): Promise<string | null> {
-  const subs = eligible(state.digestSubscribers, "weekly");
+  const subs = eligible(state.digestSubscribers, "monthly");
   if (subs.length === 0) return null;
   const edition = await buildMonthlyEdition(state, cfg, month);
   if (!edition) return "monthly email: skipped, nothing to send";

@@ -5,7 +5,7 @@ import { AdminChrome, type AdminChromeData, Toast, useAdminAct } from "../shared
 
 export interface EmailData {
   subscribers: { daily: number; weekly: number };
-  emailSubscribers: Array<{ email: string; daily: boolean; weekly: boolean; confirmed: boolean; addedAt: string }>;
+  emailSubscribers: Array<{ email: string; daily: boolean; weekly: boolean; monthly: boolean; confirmed: boolean; addedAt: string }>;
 }
 
 export function EmailClient({ chrome, data }: { chrome: AdminChromeData; data: EmailData }) {
@@ -33,7 +33,7 @@ export function EmailClient({ chrome, data }: { chrome: AdminChromeData; data: E
       {data.emailSubscribers.map((s) => (
         <div key={s.email} className="admin-card">
           <div className="sub">
-            <strong>{s.email}</strong> · {[s.daily ? "daily" : null, s.weekly ? "weekly" : null].filter(Boolean).join(" + ")} ·{" "}
+            <strong>{s.email}</strong> · {[s.daily ? "daily" : null, s.weekly ? "weekly" : null, s.monthly ? "monthly" : null].filter(Boolean).join(" + ")} ·{" "}
             {s.confirmed ? "confirmed" : <span className="health-bad">unconfirmed</span>} · joined {timeAgo(s.addedAt)}{" "}
             <button
               className="btn"

@@ -20,6 +20,7 @@ export default async function AdminEmailPage() {
       email: s.email,
       daily: s.daily,
       weekly: s.weekly,
+      monthly: s.monthly ?? s.weekly,
       confirmed: s.confirmed !== false,
       addedAt: s.addedAt,
     })),

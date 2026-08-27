@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     email?: string;
     daily?: boolean;
     weekly?: boolean;
+    monthly?: boolean;
     website?: string; // honeypot: real users never see or fill this field
   } | null;
   if (!body) return NextResponse.json({ ok: false, message: "Bad request." }, { status: 400 });
@@ -45,8 +46,9 @@ export async function POST(req: NextRequest) {
   }
   const daily = Boolean(body.daily);
   const weekly = Boolean(body.weekly);
-  if (!daily && !weekly) {
-    return NextResponse.json({ ok: false, message: "Pick at least one of daily or weekly." }, { status: 400 });
+  const monthly = Boolean(body.monthly);
+  if (!daily && !weekly && !monthly) {
+    return NextResponse.json({ ok: false, message: "Pick at least one edition." }, { status: 400 });
   }
 
   // fresh: this route saves state, and saving a stale fallback would roll the site back
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
   if (existing) {
     existing.daily = daily;
     existing.weekly = weekly;
+    existing.monthly = monthly;
     await saveState(state);
     if (existing.confirmed === false) {
       // still unconfirmed: a re-signup is the natural "resend the link" gesture
@@ -76,6 +79,7 @@ export async function POST(req: NextRequest) {
     email,
     daily,
     weekly,
+    monthly,
     token: `${newId()}${newId()}`,
     addedAt: new Date().toISOString(),
     // nothing sends until the confirmation link is clicked, so a stranger's
