@@ -1,5 +1,6 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
 import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sendDailyEmail, sendMonthlyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC, yearlyTop } from "./digest";
+import { sendAdminEmail } from "./mail";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
 import { liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
@@ -1776,6 +1777,15 @@ export async function runPipeline(): Promise<RunReport> {
           weekendMode: weekend,
         });
         report.usedLlm = true;
+        // an outage that alerted gets a recovery note, then the streak resets
+        if (state.llmAlertedAt) {
+          await sendAdminEmail(
+            `${siteIdentity().siteName}: editor LLM recovered`,
+            `Editor calls are succeeding again after ${state.llmFailStreak ?? 0} failed run(s). Held items are flowing normally.`
+          );
+        }
+        state.llmFailStreak = 0;
+        delete state.llmAlertedAt;
       } catch (err) {
         // A transient LLM failure must not swallow the batch. Applying the
         // fallback here used to reject every tier-2 item AND mark it seen,
@@ -1785,6 +1795,18 @@ export async function runPipeline(): Promise<RunReport> {
           `LLM failed, holding ${newItems.length} item(s) for retry next run: ${err instanceof Error ? err.message : err}`
         );
         out = null;
+        // three failures in a row (~15 minutes of runs) reads as an outage,
+        // not a blip: credit exhaustion, a rotated key, or the provider down.
+        // One email per outage; recovery clears the latch above.
+        state.llmFailStreak = (state.llmFailStreak ?? 0) + 1;
+        if (state.llmFailStreak >= 3 && !state.llmAlertedAt) {
+          state.llmAlertedAt = new Date().toISOString();
+          const sent = await sendAdminEmail(
+            `${siteIdentity().siteName}: editor LLM failing, items on hold`,
+            `The editor call has failed ${state.llmFailStreak} runs in a row. New items are held and retried automatically, so nothing is lost, but the front page stops updating until calls succeed.\n\nLatest error: ${err instanceof Error ? err.message : err}\n\nUsual causes: API credit run out, a rotated or revoked key, or a provider outage.\n\nRun log: ${cfg.bots.siteUrl}/admin/runs`
+          );
+          if (sent) report.notes.push("Admin alerted by email about the LLM outage.");
+        }
       }
     } else {
       // deliberate no-key mode: the degraded gate still applies (and marks

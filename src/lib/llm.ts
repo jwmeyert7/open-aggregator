@@ -18,12 +18,14 @@ function editorModel(): LanguageModel {
 }
 
 /**
- * The release-summary model: distilling ninety PRs into the two themes that
- * matter is judgment work the editor tier gets wrong, and releases are rare
- * enough that the stronger model costs cents a week.
+ * The stronger model for low-volume judgment calls: release-notes distillation,
+ * chapter-to-story matching, and the day-in-review bullets. These run a few
+ * times a day at most, so the quality tier costs cents a week. The 5-minute
+ * editor call stays on the editor tier deliberately, that is where the LLM
+ * budget lives.
  */
-function releaseModel(): LanguageModel {
-  const configured = process.env.RELEASE_LLM_MODEL;
+function qualityModel(): LanguageModel {
+  const configured = process.env.QUALITY_LLM_MODEL;
   if (process.env.AI_GATEWAY_API_KEY) return configured || "anthropic/claude-sonnet-5";
   return anthropic(configured?.replace(/^anthropic\//, "") || "claude-sonnet-5");
 }
@@ -246,7 +248,7 @@ export async function matchChaptersToStories(
 ): Promise<Array<{ episodeId: string; at: number; storyId: string }>> {
   if (episodes.length === 0 || stories.length === 0) return [];
   const { object } = await generateObject({
-    model: editorModel(),
+    model: qualityModel(),
     schema: z.object({
       matches: z.array(
         z.object({
@@ -267,7 +269,7 @@ export async function matchChaptersToStories(
 /** Distills a software release's notes into a themed headline and explainer. */
 export async function summarizeRelease(input: { source: string; title: string; notes: string }): Promise<{ headline: string; explainer: string }> {
   const { object } = await generateObject({
-    model: releaseModel(),
+    model: qualityModel(),
     schema: z.object({
       headline: z.string().describe("short declarative phrase, ten words or fewer, naming project, version, and the release's essence"),
       explainer: z.string().describe("one or two sentences under 60 words naming the major themes concretely"),
@@ -303,7 +305,7 @@ export async function compressTweetLines(lines: Array<{ text: string; max: numbe
 export async function dayInReview(date: string, clusters: Cluster[]): Promise<SummaryBullet[]> {
   const sections = navSections();
   const { object } = await generateObject({
-    model: editorModel(),
+    model: qualityModel(),
     schema: z.object({
       summary: z
         .array(summaryBulletSchema(sections.map((s) => s.id)))

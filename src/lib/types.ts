@@ -338,6 +338,10 @@ export interface SiteState {
   seen: Record<string, string>; // url/content hash -> ISO date first seen
   clusters: Record<string, Cluster>;
   feedHealth: Record<string, FeedHealth>;
+  /** consecutive editor-call failures; a streak emails the admin once per outage */
+  llmFailStreak?: number;
+  /** set while an LLM-outage alert has gone out and calls have not yet recovered */
+  llmAlertedAt?: string;
   xPosts: XPostRecord[];
   farcasterPosts: FarcasterPostRecord[];
   jobs: Listing[];
