@@ -1,35 +1,26 @@
 import { ImageResponse } from "next/og";
+import { shortRangeLabel } from "@/lib/digest";
 import { ogFonts, ogTruncate } from "@/lib/og";
 import { siteIdentity } from "@/lib/site";
 import { leadLink } from "@/lib/rank";
-import { loadDailyDigest } from "@/lib/state";
+import { loadWeeklyDigest } from "@/lib/state";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Daily front page preview";
+export const alt = "Weekly review preview";
 
-function dateLabel(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/** Farcaster/social embed card: a real preview of the day's digest. */
+/** The weekly thread's card: the frozen week's top stories. */
 export default async function Image({ params }: { params: Promise<{ date: string }> }) {
   const { date } = await params;
-  const digest = await loadDailyDigest(date);
-  const site = siteIdentity();
+  const digest = await loadWeeklyDigest(date);
   const entries = (digest?.clusters ?? []).slice(0, 4).map((c) => ({
     headline: c.headline,
     source: leadLink(c)?.sourceName ?? "",
   }));
-  // a thin day's card fills out with the day's OTHER news (active stories
-  // filed to earlier days), under their own quiet label
-  const also = entries.length < 4 ? (digest?.alsoActive ?? []).slice(0, 4 - entries.length) : [];
+  const site = siteIdentity();
+  const label = digest
+    ? `The week in review · ${shortRangeLabel(new Date(`${digest.start}T00:00:00Z`), new Date(`${digest.end}T00:00:00Z`))}`
+    : "The week in review";
 
   return new ImageResponse(
     (
@@ -52,26 +43,16 @@ export default async function Image({ params }: { params: Promise<{ date: string
             {site.tagline}
           </div>
         </div>
-        <div style={{ display: "flex", fontSize: 34, color: "#b8bcc4", marginTop: 14 }}>{dateLabel(date)}</div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            marginTop: 32,
-            gap: 20,
-          }}
-        >
+        <div style={{ display: "flex", fontSize: 34, color: "#b8bcc4", marginTop: 14 }}>{label}</div>
+        <div style={{ display: "flex", flexDirection: "column", marginTop: 32, gap: 20 }}>
           {entries.map((e, i) => (
             // the rank is absolutely positioned so its glyph width can never
-            // shift the headline: every headline starts at exactly the same x
-            // (flex-based ranks aligned differently in Satori locally vs on
-            // Vercel, so alignment must not depend on flex at all)
+            // shift the headline (flex alignment differs local vs Vercel)
             <div key={i} style={{ display: "flex", position: "relative", paddingLeft: 48 }}>
               <div style={{ display: "flex", position: "absolute", left: 0, top: 0, color: "#8b8ff0", fontWeight: 700, lineHeight: 1.3 }}>
                 {i + 1}.
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                {/* 62 chars keeps one line, cut at a word boundary, never mid-word */}
                 <div style={{ display: "flex", lineHeight: 1.3 }}>{ogTruncate(e.headline, 62)}</div>
                 {e.source ? (
                   <div style={{ display: "flex", color: "#858b96", fontSize: 22, marginTop: 4 }}>/ {e.source}</div>
@@ -80,18 +61,8 @@ export default async function Image({ params }: { params: Promise<{ date: string
             </div>
           ))}
         </div>
-        {also.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", marginTop: 30, gap: 14 }}>
-            <div style={{ display: "flex", fontSize: 20, letterSpacing: 2, color: "#6b707a" }}>ALSO IN THE NEWS</div>
-            {also.map((s, i) => (
-              <div key={i} style={{ display: "flex", paddingLeft: 48, fontSize: 26, color: "#b8bcc4", lineHeight: 1.3 }}>
-                {ogTruncate(s.headline, 68)}
-              </div>
-            ))}
-          </div>
-        ) : null}
         <div style={{ display: "flex", marginTop: "auto", fontSize: 24, color: "#858b96" }}>
-          {site.domain}/day/{date}
+          {site.domain}/week/{date}
         </div>
       </div>
     ),

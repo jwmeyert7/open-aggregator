@@ -285,7 +285,7 @@ export async function sendDailyEmail(
  * Importance leads and magnitude breaks ties, same as the weekend page.
  * Shared by the weekly email and the weekly cast.
  */
-async function weeklyTop(
+export async function weeklyTop(
   state: SiteState,
   cfg: SiteConfig
 ): Promise<{ top: Cluster[]; start: Date; end: Date } | null> {
@@ -362,8 +362,10 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig, epis
     subject: `${siteIdentity().siteName} Weekly Digest: ${subjectRangeLabel(start, end)}`,
     ...digestEmail({
       heading,
-      archiveUrl: `${siteUrl()}/day`,
-      archiveLabel: "Browse the daily archive",
+      // the frozen weekly page exists by the time this sends (the pipeline
+      // freezes the week first, then mails)
+      archiveUrl: `${siteUrl()}/week/${end.toISOString().slice(0, 10)}`,
+      archiveLabel: "Read this week on the site",
       summary: [],
       groups: groupStories(top),
       episodes: episodes ?? recentEpisodes(state, 7 * 24, 5),

@@ -2416,6 +2416,16 @@ button.status-date {
   display: inline-block;
   margin-left: 0.3em;
 }
+/* the day page's "also in the news" list: bullets tuck in line with the
+   prose above instead of hanging into the margin */
+.also-active {
+  margin: 8px 0 24px;
+  padding-left: 1.4em;
+}
+.also-active li {
+  margin: 5px 0;
+}
+
 /* the kicker's source name links its on-site source page, quietly: it keeps
    the muted masthead color so the headline stays the loud click (late in the
    file on purpose, to outrank context link colors like .week-review a) */

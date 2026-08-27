@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClusterCard } from "@/components/ClusterCard";
+import { DigestEpisodes } from "@/components/DigestEpisodes";
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { loadSiteConfig } from "@/lib/config";
 import { loadDailyDigest } from "@/lib/state";
@@ -82,6 +83,27 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
         {digest.clusters.map((c) => (
           <ClusterCard key={c.id} cluster={c} showSection />
         ))}
+        {digest.episodes && digest.episodes.length > 0 ? (
+          <>
+            <h2 className="list-label">Top podcasts this day</h2>
+            <DigestEpisodes episodes={digest.episodes} idPrefix="day" />
+          </>
+        ) : null}
+        {digest.alsoActive && digest.alsoActive.length > 0 ? (
+          <>
+            <h2 className="list-label">Also in the news this day</h2>
+            <p className="sub">
+              Stories that gathered new coverage this day but broke earlier, so they live on their own day&apos;s page.
+            </p>
+            <ul className="also-active">
+              {digest.alsoActive.map((s) => (
+                <li key={s.slug} className="newest-item">
+                  <Link href={`/story/${s.slug}`}>{s.headline}</Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </div>
     </main>
   );

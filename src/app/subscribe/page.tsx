@@ -1,3 +1,4 @@
+import { siteIdentity } from "@/lib/site";
 import { SubscribeForm } from "./SubscribeForm";
 
 export const metadata = {
@@ -12,6 +13,7 @@ export default async function SubscribePage({
   searchParams: Promise<{ unsubscribed?: string; confirmed?: string }>;
 }) {
   const { unsubscribed, confirmed } = await searchParams;
+  const xHandle = siteIdentity().social?.xHandle;
   return (
     <main className="wrap page single roomy">
       <div className="prose">
@@ -23,6 +25,12 @@ export default async function SubscribePage({
           daily edition is the day&apos;s top stories as they freeze at UTC midnight, the same page that lives in the
           daily archive. The weekly edition arrives Saturday morning with the biggest stories of the week just ended,
           ready to read over the weekend.
+          {xHandle ? (
+            <>
+              {" "}The same snapshots post to{" "}
+              <a href={`https://x.com/${xHandle}`} rel="noopener">@{xHandle}</a> on X at the same moments.
+            </>
+          ) : null}
         </p>
         <p>
           See what you would get before you sign up: a <a href="/subscribe/sample/daily">sample daily edition</a> and

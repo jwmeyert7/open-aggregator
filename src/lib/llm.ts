@@ -253,6 +253,26 @@ export async function matchChaptersToStories(
   return object.matches.filter((m) => storyIds.has(m.storyId) && episodeIds.has(m.episodeId));
 }
 
+/**
+ * Compress digest-thread lines into complete phrases that fit a tweet. Each
+ * input carries its own character budget; the output keeps the concrete
+ * facts and never trails off.
+ */
+export async function compressTweetLines(lines: Array<{ text: string; max: number }>): Promise<string[]> {
+  const { object } = await generateObject({
+    model: editorModel(),
+    schema: z.object({
+      lines: z.array(z.string()).describe("one compressed line per input line, same order"),
+    }),
+    system: [
+      "You compress news headlines for a social post. For each input return ONE complete phrase at or under its max characters, keeping the concrete facts (who did what).",
+      "Never use an ellipsis or trail off mid-phrase. No em dashes, en dashes, or semicolons. Plain language, no hype. Return exactly one output line per input, in order.",
+    ].join("\n"),
+    prompt: JSON.stringify(lines),
+  });
+  return object.lines;
+}
+
 /** Day-in-review bullets for a frozen daily digest: one small call, best-effort at the call site. */
 export async function dayInReview(date: string, clusters: Cluster[]): Promise<SummaryBullet[]> {
   const sections = navSections();

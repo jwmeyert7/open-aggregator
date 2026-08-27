@@ -1,16 +1,17 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
-import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, WEEKLY_SEND_HOUR_UTC } from "./digest";
+import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC } from "./digest";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
-import { assessSourceCandidates, classifyAndCluster, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
-import { liveClusters, magnitude, rankClusters, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
+import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
+import { liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
 import { castRaw, postToFarcaster, farcasterPostedToday } from "./social/farcaster";
 import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from "./social/x";
-import { loadState, saveDailyDigest, saveSnapshot, saveState } from "./state";
+import { loadDailyDigest, loadState, saveDailyDigest, saveSnapshot, saveState, saveWeeklyDigest } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
-import type { CandidateItem, Cluster, DailyDigest, MediaItem, SiteState } from "./types";
+import type { CandidateItem, Cluster, DailyDigest, MediaItem, SiteState, WeeklyDigest } from "./types";
+import { ogTruncate } from "./og";
 import { bestMatchIndex, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, truncate, utcDay } from "./util";
 
 /** Gate counters are kept a little longer than the leaderboard's 30 day window. */
@@ -112,7 +113,7 @@ function joinSummaryLines(lines: SummaryBullet[], resolveRef?: (ref: string) => 
     .slice(0, 6)
     .map((l) => {
       const id = l.ref && resolveRef ? resolveRef(l.ref) : undefined;
-      return `[${l.section}${id ? `@${id}` : ""}] ${truncate(l.text, 160)}`;
+      return `[${l.section}${id ? `@${id}` : ""}] ${ogTruncate(l.text, 160)}`;
     })
     .join("\n");
 }
@@ -451,10 +452,31 @@ async function makeDailyDigest(
       if (biggest) bullets.push({ section: sec, ref: biggest.id, text: biggest.headline });
     }
     digest.summary = joinSummaryLines(bullets) || undefined;
+    // the day's other news: active stories filed to earlier days, frozen as
+    // plain links so a thin broke-day list still reads like the day
+    const topIds = new Set(top.map((c) => c.id));
+    const also = reviewPool
+      .filter((c) => !topIds.has(c.id))
+      .slice(0, 8)
+      .map((c) => ({ headline: c.headline, slug: c.slug, ...(c.section !== "general" ? { section: c.section } : {}) }));
+    if (also.length > 0) digest.alsoActive = also;
   }
 
+  // the day's top podcasts freeze into the digest, playable on the day page;
+  // days with no fresh episode borrow the shelf's current top so the section
+  // (and the tweet's Podcast line) never goes empty
+  const dayEps = rankMedia(
+    (state.mediaItems ?? []).filter((m) => !m.hidden && utcDay(m.publishedAt) === yesterday),
+    state,
+    cfg.ranking
+  ).slice(0, 4);
+  const fallbackEps = dayEps.length > 0 ? dayEps : rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, cfg.ranking).slice(0, 1);
+  if (fallbackEps.length > 0) digest.episodes = JSON.parse(JSON.stringify(fallbackEps)) as MediaItem[];
+
   const url = `${cfg.bots.siteUrl}/day/${yesterday}`;
-  const text = digestPostText(digest, cfg.bots.siteUrl);
+  // the cast carries the same snapshot text as the X thread's first tweet,
+  // with the day page as the embed standing in for the reply's link
+  const text = await threadFirstTweet(`${siteIdentity().siteName} - ${tweetDate(yesterday)}`, digest.clusters, state, cfg, 36, digest.episodes?.[0]);
   // failures never block the digest (the page must exist regardless), but
   // every skip or error is reported: three silently missing tweets taught us
   // that a swallowed reason is a debugging dead end
@@ -471,14 +493,8 @@ async function makeDailyDigest(
   } catch (err) {
     notes.push(`cast failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
   }
-  try {
-    // the anchor daily post on X; outside the story caps by design
-    const t = await postTextToX(text);
-    if (t.id) digest.tweetId = t.id;
-    else notes.push(t.dryRun ? "tweet skipped (dry-run or no X credentials)" : "tweet sent but X returned no id");
-  } catch (err) {
-    notes.push(`tweet failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
-  }
+  // the X side is the day THREAD, posted (and retried) by its own pipeline
+  // step once the digest exists, so a failed post never blocks the freeze
   await saveDailyDigest(digest);
   state.dailyDigestDates = [yesterday, ...(state.dailyDigestDates ?? []).filter((d) => d !== yesterday)];
 
@@ -490,6 +506,122 @@ async function makeDailyDigest(
     notes.push(`daily email failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
   }
   return { date: yesterday, count: top.length, cast, tweeted: Boolean(digest.tweetId), notes };
+}
+
+/** The reply tweet's follow line, only when an X handle is configured. */
+function followLine(): string {
+  const handle = siteIdentity().social?.xHandle;
+  return handle ? `\n\nFollow @${handle} for these daily and weekly summaries.` : "";
+}
+
+/** "August 26, 2026" for the daily tweet heading. */
+function tweetDate(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * Tweet 1 of a digest thread: the heading, then one labeled block per
+ * section and the top podcast, each label on its own line with a blank line
+ * between blocks. Never empty: a section missing from the digest pool falls
+ * back to its biggest live story, and the podcast line falls back from the
+ * window to the shelf's overall top. Lines are compressed into COMPLETE
+ * phrases by the editor model (never an ellipsis); without an LLM they trim
+ * at word boundaries, and budgets shrink until the tweet fits 280.
+ */
+async function threadFirstTweet(
+  heading: string,
+  pool: Cluster[],
+  state: SiteState,
+  cfg: SiteConfig,
+  podcastWindowHours: number,
+  preferredEpisode?: MediaItem
+): Promise<string> {
+  const pick = (sec: SectionId): Cluster | undefined =>
+    pool.find((c) => c.section === sec || c.alsoIn === sec) ?? sectionStories(state, sec, cfg.ranking)[0];
+  const media = rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, cfg.ranking);
+  const inWindow = media.filter((m) => Date.now() - Date.parse(m.publishedAt) <= podcastWindowHours * 3600000);
+  const ep = preferredEpisode ?? inWindow[0] ?? media[0];
+
+  const blocks: Array<{ label: string; text: string; suffix: string; max: number }> = [];
+  for (const s of cfg.sections) {
+    const c = pick(s.id);
+    if (c) blocks.push({ label: `${s.title}:`, text: c.headline, suffix: "", max: 52 });
+  }
+  if (ep) {
+    const suffix = ` (${ep.sourceName})`;
+    blocks.push({ label: "Podcast:", text: ep.displayTitle ?? ep.title, suffix, max: Math.max(30, 52 - suffix.length) });
+  }
+
+  // the editor model rewrites each line as a complete phrase inside its
+  // budget; any bad output (missing, empty, way over) falls back to a plain
+  // word-boundary trim of the original
+  let texts = blocks.map((b) => (b.text.length <= b.max ? b.text : ogTruncate(b.text, b.max)));
+  if (llmAvailable() && blocks.some((b) => b.text.length > b.max)) {
+    try {
+      const out = await compressTweetLines(blocks.map((b) => ({ text: b.text, max: b.max })));
+      texts = blocks.map((b, i) => {
+        const line = (out[i] ?? "").trim();
+        return line.length > 0 && line.length <= b.max + 10 && !line.includes("…") ? line : texts[i];
+      });
+    } catch {
+      // the word-boundary trims stand
+    }
+  }
+
+  for (let squeeze = 0; squeeze <= 4; squeeze++) {
+    const body = blocks
+      .map((b, i) => `${b.label}\n${squeeze === 0 ? texts[i] : ogTruncate(texts[i], Math.max(24, blocks[i].max - squeeze * 6))}${b.suffix}`)
+      .join("\n\n");
+    const text = `${heading}\n\n${body}`;
+    if (text.length <= 279) return text;
+  }
+  return ogTruncate(heading, 279);
+}
+
+/**
+ * Post a two-tweet digest thread: the snapshot as clean text, then the
+ * archive link as a reply. No image on tweet 1 by decision: the reply's link
+ * unfurls into the archive page's card, and attaching the same card to
+ * tweet 1 showed it twice.
+ */
+async function postThread(first: string, second: string): Promise<{ tweetId?: string; notes: string[] }> {
+  const notes: string[] = [];
+  const t1 = await postTextToX(first);
+  if (t1.dryRun) return { notes: [...notes, "thread skipped (dry-run or no X credentials)"] };
+  if (!t1.id) return { notes: [...notes, "thread tweet 1 returned no id"] };
+  try {
+    await postTextToX(second, { replyTo: t1.id });
+  } catch (err) {
+    notes.push(`thread reply failed: ${truncate(err instanceof Error ? err.message : String(err), 160)}`);
+  }
+  return { tweetId: t1.id, notes };
+}
+
+/**
+ * The daily thread for yesterday's frozen digest. Its own step (not part of
+ * the freeze) so a failed post retries on later runs until the tweetId is
+ * written back onto the digest; skipped once the digest is over 36h old.
+ */
+async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: RunReport): Promise<void> {
+  if (cfg.bots.x.dailyThread === false) return;
+  const yesterday = utcDay(new Date(Date.now() - 24 * 60 * 60000).toISOString());
+  const digest = await loadDailyDigest(yesterday);
+  if (!digest || digest.tweetId || hoursAgo(digest.takenAt) > 36) return;
+  const first = await threadFirstTweet(`${siteIdentity().siteName} - ${tweetDate(digest.date)}`, digest.clusters, state, cfg, 36, digest.episodes?.[0]);
+  const second = `Read the full day in review:\n${cfg.bots.siteUrl}/day/${digest.date}\n\nOr get the daily snapshot by email:\n${cfg.bots.siteUrl}/subscribe${followLine()}`;
+  const r = await postThread(first, second);
+  if (r.tweetId) {
+    digest.tweetId = r.tweetId;
+    await saveDailyDigest(digest);
+    report.notes.push(`day thread posted (${r.tweetId})${r.notes.length > 0 ? `, ${r.notes.join(", ")}` : ""}`);
+  } else if (r.notes.length > 0) {
+    report.notes.push(`day thread: ${r.notes.join(", ")}`);
+  }
 }
 
 /**
@@ -1639,27 +1771,99 @@ export async function runPipeline(): Promise<RunReport> {
     state.lastDailyDigest = today;
   }
 
-  // Saturday-morning weekly email: the prior Saturday to Friday's top stories,
-  // assembled from the frozen daily digests, once per Saturday
+  // the day thread on X, retried until it lands (see maybePostDayThread)
+  try {
+    await maybePostDayThread(state, cfg, report);
+  } catch (err) {
+    report.notes.push(`day thread failed: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // Saturday-morning weekly edition: the prior Saturday to Friday's top
+  // stories, assembled from the frozen daily digests, once per Saturday. The
+  // frozen /week page comes FIRST so the email and thread can link a page
+  // that exists
   const nowUtc = new Date();
   if (nowUtc.getUTCDay() === 6 && nowUtc.getUTCHours() >= WEEKLY_SEND_HOUR_UTC && (state.lastWeeklyDigest ?? "") !== today) {
+    let weekly: WeeklyDigest | null = null;
+    try {
+      const week = await weeklyTop(state, cfg);
+      if (week) {
+        weekly = {
+          start: utcDay(week.start.toISOString()),
+          end: utcDay(week.end.toISOString()),
+          takenAt: new Date().toISOString(),
+          clusters: JSON.parse(JSON.stringify(week.top)) as Cluster[],
+        };
+        // the week's top podcasts freeze in, playable on the /week page
+        const weekStart = `${weekly.start}T00:00:00.000Z`;
+        const weekEndEx = new Date(new Date(`${weekly.end}T00:00:00Z`).getTime() + 24 * 60 * 60000).toISOString();
+        const weekEps = rankMedia(
+          (state.mediaItems ?? []).filter((m) => !m.hidden && m.publishedAt >= weekStart && m.publishedAt < weekEndEx),
+          state,
+          cfg.ranking
+        ).slice(0, 5);
+        if (weekEps.length > 0) weekly.episodes = JSON.parse(JSON.stringify(weekEps)) as MediaItem[];
+        await saveWeeklyDigest(weekly);
+        state.weeklyDigestDates = [weekly.end, ...(state.weeklyDigestDates ?? []).filter((d) => d !== weekly!.end)];
+        report.notes.push(`Weekly digest ${weekly.end}: ${weekly.clusters.length} stories frozen`);
+      }
+    } catch (err) {
+      report.notes.push(`Weekly digest freeze failed: ${err instanceof Error ? err.message : err}`);
+    }
     try {
       const note = await sendWeeklyEmail(state, cfg);
       if (note) report.notes.push(note);
     } catch (err) {
       report.notes.push(`Weekly email failed: ${err instanceof Error ? err.message : err}`);
     }
-    // the weekly cast rides the same once-per-Saturday trigger as the email
+    // the weekly cast and thread share the same snapshot text, so both
+    // platforms tell one edition; the /week page rides along as the embed
+    let weeklyFirst: string | null = null;
+    if (weekly) {
+      try {
+        weeklyFirst = await threadFirstTweet(
+          `${siteIdentity().siteName} - ${subjectRangeLabel(new Date(`${weekly.start}T00:00:00Z`), new Date(`${weekly.end}T00:00:00Z`))}`,
+          weekly.clusters,
+          state,
+          cfg,
+          7 * 24,
+          weekly.episodes?.[0]
+        );
+      } catch (err) {
+        report.notes.push(`weekly snapshot text failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
     try {
-      const wc = await buildWeeklyCast(state, cfg);
-      if (wc) {
-        const r = await castRaw(wc.text, wc.url, cfg.bots.farcaster.digestChannel || undefined);
+      if (weekly && weeklyFirst) {
+        const r = await castRaw(weeklyFirst, `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
       } else {
-        report.notes.push("Weekly cast skipped (fewer than three stories this week).");
+        const wc = await buildWeeklyCast(state, cfg);
+        if (wc) {
+          const r = await castRaw(wc.text, wc.url, cfg.bots.farcaster.digestChannel || undefined);
+          report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
+        } else {
+          report.notes.push("Weekly cast skipped (fewer than three stories this week).");
+        }
       }
     } catch (err) {
       report.notes.push(`Weekly cast failed: ${err instanceof Error ? err.message : err}`);
+    }
+    // the weekly thread on X, same shape as the daily
+    if (weekly && weeklyFirst && cfg.bots.x.weeklyThread !== false) {
+      try {
+        const second = `Read the full week in review:\n${cfg.bots.siteUrl}/week/${weekly.end}\n\nOr get the weekly snapshot by email:\n${cfg.bots.siteUrl}/subscribe${followLine()}`;
+        const r = await postThread(weeklyFirst, second);
+        if (r.tweetId) {
+          weekly.tweetId = r.tweetId;
+          await saveWeeklyDigest(weekly);
+          report.notes.push(`week thread posted (${r.tweetId})${r.notes.length > 0 ? `, ${r.notes.join(", ")}` : ""}`);
+        } else if (r.notes.length > 0) {
+          report.notes.push(`week thread: ${r.notes.join(", ")}`);
+        }
+      } catch (err) {
+        report.notes.push(`week thread failed: ${err instanceof Error ? err.message : err}`);
+      }
     }
     state.lastWeeklyDigest = today;
   }

@@ -48,9 +48,9 @@
     "candidateRetentionDays": 45
   },
   "bots": {
-    "$comment": "Social posting, off by default: with no credentials configured every post is a logged dry-run. siteUrl is the canonical base for links in posts (SITE_URL env overrides it). digestChannel is a Farcaster channel id for the nightly digest cast, empty for none. X posting is capped in code: at most maxAutoPerDay automated posts per day and maxPerMonth posts per calendar month.",
+    "$comment": "Social posting, off by default: with no credentials configured every post is a logged dry-run. siteUrl is the canonical base for links in posts (SITE_URL env overrides it). digestChannel is a Farcaster channel id for the nightly digest cast, empty for none. X posting is capped in code: at most maxAutoPerDay automated posts per day and maxPerMonth posts per calendar month. dailyThread and weeklyThread turn the two-tweet digest threads on X on or off (they ride outside the story caps).",
     "siteUrl": "http://localhost:3000",
     "farcaster": { "maxPerDay": 8, "minScore": 0.8, "topN": 3, "digestChannel": "" },
-    "x": { "maxAutoPerDay": 0, "maxPerMonth": 30, "minScore": 1.0 }
+    "x": { "maxAutoPerDay": 0, "maxPerMonth": 30, "minScore": 1.0, "dailyThread": true, "weeklyThread": true }
   }
 }

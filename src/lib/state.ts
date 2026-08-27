@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { BlobNotFoundError, del, head, list, put } from "@vercel/blob";
 import { loadFeeds } from "./config";
-import type { Cluster, DailyDigest, SiteState, Snapshot } from "./types";
+import type { Cluster, DailyDigest, SiteState, Snapshot, WeeklyDigest } from "./types";
 import { emptyState } from "./types";
 
 /**
@@ -211,10 +211,31 @@ export async function saveSnapshot(snap: Snapshot): Promise<void> {
 
 const DAILY_DIR = "aggregator/daily";
 
+const WEEKLY_DIR = "aggregator/weekly";
 export async function saveDailyDigest(digest: DailyDigest): Promise<void> {
   const body = JSON.stringify(digest);
   if (useBlob()) await blobWrite(`${DAILY_DIR}/${digest.date}.json`, body);
   else localWrite(path.join("daily", `${digest.date}.json`), body);
+}
+
+export async function saveWeeklyDigest(digest: WeeklyDigest): Promise<void> {
+  const body = JSON.stringify(digest);
+  if (useBlob()) await blobWrite(`${WEEKLY_DIR}/${digest.end}.json`, body);
+  else localWrite(path.join("weekly", `${digest.end}.json`), body);
+}
+
+export async function loadWeeklyDigest(end: string): Promise<WeeklyDigest | null> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) return null;
+  const raw = useBlob() ? await blobRead(`${WEEKLY_DIR}/${end}.json`) : localRead(path.join("weekly", `${end}.json`));
+  if (!raw) return null;
+  try {
+    const digest = JSON.parse(raw) as WeeklyDigest;
+    digest.clusters = dropLinklessClusters(digest.clusters);
+    normalizeClusterSections(digest.clusters);
+    return digest;
+  } catch {
+    return null;
+  }
 }
 
 export async function loadDailyDigest(date: string): Promise<DailyDigest | null> {

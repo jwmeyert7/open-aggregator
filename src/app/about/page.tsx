@@ -75,7 +75,22 @@ export default function AboutPage() {
         </p>
         <h2>Follow and contact</h2>
         <p>
-          {site.siteName} offers <Link href="/subscribe">daily and weekly email digests</Link>. Story suggestions come
+          {site.siteName}
+          {site.social?.xHandle || site.social?.farcasterHandle ? (
+            <>
+              {" "}
+              posts its daily and weekly digests to{" "}
+              {site.social?.xHandle ? <a href={`https://x.com/${site.social.xHandle}`}>X</a> : null}
+              {site.social?.xHandle && site.social?.farcasterHandle ? " and " : null}
+              {site.social?.farcasterHandle ? (
+                <a href={`https://farcaster.xyz/${site.social.farcasterHandle}`}>Farcaster</a>
+              ) : null}
+              , and offers
+            </>
+          ) : (
+            <> offers</>
+          )}{" "}
+          <Link href="/subscribe">daily and weekly email digests</Link>. Story suggestions come
           in through the <Link href="/submit">submit page</Link>, and anything else can be communicated to:{" "}
           <a href={`mailto:${site.contactEmail}`}>{site.contactEmail}</a>.
         </p>

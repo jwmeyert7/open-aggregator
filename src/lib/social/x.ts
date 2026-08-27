@@ -91,11 +91,14 @@ export async function postToX(
 }
 
 /**
- * Send raw text as a tweet. No cap logic here: the daily digest is the one
- * caller, at exactly one tweet per day by construction. Dry-runs without
- * credentials or with DRY_RUN=1.
+ * Send raw text as a tweet, optionally as a reply and with attached media.
+ * No cap logic here: the digest threads are the callers, at a fixed handful
+ * per day by construction. Dry-runs without credentials or with DRY_RUN=1.
  */
-export async function postTextToX(text: string): Promise<{ dryRun: boolean; id?: string }> {
+export async function postTextToX(
+  text: string,
+  opts: { replyTo?: string; mediaId?: string } = {}
+): Promise<{ dryRun: boolean; id?: string }> {
   const c = creds();
   const dryRun = !c || process.env.DRY_RUN === "1";
   if (dryRun) return { dryRun };
@@ -103,9 +106,39 @@ export async function postTextToX(text: string): Promise<{ dryRun: boolean; id?:
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { authorization: oauthHeader(endpoint, c), "content-type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text,
+      ...(opts.replyTo ? { reply: { in_reply_to_tweet_id: opts.replyTo } } : {}),
+      ...(opts.mediaId ? { media: { media_ids: [opts.mediaId] } } : {}),
+    }),
   });
   if (!res.ok) throw new Error(`X API error ${res.status}: ${await res.text()}`);
   const json = (await res.json().catch(() => ({}))) as { data?: { id?: string } };
   return { dryRun, id: json?.data?.id };
+}
+
+/**
+ * Upload one PNG for tweet attachment via the v2 simple media upload: one
+ * multipart POST with the file in a `media` field (the old chunked
+ * INIT/APPEND/FINALIZE command style is v1.1 and gets a 400 here). The
+ * multipart body stays out of the OAuth signature, so the plain header
+ * works. Returns null in dry-run; throws on an API refusal so the caller can
+ * decide to post without the image.
+ */
+export async function uploadImageToX(png: Buffer): Promise<string | null> {
+  const c = creds();
+  if (!c || process.env.DRY_RUN === "1") return null;
+  const endpoint = "https://api.x.com/2/media/upload";
+  const fd = new FormData();
+  fd.append("media", new Blob([new Uint8Array(png)], { type: "image/png" }), "card.png");
+  fd.append("media_category", "tweet_image");
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { authorization: oauthHeader(endpoint, c) },
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`X media upload ${res.status}: ${await res.text()}`);
+  const json = (await res.json().catch(() => ({}))) as { data?: { id?: string } };
+  if (!json.data?.id) throw new Error("X media upload returned no id");
+  return json.data.id;
 }

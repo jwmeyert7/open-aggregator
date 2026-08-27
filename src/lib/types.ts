@@ -129,7 +129,8 @@ export interface SiteConfig {
     siteUrl: string;
     /** digestChannel: channel id for the nightly digest cast; empty = no channel (requires channel membership to stick). */
     farcaster: { maxPerDay: number; minScore: number; topN: number; digestChannel?: string };
-    x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number };
+    /** dailyThread/weeklyThread: the two-tweet digest threads on X (tweet 1 the snapshot lines with the card image, tweet 2 the archive link). Like the old single digest tweet they ride outside the story caps. */
+    x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number; dailyThread?: boolean; weeklyThread?: boolean };
   };
 }
 
@@ -399,6 +400,8 @@ export interface SiteState {
   lastWeeklyDigest?: string;
   /** Dates (YYYY-MM-DD) with a stored daily digest, newest first. */
   dailyDigestDates?: string[];
+  /** Week-end dates (YYYY-MM-DD, the covered Friday) with a stored weekly digest, newest first. */
+  weeklyDigestDates?: string[];
   snapshots: string[]; // YYMMDD-HHMM ids, newest last
 }
 
@@ -472,6 +475,28 @@ export interface DailyDigest {
   tweetId?: string;
   /** Editor-model day-in-review paragraph, written once when the digest freezes. */
   summary?: string;
+  /**
+   * Stories active that day (new coverage arrived) that broke on an earlier
+   * day, so they file elsewhere but belong to this day's experience. Frozen
+   * as plain headline links, biggest first.
+   */
+  alsoActive?: Array<{ headline: string; slug: string; section?: SectionId }>;
+  /** The day's top podcast episodes, frozen playable (full items, ranked). */
+  episodes?: MediaItem[];
+}
+
+/** One frozen week: Saturday through Friday, frozen when the weekly email sends. */
+export interface WeeklyDigest {
+  /** YYYY-MM-DD (UTC), the covered week's Saturday. */
+  start: string;
+  /** YYYY-MM-DD (UTC), the covered week's Friday; the /week URL segment. */
+  end: string;
+  takenAt: string;
+  clusters: Cluster[]; // the week's top stories, importance first then magnitude
+  /** The week's top podcast episodes, frozen playable (full items, ranked). */
+  episodes?: MediaItem[];
+  /** Id of the week's X thread (its first tweet), when it really posted. */
+  tweetId?: string;
 }
 
 /** A domain that Farcaster keeps pointing at while no source of ours covers it. */
