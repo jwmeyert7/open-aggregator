@@ -2,8 +2,8 @@ import { loadSiteConfig, siteUrl } from "./config";
 import { sendMail } from "./mail";
 import { siteIdentity } from "./site";
 import { leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
-import { loadDailyDigest } from "./state";
-import type { Cluster, DigestSubscriber, SiteConfig, SiteState } from "./types";
+import { loadDailyDigest, loadMonthlyDigest } from "./state";
+import type { Cluster, DigestSubscriber, MediaItem, SiteConfig, SiteState } from "./types";
 import { formatDuration, parseSummaryLines, utcDay } from "./util";
 
 /**
@@ -285,6 +285,30 @@ export async function sendDailyEmail(
  * Importance leads and magnitude breaks ties, same as the weekend page.
  * Shared by the weekly email and the weekly cast.
  */
+/**
+ * The frozen daily digests of some days pooled into one cluster list. A story
+ * big enough to top consecutive dailies appears in several of them: keep one
+ * copy per cluster (the latest day's version) or a multi-day story occupies
+ * several of the edition's slots.
+ */
+export async function poolFromDailies(days: string[]): Promise<Cluster[]> {
+  const byId = new Map<string, Cluster>();
+  for (const d of days) {
+    const digest = await loadDailyDigest(d);
+    for (const c of digest?.clusters ?? []) byId.set(c.id, c);
+  }
+  return [...byId.values()];
+}
+
+/** The edition ranking shared by every rollup: importance leads, magnitude breaks ties. */
+export function rankPool(pool: Cluster[], cfg: SiteConfig, limit: number): Cluster[] {
+  const eff = (c: Cluster) => {
+    const b = scoreBreakdown(c, cfg.ranking);
+    return b.importanceCapped ? 2 : c.importance;
+  };
+  return [...pool].sort((a, b) => eff(b) - eff(a) || magnitude(b, cfg.ranking) - magnitude(a, cfg.ranking)).slice(0, limit);
+}
+
 export async function weeklyTop(
   state: SiteState,
   cfg: SiteConfig
@@ -294,15 +318,7 @@ export async function weeklyTop(
   for (let i = daysSinceSat + 7; i >= daysSinceSat + 1; i--) {
     days.push(utcDay(new Date(Date.now() - i * 24 * 60 * 60000).toISOString()));
   }
-  // A story big enough to top consecutive dailies appears in several of them:
-  // keep one copy per cluster (the latest day's version) or a multi-day story
-  // occupies several of the edition's slots.
-  const byId = new Map<string, Cluster>();
-  for (const d of days) {
-    const digest = await loadDailyDigest(d);
-    for (const c of digest?.clusters ?? []) byId.set(c.id, c);
-  }
-  let pool = [...byId.values()];
+  let pool = await poolFromDailies(days);
   if (pool.length === 0) {
     const start = `${days[0]}T00:00:00.000Z`;
     const endExclusive = new Date(
@@ -313,17 +329,83 @@ export async function weeklyTop(
     pool = liveClusters(state).filter((c) => broke(c) >= start && broke(c) < endExclusive);
   }
   if (pool.length === 0) return null;
-
-  const eff = (c: Cluster) => {
-    const b = scoreBreakdown(c, cfg.ranking);
-    return b.importanceCapped ? 2 : c.importance;
-  };
-  const top = [...pool].sort((a, b) => eff(b) - eff(a) || magnitude(b, cfg.ranking) - magnitude(a, cfg.ranking)).slice(0, 10);
   return {
-    top,
+    top: rankPool(pool, cfg, 10),
     start: new Date(`${days[0]}T00:00:00Z`),
     end: new Date(`${days[days.length - 1]}T00:00:00Z`),
   };
+}
+
+/** "August 2026" for monthly headings, subjects, and tweet headings. */
+export function monthLabel(month: string): string {
+  return new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", year: "numeric" });
+}
+
+/**
+ * One calendar month's biggest stories, pooled from its frozen daily digests
+ * (the in-progress current day rides along when the month is the current
+ * one, so the live preview covers today too). Capped at 12.
+ */
+export async function monthlyTop(state: SiteState, cfg: SiteConfig, month: string): Promise<{ top: Cluster[] } | null> {
+  const days = (state.dailyDigestDates ?? []).filter((d) => d.startsWith(month));
+  const pool = await poolFromDailies(days);
+  if (pool.length === 0) return null;
+  return { top: rankPool(pool, cfg, 12) };
+}
+
+/**
+ * One calendar year's biggest stories, pooled from its frozen monthly digests
+ * plus the frozen dailies of any month that has no monthly yet (the site's
+ * first months, and the in-progress current month before its own preview
+ * exists). Capped at 15. The episodes are one podcast per month: each
+ * month's frozen top episode, in month order.
+ */
+export async function yearlyTop(
+  state: SiteState,
+  cfg: SiteConfig,
+  year: string
+): Promise<{ top: Cluster[]; episodes: MediaItem[] } | null> {
+  const months = (state.monthlyDigestMonths ?? []).filter((m) => m.startsWith(`${year}-`)).sort();
+  const byId = new Map<string, Cluster>();
+  const episodes: MediaItem[] = [];
+  for (const m of months) {
+    const digest = await loadMonthlyDigest(m);
+    for (const c of digest?.clusters ?? []) byId.set(c.id, c);
+    if (digest?.episodes?.[0]) episodes.push(digest.episodes[0]);
+  }
+  const covered = new Set(months);
+  const strayDays = (state.dailyDigestDates ?? []).filter((d) => d.startsWith(`${year}-`) && !covered.has(d.slice(0, 7)));
+  for (const c of await poolFromDailies(strayDays)) if (!byId.has(c.id)) byId.set(c.id, c);
+  const pool = [...byId.values()];
+  if (pool.length === 0) return null;
+  return { top: rankPool(pool, cfg, 15), episodes: episodes.slice(0, 12) };
+}
+
+/** The monthly edition email, sent to weekly subscribers as a bonus on the 1st. */
+export async function buildMonthlyEdition(state: SiteState, cfg: SiteConfig, month: string): Promise<Edition | null> {
+  const m = await monthlyTop(state, cfg, month);
+  if (!m) return null;
+  return {
+    subject: `${siteIdentity().siteName} Monthly Digest: ${monthLabel(month)}`,
+    ...digestEmail({
+      heading: `${siteIdentity().siteName} monthly, ${monthLabel(month)}`,
+      archiveUrl: `${siteUrl()}/month/${month}`,
+      archiveLabel: "Read this month on the site",
+      summary: [],
+      groups: groupStories(m.top),
+      episodes: recentEpisodes(state, 31 * 24, 6),
+    }),
+  };
+}
+
+/** Send the monthly edition. It rides the weekly list: no third checkbox. */
+export async function sendMonthlyEmail(state: SiteState, cfg: SiteConfig, month: string): Promise<string | null> {
+  const subs = eligible(state.digestSubscribers, "weekly");
+  if (subs.length === 0) return null;
+  const edition = await buildMonthlyEdition(state, cfg, month);
+  if (!edition) return "monthly email: skipped, nothing to send";
+  const r = await sendToAll(subs, edition);
+  return `monthly email: ${r.sent}/${subs.length} sent${r.errors.length > 0 ? ` (${r.errors.join("; ")})` : ""}`;
 }
 
 /** "August 10-16" or "August 29 - September 4", with years only when the week crosses New Year. */

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { BlobNotFoundError, del, head, list, put } from "@vercel/blob";
 import { loadFeeds } from "./config";
-import type { Cluster, DailyDigest, SiteState, Snapshot, WeeklyDigest } from "./types";
+import type { Cluster, DailyDigest, MonthlyDigest, SiteState, Snapshot, WeeklyDigest, YearlyDigest } from "./types";
 import { emptyState } from "./types";
 
 /**
@@ -210,12 +210,56 @@ export async function saveSnapshot(snap: Snapshot): Promise<void> {
 }
 
 const DAILY_DIR = "aggregator/daily";
-
 const WEEKLY_DIR = "aggregator/weekly";
+
 export async function saveDailyDigest(digest: DailyDigest): Promise<void> {
   const body = JSON.stringify(digest);
   if (useBlob()) await blobWrite(`${DAILY_DIR}/${digest.date}.json`, body);
   else localWrite(path.join("daily", `${digest.date}.json`), body);
+}
+
+const MONTHLY_DIR = "aggregator/monthly";
+
+export async function saveMonthlyDigest(digest: MonthlyDigest): Promise<void> {
+  const body = JSON.stringify(digest);
+  if (useBlob()) await blobWrite(`${MONTHLY_DIR}/${digest.month}.json`, body);
+  else localWrite(path.join("monthly", `${digest.month}.json`), body);
+}
+
+export async function loadMonthlyDigest(month: string): Promise<MonthlyDigest | null> {
+  if (!/^\d{4}-\d{2}$/.test(month)) return null;
+  const raw = useBlob() ? await blobRead(`${MONTHLY_DIR}/${month}.json`) : localRead(path.join("monthly", `${month}.json`));
+  if (!raw) return null;
+  try {
+    const digest = JSON.parse(raw) as MonthlyDigest;
+    digest.clusters = dropLinklessClusters(digest.clusters);
+    normalizeClusterSections(digest.clusters);
+    return digest;
+  } catch {
+    return null;
+  }
+}
+
+const YEARLY_DIR = "aggregator/yearly";
+
+export async function saveYearlyDigest(digest: YearlyDigest): Promise<void> {
+  const body = JSON.stringify(digest);
+  if (useBlob()) await blobWrite(`${YEARLY_DIR}/${digest.year}.json`, body);
+  else localWrite(path.join("yearly", `${digest.year}.json`), body);
+}
+
+export async function loadYearlyDigest(year: string): Promise<YearlyDigest | null> {
+  if (!/^\d{4}$/.test(year)) return null;
+  const raw = useBlob() ? await blobRead(`${YEARLY_DIR}/${year}.json`) : localRead(path.join("yearly", `${year}.json`));
+  if (!raw) return null;
+  try {
+    const digest = JSON.parse(raw) as YearlyDigest;
+    digest.clusters = dropLinklessClusters(digest.clusters);
+    normalizeClusterSections(digest.clusters);
+    return digest;
+  } catch {
+    return null;
+  }
 }
 
 export async function saveWeeklyDigest(digest: WeeklyDigest): Promise<void> {

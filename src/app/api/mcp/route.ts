@@ -252,7 +252,7 @@ const handler = createMcpHandler(
       {
         title: "Get daily digest",
         description:
-          "One UTC day's frozen edition: the day's top stories plus an editor-written day-in-review paragraph. Omit the date for the most recent edition. Editions freeze shortly after midnight UTC, so today's edition usually does not exist yet and the live view is get_top_stories. When presenting a story to the user, link its permalink.",
+          "One UTC day's edition: the day's top stories plus an editor-written day-in-review paragraph. Omit the date for the most recent frozen edition. Editions freeze shortly after midnight UTC; today's date returns the still-in-progress edition, marked inProgress. When presenting a story to the user, link its permalink.",
         annotations: { readOnlyHint: true },
         inputSchema: z.object({
           date: z
@@ -264,7 +264,10 @@ const handler = createMcpHandler(
       async ({ date }) => {
         const state = await loadState();
         const available = state.dailyDigestDates ?? [];
-        const target = date ?? available[0];
+        // the no-date default is the newest FROZEN edition, so callers asking
+        // for "the daily digest" never get the half-built current day
+        const today = new Date().toISOString().slice(0, 10);
+        const target = date ?? available.find((d) => d !== today);
         if (!target) return asText({ error: "No daily editions exist yet." });
         const digest = await loadDailyDigest(target);
         if (!digest) {
@@ -278,6 +281,7 @@ const handler = createMcpHandler(
           site: base,
           date: digest.date,
           permalink: `${base}/day/${digest.date}`,
+          ...(digest.inProgress ? { inProgress: true, note: "This day is still in progress and updates all day." } : {}),
           ...(digest.summary ? { dayInReview: digest.summary } : {}),
           stories: digest.clusters.map((c, i) => serializeCluster(c, i + 1, base)),
         });

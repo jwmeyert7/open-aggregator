@@ -49,7 +49,14 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
       <div>
         <div className="section-head">
           <h1>{siteIdentity().siteName}: {dateLabel(date)}</h1>
-          <p>The day&apos;s top ranked stories.</p>
+          {digest.inProgress ? (
+            <p>
+              <span className="live-dot" aria-hidden="true" />
+              This day is still in progress. The list below updates all day and freezes at midnight UTC.
+            </p>
+          ) : (
+            <p>The day&apos;s top ranked stories.</p>
+          )}
           <p>
             All days are in the <Link href="/day">daily archive</Link>
             {(digest.castHash && fcHandle) || digest.tweetId ? " and posted to " : ""}

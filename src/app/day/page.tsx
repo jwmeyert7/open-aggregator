@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DayPickerJump } from "@/components/DayPickerJump";
 import { loadState } from "@/lib/state";
+import { utcDay } from "@/lib/util";
 import { dayLabel, RECENT_DAYS } from "./dayList";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,13 @@ export default async function DayIndexPage() {
           {recent.map((d) => (
             <li key={d}>
               <Link href={`/day/${d}`}>{dayLabel(d)}</Link>
+              {d === utcDay(new Date().toISOString()) ? (
+                <span className="org">
+                  {" "}
+                  · <span className="live-dot" aria-hidden="true" />
+                  in progress
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

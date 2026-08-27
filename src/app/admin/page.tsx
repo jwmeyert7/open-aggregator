@@ -74,6 +74,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     { href: "/admin/announcement", name: "Announcement", sub: announcement },
     { href: "/admin/sponsored", name: "Sponsored", sub: `${sponsoredLive} live across posts, jobs, events, and podcasts` },
     { href: "/admin/leaderboard", name: "Leaderboard", sub: "which sources earn their keep" },
+    { href: "/admin/wordmap", name: "Word maps", sub: "preview clouds for the frozen editions" },
     { href: "/admin/farcaster", name: "Farcaster", sub: "the bot's activity and channel reads" },
   ];
 

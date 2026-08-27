@@ -3,7 +3,8 @@ import { SubscribeForm } from "./SubscribeForm";
 
 export const metadata = {
   title: "Email digests",
-  description: "The front page by email: a daily edition at UTC midnight and a weekly edition on Saturday morning.",
+  description:
+    "The front page by email: a daily edition at UTC midnight, a weekly edition on Saturday morning, and a monthly edition on the 1st.",
 };
 
 /** House style for this copy: no em dashes, no semicolons. */
@@ -24,7 +25,8 @@ export default async function SubscribePage({
           Two editions, both built from the site&apos;s frozen archives rather than a separate newsletter pipeline. The
           daily edition is the day&apos;s top stories as they freeze at UTC midnight, the same page that lives in the
           daily archive. The weekly edition arrives Saturday morning with the biggest stories of the week just ended,
-          ready to read over the weekend.
+          ready to read over the weekend. Weekly subscribers also get a monthly edition on the morning of the 1st, the
+          month just ended in one page.
           {xHandle ? (
             <>
               {" "}The same snapshots post to{" "}
@@ -33,8 +35,9 @@ export default async function SubscribePage({
           ) : null}
         </p>
         <p>
-          See what you would get before you sign up: a <a href="/subscribe/sample/daily">sample daily edition</a> and
-          a <a href="/subscribe/sample/weekly">sample weekly edition</a>, each the most recent one sent.
+          See what you would get before you sign up: a <a href="/subscribe/sample/daily">sample daily edition</a>, a{" "}
+          <a href="/subscribe/sample/weekly">sample weekly edition</a>, and a{" "}
+          <a href="/subscribe/sample/monthly">sample monthly edition</a>, each the most recent one sent.
         </p>
         <SubscribeForm />
         <p>

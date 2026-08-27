@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { loadSiteConfig, siteUrl } from "@/lib/config";
-import { buildDailyEdition, buildWeeklyEdition, recentEpisodes, type Edition } from "@/lib/digest";
-import { loadDailyDigest, loadState } from "@/lib/state";
+import { buildDailyEdition, buildMonthlyEdition, buildWeeklyEdition, recentEpisodes, type Edition } from "@/lib/digest";
+import { loadDailyDigest, loadMonthlyDigest, loadState } from "@/lib/state";
 
 export const dynamic = "force-dynamic";
 
@@ -13,16 +13,28 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ kind: string }> }) {
   const { kind } = await ctx.params;
-  if (kind !== "daily" && kind !== "weekly") return new NextResponse("Not found", { status: 404 });
+  if (kind !== "daily" && kind !== "weekly" && kind !== "monthly") return new NextResponse("Not found", { status: 404 });
   const state = await loadState();
   const cfg = loadSiteConfig();
   let edition: Edition | null = null;
   if (kind === "weekly") {
     edition = await buildWeeklyEdition(state, cfg, recentEpisodes(state, 7 * 24, 5));
+  } else if (kind === "monthly") {
+    // the newest FROZEN month: the in-progress current month was never sent
+    for (const month of state.monthlyDigestMonths ?? []) {
+      const digest = await loadMonthlyDigest(month);
+      if (!digest || digest.inProgress) continue;
+      edition = await buildMonthlyEdition(state, cfg, month);
+      break;
+    }
   } else {
-    const date = state.dailyDigestDates?.[0];
-    const digest = date ? await loadDailyDigest(date) : null;
-    if (digest) edition = buildDailyEdition(digest, recentEpisodes(state, 24, 3));
+    // the newest FROZEN day: the in-progress today was never sent
+    for (const date of state.dailyDigestDates ?? []) {
+      const digest = await loadDailyDigest(date);
+      if (!digest || digest.inProgress) continue;
+      edition = buildDailyEdition(digest, recentEpisodes(state, 24, 3));
+      break;
+    }
   }
   if (!edition) return new NextResponse("No edition to show yet. The first daily freezes at UTC midnight.", { status: 404 });
   const banner =

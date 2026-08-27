@@ -1,5 +1,5 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
-import { buildWeeklyCast, sendDailyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC } from "./digest";
+import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sendDailyEmail, sendMonthlyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC, yearlyTop } from "./digest";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
 import { liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
@@ -8,9 +8,9 @@ import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
 import { castRaw, postToFarcaster, farcasterPostedToday } from "./social/farcaster";
 import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from "./social/x";
-import { loadDailyDigest, loadState, saveDailyDigest, saveSnapshot, saveState, saveWeeklyDigest } from "./state";
+import { loadDailyDigest, loadState, saveDailyDigest, saveMonthlyDigest, saveSnapshot, saveState, saveWeeklyDigest, saveYearlyDigest } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
-import type { CandidateItem, Cluster, DailyDigest, MediaItem, SiteState, WeeklyDigest } from "./types";
+import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
 import { ogTruncate } from "./og";
 import { bestMatchIndex, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, truncate, utcDay } from "./util";
 
@@ -395,31 +395,49 @@ export function applyEditorOutput(
   return { rejected, rejectedSamples, clustersCreated, clustersUpdated, touched, clusterIdByRef, guardNotes };
 }
 
+/** Insert a key into a newest-first date list, deduped and re-sorted (the
+ * in-progress editions can add keys newer than a later freeze's, so a plain
+ * prepend would disorder the list). */
+function rememberDate(list: string[] | undefined, v: string): string[] {
+  return [...new Set([v, ...(list ?? [])])].sort().reverse();
+}
+
 /**
- * Freeze yesterday's best curation as a daily digest and cast it. Stories are
- * ranked by magnitude (score with decay factored out) so a big morning story
- * competes fairly with an evening one; capped at 10. Runs once per UTC day,
- * on the first pipeline run after midnight.
+ * The day's story lists, shared by the nightly freeze and the in-progress
+ * preview. `top` is the day page's list: stories that BROKE that day
+ * (earliest link, so each story files to exactly one page), ranked by
+ * magnitude (score with decay factored out, so a big morning story competes
+ * fairly with an evening one), same eligibility bar as Top Stories with a
+ * fallback so a quiet day still gets a page; capped at 10. `reviewPool` is
+ * every story ACTIVE that day (any link published then), for the review
+ * bullets and the also-in-the-news list.
+ */
+function dayTopClusters(state: SiteState, cfg: SiteConfig, date: string): { top: Cluster[]; reviewPool: Cluster[] } {
+  const broke = (c: Cluster) =>
+    c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
+  const mag = (c: Cluster) => magnitude(c, cfg.ranking);
+  const dayClusters = liveClusters(state).filter((c) => utcDay(broke(c)) === date);
+  const eligible = dayClusters.filter((c) => {
+    const b = scoreBreakdown(c, cfg.ranking);
+    return b.uniqueSources >= 2 || (b.importanceCapped ? 2 : c.importance) >= 3;
+  });
+  const top = [...(eligible.length > 0 ? eligible : dayClusters)].sort((a, b) => mag(b) - mag(a)).slice(0, 10);
+  const active = liveClusters(state).filter((c) => c.links.some((l) => !l.undated && utcDay(l.publishedAt) === date));
+  const reviewPool = [...active].sort((a, b) => mag(b) - mag(a)).slice(0, 12);
+  return { top, reviewPool };
+}
+
+/**
+ * Freeze yesterday's best curation as a daily digest and cast it. Runs once
+ * per UTC day, on the first pipeline run after midnight.
  */
 async function makeDailyDigest(
   state: SiteState,
   cfg: SiteConfig
 ): Promise<{ date: string; count: number; cast: boolean; tweeted: boolean; notes: string[] } | null> {
   const yesterday = utcDay(new Date(Date.now() - 24 * 60 * 60000).toISOString());
-  // a story belongs to the day it BROKE (earliest link), so each story lands
-  // in exactly one daily page and a straggler link can't re-file it
-  const broke = (c: Cluster) =>
-    c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
-  const dayClusters = liveClusters(state).filter((c) => utcDay(broke(c)) === yesterday);
-  if (dayClusters.length === 0) return null;
-  // magnitude = how big the story was that day, age stripped out entirely
-  const mag = (c: Cluster) => magnitude(c, cfg.ranking);
-  // same bar as Top Stories, falling back so a quiet day still gets a page
-  const eligible = dayClusters.filter((c) => {
-    const b = scoreBreakdown(c, cfg.ranking);
-    return b.uniqueSources >= 2 || (b.importanceCapped ? 2 : c.importance) >= 3;
-  });
-  const top = [...(eligible.length > 0 ? eligible : dayClusters)].sort((a, b) => mag(b) - mag(a)).slice(0, 10);
+  const { top, reviewPool } = dayTopClusters(state, cfg, yesterday);
+  if (top.length === 0) return null;
   const digest: DailyDigest = {
     date: yesterday,
     takenAt: new Date().toISOString(),
@@ -427,16 +445,6 @@ async function makeDailyDigest(
   };
 
   {
-    // The review bullets look at every story ACTIVE that day (any link
-    // published then), not only the ones that broke then: readers experience
-    // day-two coverage as the day's news, and the box would claim "a quiet
-    // day" in sections that were busy all day just because their stories
-    // happened to break the evening before. The story LIST below keeps the
-    // broke-day rule so each story files to exactly one page.
-    const active = liveClusters(state).filter((c) =>
-      c.links.some((l) => !l.undated && utcDay(l.publishedAt) === yesterday)
-    );
-    const reviewPool = [...active].sort((a, b) => mag(b) - mag(a)).slice(0, 12);
     let bullets: SummaryBullet[] = [];
     if (llmAvailable()) {
       // the day page reads fine without the model's review bullets
@@ -496,7 +504,7 @@ async function makeDailyDigest(
   // the X side is the day THREAD, posted (and retried) by its own pipeline
   // step once the digest exists, so a failed post never blocks the freeze
   await saveDailyDigest(digest);
-  state.dailyDigestDates = [yesterday, ...(state.dailyDigestDates ?? []).filter((d) => d !== yesterday)];
+  state.dailyDigestDates = rememberDate(state.dailyDigestDates, yesterday);
 
   // the daily email edition IS this digest, so it sends the moment it exists
   try {
@@ -611,7 +619,9 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
   if (cfg.bots.x.dailyThread === false) return;
   const yesterday = utcDay(new Date(Date.now() - 24 * 60 * 60000).toISOString());
   const digest = await loadDailyDigest(yesterday);
-  if (!digest || digest.tweetId || hoursAgo(digest.takenAt) > 36) return;
+  // an inProgress digest means yesterday's freeze hasn't run (or failed):
+  // the thread must never post a preview as the day's edition
+  if (!digest || digest.inProgress || digest.tweetId || hoursAgo(digest.takenAt) > 36) return;
   const first = await threadFirstTweet(`${siteIdentity().siteName} - ${tweetDate(digest.date)}`, digest.clusters, state, cfg, 36, digest.episodes?.[0]);
   const second = `Read the full day in review:\n${cfg.bots.siteUrl}/day/${digest.date}\n\nOr get the daily snapshot by email:\n${cfg.bots.siteUrl}/subscribe${followLine()}`;
   const r = await postThread(first, second);
@@ -621,6 +631,84 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
     report.notes.push(`day thread posted (${r.tweetId})${r.notes.length > 0 ? `, ${r.notes.join(", ")}` : ""}`);
   } else if (r.notes.length > 0) {
     report.notes.push(`day thread: ${r.notes.join(", ")}`);
+  }
+}
+
+/**
+ * The current day, week, month, and year as living digests: the same shape
+ * as the frozen ones, flagged inProgress, refreshed every run and replaced
+ * for good by their freezes (same storage keys). They give the archive pages
+ * and word maps a "so far" view that costs one blob read to render, and they
+ * never email, cast, or tweet.
+ */
+async function refreshInProgressDigests(state: SiteState, cfg: SiteConfig): Promise<void> {
+  const now = new Date();
+  const today = utcDay(now.toISOString());
+  const takenAt = now.toISOString();
+  const deep = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+  const { top, reviewPool } = dayTopClusters(state, cfg, today);
+  if (top.length > 0) {
+    const digest: DailyDigest = { date: today, takenAt, clusters: deep(top), inProgress: true };
+    const topIds = new Set(top.map((c) => c.id));
+    const also = reviewPool
+      .filter((c) => !topIds.has(c.id))
+      .slice(0, 8)
+      .map((c) => ({ headline: c.headline, slug: c.slug, ...(c.section !== "general" ? { section: c.section } : {}) }));
+    if (also.length > 0) digest.alsoActive = also;
+    const dayEps = rankMedia(
+      (state.mediaItems ?? []).filter((m) => !m.hidden && utcDay(m.publishedAt) === today),
+      state,
+      cfg.ranking
+    ).slice(0, 4);
+    const fallbackEps = dayEps.length > 0 ? dayEps : rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, cfg.ranking).slice(0, 1);
+    if (fallbackEps.length > 0) digest.episodes = deep(fallbackEps);
+    await saveDailyDigest(digest);
+    state.dailyDigestDates = rememberDate(state.dailyDigestDates, today);
+  }
+
+  // the week so far: this Saturday through today, filed under the coming
+  // Friday (the same key Saturday's freeze will overwrite)
+  const sinceSat = (now.getUTCDay() + 1) % 7;
+  const wkDays: string[] = [];
+  for (let i = sinceSat; i >= 0; i--) wkDays.push(utcDay(new Date(now.getTime() - i * 86400000).toISOString()));
+  const wkEnd = utcDay(new Date(now.getTime() + (6 - sinceSat) * 86400000).toISOString());
+  const wkTop = rankPool(await poolFromDailies(wkDays), cfg, 10);
+  if (wkTop.length > 0) {
+    const weekly: WeeklyDigest = { start: wkDays[0], end: wkEnd, takenAt, clusters: deep(wkTop), inProgress: true };
+    const weekEps = rankMedia(
+      (state.mediaItems ?? []).filter((m) => !m.hidden && m.publishedAt >= `${wkDays[0]}T00:00:00.000Z`),
+      state,
+      cfg.ranking
+    ).slice(0, 5);
+    if (weekEps.length > 0) weekly.episodes = deep(weekEps);
+    await saveWeeklyDigest(weekly);
+    state.weeklyDigestDates = rememberDate(state.weeklyDigestDates, wkEnd);
+  }
+
+  const month = today.slice(0, 7);
+  const m = await monthlyTop(state, cfg, month);
+  if (m) {
+    const monthly: MonthlyDigest = { month, takenAt, clusters: deep(m.top), inProgress: true };
+    const monthEps = rankMedia(
+      (state.mediaItems ?? []).filter((x) => !x.hidden && x.publishedAt.slice(0, 7) === month),
+      state,
+      cfg.ranking
+    ).slice(0, 6);
+    if (monthEps.length > 0) monthly.episodes = deep(monthEps);
+    await saveMonthlyDigest(monthly);
+    state.monthlyDigestMonths = rememberDate(state.monthlyDigestMonths, month);
+  }
+
+  // the year pool reads the month preview just saved above, so the current
+  // month's stories and top episode are already in it
+  const year = today.slice(0, 4);
+  const y = await yearlyTop(state, cfg, year);
+  if (y) {
+    const yearly: YearlyDigest = { year, takenAt, clusters: deep(y.top), inProgress: true };
+    if (y.episodes.length > 0) yearly.episodes = deep(y.episodes);
+    await saveYearlyDigest(yearly);
+    state.yearlyDigestYears = rememberDate(state.yearlyDigestYears, year);
   }
 }
 
@@ -1804,7 +1892,7 @@ export async function runPipeline(): Promise<RunReport> {
         ).slice(0, 5);
         if (weekEps.length > 0) weekly.episodes = JSON.parse(JSON.stringify(weekEps)) as MediaItem[];
         await saveWeeklyDigest(weekly);
-        state.weeklyDigestDates = [weekly.end, ...(state.weeklyDigestDates ?? []).filter((d) => d !== weekly!.end)];
+        state.weeklyDigestDates = rememberDate(state.weeklyDigestDates, weekly.end);
         report.notes.push(`Weekly digest ${weekly.end}: ${weekly.clusters.length} stories frozen`);
       }
     } catch (err) {
@@ -1866,6 +1954,127 @@ export async function runPipeline(): Promise<RunReport> {
       }
     }
     state.lastWeeklyDigest = today;
+  }
+
+  // First-of-month monthly edition: the prior calendar month's top stories,
+  // pooled from its frozen dailies. Same morning hour as the weekly, so on a
+  // Saturday the 1st both go out. The frozen /month page comes FIRST so the
+  // email, cast, and thread link a page that exists. The monthly email rides
+  // the weekly list by decision: no third subscription checkbox.
+  const thisMonth = today.slice(0, 7);
+  if (nowUtc.getUTCDate() === 1 && nowUtc.getUTCHours() >= WEEKLY_SEND_HOUR_UTC && (state.lastMonthlyDigest ?? "") !== thisMonth) {
+    const prevMonth = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+    let monthly: MonthlyDigest | null = null;
+    try {
+      const m = await monthlyTop(state, cfg, prevMonth);
+      if (m) {
+        monthly = {
+          month: prevMonth,
+          takenAt: new Date().toISOString(),
+          clusters: JSON.parse(JSON.stringify(m.top)) as Cluster[],
+        };
+        const monthEps = rankMedia(
+          (state.mediaItems ?? []).filter((x) => !x.hidden && x.publishedAt.slice(0, 7) === prevMonth),
+          state,
+          cfg.ranking
+        ).slice(0, 6);
+        if (monthEps.length > 0) monthly.episodes = JSON.parse(JSON.stringify(monthEps)) as MediaItem[];
+        await saveMonthlyDigest(monthly);
+        state.monthlyDigestMonths = rememberDate(state.monthlyDigestMonths, prevMonth);
+        report.notes.push(`Monthly digest ${prevMonth}: ${monthly.clusters.length} stories frozen`);
+      }
+    } catch (err) {
+      report.notes.push(`Monthly digest freeze failed: ${err instanceof Error ? err.message : err}`);
+    }
+    try {
+      const note = await sendMonthlyEmail(state, cfg, prevMonth);
+      if (note) report.notes.push(note);
+    } catch (err) {
+      report.notes.push(`Monthly email failed: ${err instanceof Error ? err.message : err}`);
+    }
+    // the monthly cast and thread share one snapshot text, like the weekly
+    let monthlyFirst: string | null = null;
+    if (monthly) {
+      try {
+        monthlyFirst = await threadFirstTweet(
+          `${siteIdentity().siteName} - ${monthLabel(prevMonth)}`,
+          monthly.clusters,
+          state,
+          cfg,
+          31 * 24,
+          monthly.episodes?.[0]
+        );
+      } catch (err) {
+        report.notes.push(`monthly snapshot text failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+    try {
+      if (monthly && monthlyFirst) {
+        const r = await castRaw(monthlyFirst, `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg.bots.farcaster.digestChannel || undefined);
+        report.notes.push(r.dryRun ? "Monthly cast skipped (dry-run or no credentials)." : "Monthly cast posted.");
+      }
+    } catch (err) {
+      report.notes.push(`Monthly cast failed: ${err instanceof Error ? err.message : err}`);
+    }
+    if (monthly && monthlyFirst && cfg.bots.x.monthlyThread !== false) {
+      try {
+        const monthlyFollow = siteIdentity().social?.xHandle
+          ? `\n\nFollow @${siteIdentity().social!.xHandle} for daily, weekly and monthly summaries.`
+          : "";
+        const second = `Read the full month in review:\n${cfg.bots.siteUrl}/month/${prevMonth}\n\nOr get these digests by email:\n${cfg.bots.siteUrl}/subscribe${monthlyFollow}`;
+        const r = await postThread(monthlyFirst, second);
+        if (r.tweetId) {
+          monthly.tweetId = r.tweetId;
+          await saveMonthlyDigest(monthly);
+          report.notes.push(`month thread posted (${r.tweetId})${r.notes.length > 0 ? `, ${r.notes.join(", ")}` : ""}`);
+        } else if (r.notes.length > 0) {
+          report.notes.push(`month thread: ${r.notes.join(", ")}`);
+        }
+      } catch (err) {
+        report.notes.push(`month thread failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+    state.lastMonthlyDigest = thisMonth;
+  }
+
+  // January 1 yearly edition: site-only by decision (no email, cast, or
+  // thread), pooled from the year's frozen monthlies. After the monthly
+  // block on purpose, so December's fresh freeze is already in the pool.
+  const thisYear = today.slice(0, 4);
+  if (
+    nowUtc.getUTCMonth() === 0 &&
+    nowUtc.getUTCDate() === 1 &&
+    nowUtc.getUTCHours() >= WEEKLY_SEND_HOUR_UTC &&
+    (state.lastYearlyDigest ?? "") !== thisYear
+  ) {
+    try {
+      const prevYear = String(Number(thisYear) - 1);
+      const y = await yearlyTop(state, cfg, prevYear);
+      if (y) {
+        const yearly: YearlyDigest = {
+          year: prevYear,
+          takenAt: new Date().toISOString(),
+          clusters: JSON.parse(JSON.stringify(y.top)) as Cluster[],
+          ...(y.episodes.length > 0 ? { episodes: JSON.parse(JSON.stringify(y.episodes)) as MediaItem[] } : {}),
+        };
+        await saveYearlyDigest(yearly);
+        state.yearlyDigestYears = rememberDate(state.yearlyDigestYears, prevYear);
+        report.notes.push(`Yearly digest ${prevYear}: ${yearly.clusters.length} stories frozen`);
+      }
+    } catch (err) {
+      report.notes.push(`Yearly digest freeze failed: ${err instanceof Error ? err.message : err}`);
+    }
+    state.lastYearlyDigest = thisYear;
+  }
+
+  // The current day, week, month, and year as living digests, refreshed
+  // every run so their pages and word maps show "so far" at any moment.
+  // Runs AFTER the freeze blocks: on a freeze morning the finished edition
+  // writes first, then the new period's preview begins.
+  try {
+    await refreshInProgressDigests(state, cfg);
+  } catch (err) {
+    report.notes.push(`In-progress refresh failed: ${err instanceof Error ? err.message : err}`);
   }
 
   if (contentChanged) {

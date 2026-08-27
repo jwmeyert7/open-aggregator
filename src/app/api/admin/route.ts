@@ -556,7 +556,9 @@ async function handle(req: NextRequest) {
       edition = await buildWeeklyEdition(state, cfg);
       if (!edition) return fail("Nothing to send: no stories in the last week.");
     } else {
-      const date = state.dailyDigestDates?.[0];
+      // the newest FROZEN day: today's in-progress preview was never sent
+      const today = new Date().toISOString().slice(0, 10);
+      const date = (state.dailyDigestDates ?? []).find((d) => d !== today);
       if (!date) return fail("No daily digest exists yet. The first freezes at UTC midnight.");
       const digest = await loadDailyDigest(date);
       if (!digest) return fail(`Could not load the ${date} digest.`);

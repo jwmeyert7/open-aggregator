@@ -2416,6 +2416,150 @@ button.status-date {
   display: inline-block;
   margin-left: 0.3em;
 }
+/* ---------- admin word maps (preview) ---------- */
+/* theme-aware palette: light values by default, dark overrides below (the
+   two generated PNGs use the same pairs from lib/wordmap.ts). Sections are
+   site config, so each word carries its own light and dark colors as inline
+   variables (--wm-light / --wm-dark) and the rules here pick the pair apart
+   by theme. */
+:root {
+  --wm-card-bg: #f7f7f5;
+  --wm-brand: #8b919b;
+  /* on light, "lighter" hover means toward white-ish paper */
+  --wm-hover-mix: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --wm-card-bg: #15171b;
+    --wm-brand: #858b96;
+  }
+}
+:root[data-theme="dark"] {
+  --wm-card-bg: #15171b;
+  --wm-brand: #858b96;
+}
+.wordmap-word,
+.wordmap-stats td.wm-sec {
+  color: var(--wm-light);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .wordmap-word,
+  :root:not([data-theme]) .wordmap-stats td.wm-sec {
+    color: var(--wm-dark);
+  }
+}
+:root[data-theme="dark"] .wordmap-word,
+:root[data-theme="dark"] .wordmap-stats td.wm-sec {
+  color: var(--wm-dark);
+}
+/* hover (and the hovered word's whole story) lightens the word's own color */
+.wordmap-word:hover,
+.wordmap-word.lit {
+  color: color-mix(in srgb, var(--wm-light) 55%, var(--wm-hover-mix));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .wordmap-word:hover,
+  :root:not([data-theme]) .wordmap-word.lit {
+    color: color-mix(in srgb, var(--wm-dark) 55%, var(--wm-hover-mix));
+  }
+}
+:root[data-theme="dark"] .wordmap-word:hover,
+:root[data-theme="dark"] .wordmap-word.lit {
+  color: color-mix(in srgb, var(--wm-dark) 55%, var(--wm-hover-mix));
+}
+/* the card holds the 1200x630 artwork ratio the public mint would use; words
+   are absolutely packed in that coordinate space and scale with the
+   container via cqw units */
+.wordmap-card {
+  aspect-ratio: 1200 / 630;
+  container-type: inline-size;
+  position: relative;
+  background: var(--wm-card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 14px 0 8px;
+  overflow: hidden;
+}
+.wordmap-word {
+  position: absolute;
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transform: translate(-50%, -50%);
+}
+.wordmap-word:hover,
+.wordmap-word.lit {
+  text-decoration: underline;
+}
+/* the title block owns the top-left corner (the layout reserves its space) */
+.wordmap-title {
+  position: absolute;
+  left: 3%;
+  top: 4%;
+}
+.wordmap-title-main {
+  font-size: 2.8cqw;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1.1;
+}
+.wordmap-title-sub {
+  font-size: 1.6cqw;
+  color: var(--wm-brand);
+  margin-top: 0.4cqw;
+}
+.wordmap-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.8rem;
+  margin: 4px 0;
+}
+.wordmap-nav a.current {
+  color: var(--fg);
+  font-weight: 700;
+}
+.wordmap-stats {
+  max-width: 420px;
+}
+/* the recording-style pulse on anything still in progress: the current
+   day, week, month, or year is literally still being built */
+.live-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #c9564a;
+  margin-right: 8px;
+  vertical-align: baseline;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+/* the swatch inherits its cell's section color */
+.wm-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 7px;
+}
+
 /* the day page's "also in the news" list: bullets tuck in line with the
    prose above instead of hanging into the margin */
 .also-active {

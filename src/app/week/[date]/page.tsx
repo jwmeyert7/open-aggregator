@@ -39,7 +39,14 @@ export default async function WeekPage({ params }: { params: Promise<{ date: str
       <div>
         <div className="section-head">
           <h1>The week in review: {rangeLabel(digest.start, digest.end)}</h1>
-          <p>The week&apos;s top ranked stories, frozen when the weekly edition went out.</p>
+          {digest.inProgress ? (
+            <p>
+              <span className="live-dot" aria-hidden="true" />
+              This week is still in progress. The list below updates all week and freezes Saturday morning.
+            </p>
+          ) : (
+            <p>The week&apos;s top ranked stories, frozen when the weekly edition went out.</p>
+          )}
           <p>
             Individual days live in the <Link href="/day">daily archive</Link>
             {digest.tweetId ? (

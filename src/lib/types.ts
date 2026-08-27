@@ -129,8 +129,8 @@ export interface SiteConfig {
     siteUrl: string;
     /** digestChannel: channel id for the nightly digest cast; empty = no channel (requires channel membership to stick). */
     farcaster: { maxPerDay: number; minScore: number; topN: number; digestChannel?: string };
-    /** dailyThread/weeklyThread: the two-tweet digest threads on X (tweet 1 the snapshot lines with the card image, tweet 2 the archive link). Like the old single digest tweet they ride outside the story caps. */
-    x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number; dailyThread?: boolean; weeklyThread?: boolean };
+    /** dailyThread/weeklyThread/monthlyThread: the two-tweet digest threads on X (tweet 1 the snapshot lines, tweet 2 the archive link). Like the old single digest tweet they ride outside the story caps. */
+    x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number; dailyThread?: boolean; weeklyThread?: boolean; monthlyThread?: boolean };
   };
 }
 
@@ -402,6 +402,14 @@ export interface SiteState {
   dailyDigestDates?: string[];
   /** Week-end dates (YYYY-MM-DD, the covered Friday) with a stored weekly digest, newest first. */
   weeklyDigestDates?: string[];
+  /** Months (YYYY-MM) with a stored monthly digest, newest first. */
+  monthlyDigestMonths?: string[];
+  /** The month (YYYY-MM) whose 1st-of-month freeze already ran. */
+  lastMonthlyDigest?: string;
+  /** Years (YYYY) with a stored yearly digest, newest first. */
+  yearlyDigestYears?: string[];
+  /** The year (YYYY) whose January 1 freeze already ran. */
+  lastYearlyDigest?: string;
   snapshots: string[]; // YYMMDD-HHMM ids, newest last
 }
 
@@ -483,6 +491,37 @@ export interface DailyDigest {
   alsoActive?: Array<{ headline: string; slug: string; section?: SectionId }>;
   /** The day's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];
+  /** Still the CURRENT day: refreshed every run, replaced by the freeze. */
+  inProgress?: boolean;
+}
+
+/** One frozen calendar month, frozen on the 1st of the next month. */
+export interface MonthlyDigest {
+  /** "YYYY-MM", the covered month; the /month URL segment. */
+  month: string;
+  takenAt: string;
+  clusters: Cluster[]; // the month's top stories, importance first then magnitude
+  /** The month's top podcast episodes, frozen playable (full items, ranked). */
+  episodes?: MediaItem[];
+  /** Id of the month's X thread (its first tweet), when it really posted. */
+  tweetId?: string;
+  /** Still the CURRENT month: refreshed every run, replaced by the freeze. */
+  inProgress?: boolean;
+}
+
+/**
+ * One frozen calendar year, frozen on January 1. Site-only by decision: the
+ * year page and word map exist, but no email, tweet, or cast goes out for it.
+ */
+export interface YearlyDigest {
+  /** "YYYY"; the /year URL segment. */
+  year: string;
+  takenAt: string;
+  clusters: Cluster[]; // the year's top stories, pooled from the monthly digests
+  /** One podcast per month: each frozen month's top episode, in month order. */
+  episodes?: MediaItem[];
+  /** Still the CURRENT year: refreshed every run, replaced by the freeze. */
+  inProgress?: boolean;
 }
 
 /** One frozen week: Saturday through Friday, frozen when the weekly email sends. */
@@ -497,6 +536,8 @@ export interface WeeklyDigest {
   episodes?: MediaItem[];
   /** Id of the week's X thread (its first tweet), when it really posted. */
   tweetId?: string;
+  /** Still the CURRENT week: refreshed every run, replaced by the freeze. */
+  inProgress?: boolean;
 }
 
 /** A domain that Farcaster keeps pointing at while no source of ours covers it. */
