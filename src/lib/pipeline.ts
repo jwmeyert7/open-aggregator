@@ -89,6 +89,20 @@ export function markSeen(state: SiteState, item: CandidateItem): void {
 }
 
 /**
+ * Content hash of a frozen edition, stored on the digest at freeze time.
+ * Post-freeze bookkeeping (tweetId, castHash) stays outside the hash, so the
+ * stored value keeps verifying against the published blob's other fields
+ * (JSON round-trips preserve key order). In-progress previews are never
+ * hashed. Groundwork for collectible editions: this is the hash an edition
+ * NFT or onchain attestation would carry as proof of the period's record.
+ */
+function digestContentHash(digest: object): string {
+  const { castHash, tweetId, contentHash, inProgress, ...core } = digest as Record<string, unknown>;
+  void castHash; void tweetId; void contentHash; void inProgress;
+  return sha256(JSON.stringify(core));
+}
+
+/**
  * Release-feed items arrive titled "v1.47.0-rc.0 released", which tells the
  * reader nothing. Before the editor sees them, a stronger model reads the
  * release notes and rewrites title and excerpt around the release's actual
@@ -529,6 +543,7 @@ async function makeDailyDigest(
   } catch (err) {
     notes.push(`cast failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
   }
+  digest.contentHash = digestContentHash(digest);
   // the X side is the day THREAD, posted (and retried) by its own pipeline
   // step once the digest exists, so a failed post never blocks the freeze
   await saveDailyDigest(digest);
@@ -1946,6 +1961,7 @@ export async function runPipeline(): Promise<RunReport> {
           cfg.ranking
         ).slice(0, 5);
         if (weekEps.length > 0) weekly.episodes = JSON.parse(JSON.stringify(weekEps)) as MediaItem[];
+        weekly.contentHash = digestContentHash(weekly);
         await saveWeeklyDigest(weekly);
         state.weeklyDigestDates = rememberDate(state.weeklyDigestDates, weekly.end);
         report.notes.push(`Weekly digest ${weekly.end}: ${weekly.clusters.length} stories frozen`);
@@ -2034,6 +2050,7 @@ export async function runPipeline(): Promise<RunReport> {
           cfg.ranking
         ).slice(0, 6);
         if (monthEps.length > 0) monthly.episodes = JSON.parse(JSON.stringify(monthEps)) as MediaItem[];
+        monthly.contentHash = digestContentHash(monthly);
         await saveMonthlyDigest(monthly);
         state.monthlyDigestMonths = rememberDate(state.monthlyDigestMonths, prevMonth);
         report.notes.push(`Monthly digest ${prevMonth}: ${monthly.clusters.length} stories frozen`);
@@ -2109,6 +2126,7 @@ export async function runPipeline(): Promise<RunReport> {
           clusters: JSON.parse(JSON.stringify(y.top)) as Cluster[],
           ...(y.episodes.length > 0 ? { episodes: JSON.parse(JSON.stringify(y.episodes)) as MediaItem[] } : {}),
         };
+        yearly.contentHash = digestContentHash(yearly);
         await saveYearlyDigest(yearly);
         state.yearlyDigestYears = rememberDate(state.yearlyDigestYears, prevYear);
         report.notes.push(`Yearly digest ${prevYear}: ${yearly.clusters.length} stories frozen`);

@@ -480,6 +480,13 @@ export interface Snapshot {
 export interface DailyDigest {
   date: string; // YYYY-MM-DD (UTC)
   takenAt: string;
+  /**
+   * sha256 of the frozen edition's content (everything except post-freeze
+   * bookkeeping: tweetId, castHash, this field). Written once at freeze.
+   * Groundwork for collectible editions: the hash an edition NFT or onchain
+   * attestation would carry as proof of the day's real record.
+   */
+  contentHash?: string;
   clusters: Cluster[]; // the day's top stories, pre-sorted by magnitude
   /** Hash of the digest's Farcaster cast, when it really posted. */
   castHash?: string;
@@ -504,6 +511,8 @@ export interface MonthlyDigest {
   /** "YYYY-MM", the covered month; the /month URL segment. */
   month: string;
   takenAt: string;
+  /** sha256 of the frozen content, as on DailyDigest. */
+  contentHash?: string;
   clusters: Cluster[]; // the month's top stories, importance first then magnitude
   /** The month's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];
@@ -521,6 +530,8 @@ export interface YearlyDigest {
   /** "YYYY"; the /year URL segment. */
   year: string;
   takenAt: string;
+  /** sha256 of the frozen content, as on DailyDigest. */
+  contentHash?: string;
   clusters: Cluster[]; // the year's top stories, pooled from the monthly digests
   /** One podcast per month: each frozen month's top episode, in month order. */
   episodes?: MediaItem[];
@@ -535,6 +546,8 @@ export interface WeeklyDigest {
   /** YYYY-MM-DD (UTC), the covered week's Friday; the /week URL segment. */
   end: string;
   takenAt: string;
+  /** sha256 of the frozen content, as on DailyDigest. */
+  contentHash?: string;
   clusters: Cluster[]; // the week's top stories, importance first then magnitude
   /** The week's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];
