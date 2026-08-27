@@ -494,7 +494,9 @@ async function makeDailyDigest(
     // the nightly digest may cast into a configured channel (and only the
     // digest: story auto-posts stay on the home feed at a politer volume).
     // Channel casting usually requires channel membership to stick.
-    const r = await castRaw(text, url, cfg.bots.farcaster.digestChannel || undefined);
+    // the page embed is the cast's "full day in review" link, so the cast
+    // only appends the email ask beneath the snapshot
+    const r = await castRaw(`${text}\n\n${subscribeLines(cfg)}`, url, cfg.bots.farcaster.digestChannel || undefined);
     cast = !r.dryRun;
     if (r.dryRun) notes.push("cast skipped (dry-run or no credentials)");
     if (r.hash) digest.castHash = r.hash;
@@ -516,10 +518,15 @@ async function makeDailyDigest(
   return { date: yesterday, count: top.length, cast, tweeted: Boolean(digest.tweetId), notes };
 }
 
-/** The reply tweet's follow line, only when an X handle is configured. */
-function followLine(): string {
-  const handle = siteIdentity().social?.xHandle;
-  return handle ? `\n\nFollow @${handle} for these daily and weekly summaries.` : "";
+/** The email ask shared by tweet 2 and the digest casts. */
+const subscribeLines = (cfg: SiteConfig): string => `Get regular summary emails:\n${cfg.bots.siteUrl}/subscribe`;
+
+/**
+ * Tweet 2 of a digest thread: the archive link, then the email ask. No
+ * follow line by decision: not asking is part of the digests' voice.
+ */
+function threadSecondTweet(period: "day" | "week" | "month", pageUrl: string, cfg: SiteConfig): string {
+  return `Full ${period} in review:\n${pageUrl}\n\n${subscribeLines(cfg)}`;
 }
 
 /** "August 26, 2026" for the daily tweet heading. */
@@ -623,7 +630,7 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
   // the thread must never post a preview as the day's edition
   if (!digest || digest.inProgress || digest.tweetId || hoursAgo(digest.takenAt) > 36) return;
   const first = await threadFirstTweet(`${siteIdentity().siteName} - ${tweetDate(digest.date)}`, digest.clusters, state, cfg, 36, digest.episodes?.[0]);
-  const second = `Read the full day in review:\n${cfg.bots.siteUrl}/day/${digest.date}\n\nOr get the daily snapshot by email:\n${cfg.bots.siteUrl}/subscribe${followLine()}`;
+  const second = threadSecondTweet("day", `${cfg.bots.siteUrl}/day/${digest.date}`, cfg);
   const r = await postThread(first, second);
   if (r.tweetId) {
     digest.tweetId = r.tweetId;
@@ -1923,12 +1930,12 @@ export async function runPipeline(): Promise<RunReport> {
     }
     try {
       if (weekly && weeklyFirst) {
-        const r = await castRaw(weeklyFirst, `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg.bots.farcaster.digestChannel || undefined);
+        const r = await castRaw(`${weeklyFirst}\n\n${subscribeLines(cfg)}`, `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
       } else {
         const wc = await buildWeeklyCast(state, cfg);
         if (wc) {
-          const r = await castRaw(wc.text, wc.url, cfg.bots.farcaster.digestChannel || undefined);
+          const r = await castRaw(`${wc.text}\n\n${subscribeLines(cfg)}`, wc.url, cfg.bots.farcaster.digestChannel || undefined);
           report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
         } else {
           report.notes.push("Weekly cast skipped (fewer than three stories this week).");
@@ -1940,7 +1947,7 @@ export async function runPipeline(): Promise<RunReport> {
     // the weekly thread on X, same shape as the daily
     if (weekly && weeklyFirst && cfg.bots.x.weeklyThread !== false) {
       try {
-        const second = `Read the full week in review:\n${cfg.bots.siteUrl}/week/${weekly.end}\n\nOr get the weekly snapshot by email:\n${cfg.bots.siteUrl}/subscribe${followLine()}`;
+        const second = threadSecondTweet("week", `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg);
         const r = await postThread(weeklyFirst, second);
         if (r.tweetId) {
           weekly.tweetId = r.tweetId;
@@ -2010,7 +2017,7 @@ export async function runPipeline(): Promise<RunReport> {
     }
     try {
       if (monthly && monthlyFirst) {
-        const r = await castRaw(monthlyFirst, `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg.bots.farcaster.digestChannel || undefined);
+        const r = await castRaw(`${monthlyFirst}\n\n${subscribeLines(cfg)}`, `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Monthly cast skipped (dry-run or no credentials)." : "Monthly cast posted.");
       }
     } catch (err) {
@@ -2018,10 +2025,7 @@ export async function runPipeline(): Promise<RunReport> {
     }
     if (monthly && monthlyFirst && cfg.bots.x.monthlyThread !== false) {
       try {
-        const monthlyFollow = siteIdentity().social?.xHandle
-          ? `\n\nFollow @${siteIdentity().social!.xHandle} for daily, weekly and monthly summaries.`
-          : "";
-        const second = `Read the full month in review:\n${cfg.bots.siteUrl}/month/${prevMonth}\n\nOr get these digests by email:\n${cfg.bots.siteUrl}/subscribe${monthlyFollow}`;
+        const second = threadSecondTweet("month", `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg);
         const r = await postThread(monthlyFirst, second);
         if (r.tweetId) {
           monthly.tweetId = r.tweetId;

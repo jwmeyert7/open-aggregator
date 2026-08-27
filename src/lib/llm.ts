@@ -267,6 +267,7 @@ export async function compressTweetLines(lines: Array<{ text: string; max: numbe
     system: [
       "You compress news headlines for a social post. For each input return ONE complete phrase at or under its max characters, keeping the concrete facts (who did what).",
       "Never use an ellipsis or trail off mid-phrase. No em dashes, en dashes, or semicolons. Plain language, no hype. Return exactly one output line per input, in order.",
+      "No headline jargon, even to save characters: probes, eyes, mulls, touts, slams, inks, taps, unveils, dubs, amid, poised, set to. Use the plain verb (examines, considers, announces) or drop the clause.",
     ].join("\n"),
     prompt: JSON.stringify(lines),
   });
