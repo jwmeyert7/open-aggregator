@@ -8,12 +8,18 @@ type Choice = "granted" | "denied" | "unset";
 /**
  * Consent-gated analytics: GA is not loaded at all until the visitor accepts.
  * The choice persists in localStorage; the footer "cookies" link reopens it.
+ * Admin browsers (the cosmetic oa_admin_ui cookie) are excluded entirely, no
+ * GA and no banner, so the operator's own visits never count as readership.
  */
 export function AnalyticsConsent({ gaId }: { gaId: string }) {
   const [choice, setChoice] = useState<Choice | null>(null);
 
   useEffect(() => {
     try {
+      if (document.cookie.includes("oa_admin_ui=1")) {
+        setChoice("denied");
+        return;
+      }
       const saved = localStorage.getItem("ga-consent");
       setChoice(saved === "granted" || saved === "denied" ? saved : "unset");
     } catch {
