@@ -18,6 +18,17 @@ function editorModel(): LanguageModel {
 }
 
 /**
+ * The release-summary model: distilling ninety PRs into the two themes that
+ * matter is judgment work the editor tier gets wrong, and releases are rare
+ * enough that the stronger model costs cents a week.
+ */
+function releaseModel(): LanguageModel {
+  const configured = process.env.RELEASE_LLM_MODEL;
+  if (process.env.AI_GATEWAY_API_KEY) return configured || "anthropic/claude-sonnet-5";
+  return anthropic(configured?.replace(/^anthropic\//, "") || "claude-sonnet-5");
+}
+
+/**
  * Section ids come from config at runtime, so every z.enum below is built
  * per call instead of hardcoded. z.enum needs a non-empty tuple type.
  */
@@ -251,6 +262,20 @@ export async function matchChaptersToStories(
   const storyIds = new Set(stories.map((s) => s.id));
   const episodeIds = new Set(episodes.map((e) => e.id));
   return object.matches.filter((m) => storyIds.has(m.storyId) && episodeIds.has(m.episodeId));
+}
+
+/** Distills a software release's notes into a themed headline and explainer. */
+export async function summarizeRelease(input: { source: string; title: string; notes: string }): Promise<{ headline: string; explainer: string }> {
+  const { object } = await generateObject({
+    model: releaseModel(),
+    schema: z.object({
+      headline: z.string().describe("short declarative phrase, ten words or fewer, naming project, version, and the release's essence"),
+      explainer: z.string().describe("one or two sentences under 60 words naming the major themes concretely"),
+    }),
+    system: loadPrompt("release-summary"),
+    prompt: JSON.stringify(input),
+  });
+  return object;
 }
 
 /**

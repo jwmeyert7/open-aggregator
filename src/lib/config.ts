@@ -64,7 +64,7 @@ export function effectiveMarkets(state: SiteState): NonNullable<SiteConfig["poly
   return [...base, ...o.custom].filter((m) => !disabled.has(m.slug));
 }
 
-export function loadPrompt(name: "cluster" | "add-by-url" | "day-summary" | "source-candidate" | "summary-refresh" | "media-gate" | "chapter-match"): string {
+export function loadPrompt(name: "cluster" | "add-by-url" | "day-summary" | "source-candidate" | "summary-refresh" | "media-gate" | "chapter-match" | "release-summary"): string {
   return readWithFallback(path.join("prompts", `${name}.md`), path.join("prompts", `${name}.example.md`));
 }
 

@@ -151,15 +151,37 @@ async function fetchRss(feed: FeedConfig, timeoutMs: number): Promise<CandidateI
   const parsed = await parseFeedXml(await fetchText(feed.url, timeoutMs));
   return (parsed.items ?? [])
     .filter((i) => i.link && i.title)
-    .map((i) =>
-      candidate(
+    .map((i) => {
+      const c = candidate(
         feed,
         i.link!,
         i.title!,
         i.isoDate || (i.pubDate ? new Date(i.pubDate).toISOString() : new Date().toISOString()),
         i.contentSnippet || i.content
-      )
-    );
+      );
+      // release-feed entries carry their full notes so the release-summary
+      // step can distill themes; the 500-char excerpt is too little for that
+      if (isReleaseFeed(feed) && i.content) c.releaseNotes = truncate(stripHtml(i.content), 8000);
+      return c;
+    });
+}
+
+/** GitHub-style software release feeds, whose items get the release-notes treatment. */
+export function isReleaseFeed(feed: FeedConfig): boolean {
+  return /\/releases\.atom$/.test(feed.url) || /\breleases$/i.test(feed.name);
+}
+
+/**
+ * Refetches a release feed and returns the stripped notes for one entry, for
+ * after-the-fact summaries of an already-ingested release. Undefined when the
+ * entry has scrolled out of the feed.
+ */
+export async function fetchReleaseNotesFor(feed: FeedConfig, entryUrl: string, timeoutMs: number): Promise<string | undefined> {
+  const parsed = await parseFeedXml(await fetchText(feed.url, timeoutMs));
+  const norm = (u: string) => u.replace(/\/+$/, "");
+  const entry = (parsed.items ?? []).find((i) => i.link && norm(i.link) === norm(entryUrl));
+  const raw = entry?.content || entry?.contentSnippet;
+  return raw ? truncate(stripHtml(raw), 8000) : undefined;
 }
 
 /**
@@ -997,8 +1019,7 @@ export function updateFeedHealth(state: SiteState, results: FeedFetchResult[], n
  * and only a hard error is worth a look.
  */
 function silentDays(feed: FeedConfig, cfg: SiteConfig["ingest"]): number {
-  const releases = /\/releases\.atom$/.test(feed.url) || /\breleases$/i.test(feed.name);
-  return releases ? Math.max(cfg.feedSilentDays, 45) : cfg.feedSilentDays;
+  return isReleaseFeed(feed) ? Math.max(cfg.feedSilentDays, 45) : cfg.feedSilentDays;
 }
 
 /** Feeds that are erroring or have gone silent for their silent threshold: feed rot made visible. */

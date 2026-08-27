@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, checkPassword, cookieValue, isAdmin, LAYOUT_PREVIEW_COOKIE } from "@/lib/auth";
 import { effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
 import { buildDailyEdition, buildWeeklyEdition, confirmationEmail, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
-import { discoverFeed, isMediaFeed, userAgent } from "@/lib/feeds";
+import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAgent } from "@/lib/feeds";
 import { sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
-import { classifyAndCluster, heuristicFallback, llmAvailable } from "@/lib/llm";
+import { classifyAndCluster, heuristicFallback, llmAvailable, summarizeRelease } from "@/lib/llm";
 import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
@@ -683,6 +683,29 @@ async function handle(req: NextRequest) {
     await takeSnapshot(state);
     await saveState(state);
     return ok(`Kicker source renamed: \u201c${before}\u201d is now \u201c${name}\u201d.`);
+  }
+
+  if (body.action === "releaseSummary") {
+    const cluster = state.clusters[String(body.clusterId ?? "")];
+    if (!cluster) return fail("Unknown story.");
+    if (!llmAvailable()) return fail("No LLM credentials configured.");
+    const feedsById = new Map(effectiveFeeds(state).map((f) => [f.id, f]));
+    const target = cluster.links
+      .map((l) => ({ link: l, feed: feedsById.get(l.sourceId) }))
+      .find((x) => x.feed && isReleaseFeed(x.feed));
+    if (!target) return fail("No release-feed link on this story.");
+    const notes = await fetchReleaseNotesFor(target.feed!, target.link.url, cfg.ingest.feedTimeoutMs);
+    if (!notes) return fail("The release notes are no longer in that feed.");
+    const out = await summarizeRelease({ source: target.link.sourceName, title: target.link.title, notes });
+    if (!out.headline.trim() || !out.explainer.trim()) return fail("The model returned an empty summary.");
+    const before = cluster.headline;
+    cluster.headline = truncate(stripHtml(out.headline), 300);
+    cluster.explainer = truncate(stripHtml(out.explainer), 500);
+    target.link.title = cluster.headline;
+    for (const i of state.items) if (i.url === target.link.url) i.title = cluster.headline;
+    await takeSnapshot(state);
+    await saveState(state);
+    return ok(`Release summarized: “${before}” is now “${cluster.headline}”.`);
   }
 
   if (body.action === "addUrl") {

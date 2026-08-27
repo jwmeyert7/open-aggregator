@@ -374,6 +374,16 @@ export function StoriesClient({
                   >
                     Re-edit
                   </button>
+                  {c.linkList.some((l) => /\breleases$/i.test(l.sourceName)) ? (
+                    <button
+                      className="btn"
+                      disabled={busy}
+                      title="Rewrite the headline and explainer from the release notes (stronger model reads the linked release)"
+                      onClick={() => act("releaseSummary", { clusterId: c.id }, `Summarize the release notes for “${c.headline}”?`)}
+                    >
+                      Summarize release
+                    </button>
+                  ) : null}
                   <button
                     className="btn"
                     disabled={busy}

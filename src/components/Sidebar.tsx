@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { SponsoredCard } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { MediaRail } from "@/components/MediaRail";
@@ -162,7 +163,7 @@ export function NewestRail({
                     </a>
                     <div className="org">
                       <span className="kind-tag">podcast</span>
-                      {i.sourceName} · <AgeStamp iso={i.publishedAt} />
+                      {i.sourceName} · <AgeStamp iso={i.publishedAt} /> <AdminEditLink href={`/admin/podcasts?episode=${i.episode.id}`} />
                     </div>
                   </div>
                 </MediaPlayer>
@@ -174,6 +175,7 @@ export function NewestRail({
                 </a>
                 <div className="org">
                   {i.sourceName} · <AgeStamp iso={i.publishedAt} />
+                  {i.clusterId ? <> <AdminEditLink href={`/admin/stories?story=${i.clusterId}`} /></> : null}
                 </div>
               </li>
             )

@@ -1,7 +1,7 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
 import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sendDailyEmail, sendMonthlyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC, yearlyTop } from "./digest";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
-import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
+import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
 import { liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
@@ -12,7 +12,7 @@ import { loadDailyDigest, loadState, saveDailyDigest, saveMonthlyDigest, saveSna
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
 import { ogTruncate } from "./og";
-import { bestMatchIndex, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, truncate, utcDay } from "./util";
+import { bestMatchIndex, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, stripHtml, truncate, utcDay } from "./util";
 
 /** Gate counters are kept a little longer than the leaderboard's 30 day window. */
 export const SOURCE_STATS_RETENTION_DAYS = 35;
@@ -85,6 +85,31 @@ export function markSeen(state: SiteState, item: CandidateItem): void {
   // enrichment replaced url/title with the publisher's after dedupe ran
   if (item.origUrl) state.seen[dedupeKeyUrl(item.origUrl)] = now;
   if (item.origTitle) state.seen[dedupeKeyContent(item.origTitle, item.sourceId)] = now;
+}
+
+/**
+ * Release-feed items arrive titled "v1.47.0-rc.0 released", which tells the
+ * reader nothing. Before the editor sees them, a stronger model reads the
+ * release notes and rewrites title and excerpt around the release's actual
+ * themes. A failure leaves the original title standing, and the notes never
+ * persist past this step.
+ */
+async function enrichReleaseItems(items: CandidateItem[], report: RunReport): Promise<void> {
+  const targets = items.filter((i) => i.releaseNotes).slice(0, 4);
+  if (llmAvailable()) {
+    for (const item of targets) {
+      try {
+        const out = await summarizeRelease({ source: item.sourceName, title: item.title, notes: item.releaseNotes! });
+        if (out.headline.trim() && out.explainer.trim()) {
+          item.title = truncate(stripHtml(out.headline), 300);
+          item.excerpt = truncate(stripHtml(out.explainer), 500);
+        }
+      } catch (err) {
+        report.notes.push(`release summary failed for ${item.sourceName}: ${truncate(err instanceof Error ? err.message : String(err), 160)}`);
+      }
+    }
+  }
+  for (const item of items) delete item.releaseNotes;
 }
 
 /**
@@ -1737,6 +1762,7 @@ export async function runPipeline(): Promise<RunReport> {
   let contentChanged = false;
   if (newItems.length > 0) {
     await enrichNewItems(newItems, feeds, cfg.ingest.feedTimeoutMs);
+    await enrichReleaseItems(newItems, report);
     let out: EditorOutput | null;
     if (llmAvailable()) {
       try {

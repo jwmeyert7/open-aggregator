@@ -573,6 +573,11 @@ export interface CandidateItem {
   /** manual adds only: the page declared no publish date, so the link must not rank as breaking */
   undated?: boolean;
   /**
+   * Release-feed items only: the stripped release notes, carried from ingest
+   * to the release-summary step and dropped before the item persists.
+   */
+  releaseNotes?: string;
+  /**
    * gnews items only: the news.google.com link/title the item arrived with,
    * kept after resolution so markSeen can record both forms and the item
    * dedupes on its next fetch.

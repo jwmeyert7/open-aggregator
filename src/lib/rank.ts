@@ -284,6 +284,8 @@ export interface NewestEntry {
   rawTitle?: string;
   sourceName: string;
   publishedAt: string;
+  /** the story this item files under, when clustered; powers the admin edit link */
+  clusterId?: string;
   /** set for podcast episodes, which carry a kind tag in the rail */
   podcast?: boolean;
   /** episodes: the in-site player link */
@@ -313,6 +315,7 @@ export function newestEntries(state: SiteState, limit: number, section?: Section
     rawTitle: i.title,
     sourceName: i.sourceName,
     publishedAt: i.publishedAt,
+    ...(i.clusterId && state.clusters[i.clusterId] ? { clusterId: i.clusterId } : {}),
   }));
   const episodes: NewestEntry[] = (state.mediaItems ?? [])
     .filter((m) => !m.hidden && (!section || m.roundup || m.section === section))
