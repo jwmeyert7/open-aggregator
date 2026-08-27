@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { siteIdentity } from "@/lib/site";
 import { loadSiteConfig } from "@/lib/config";
+import { ogFonts, ogTruncate } from "@/lib/og";
 import { adaptiveRanking, leadLink, topStories } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 
@@ -49,6 +50,7 @@ export default async function Image() {
           color: "#e8e8e4",
           padding: "56px 64px",
           fontSize: 30,
+          fontFamily: "Selawik",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-end", gap: 18 }}>
@@ -69,10 +71,8 @@ export default async function Image() {
                 {i + 1}.
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                {/* 62 chars keeps one line even with the wider prod font rendering */}
-                <div style={{ display: "flex", lineHeight: 1.3 }}>
-                  {e.headline.length > 62 ? `${e.headline.slice(0, 61)}…` : e.headline}
-                </div>
+                {/* 62 chars keeps one line, cut at a word boundary, never mid-word */}
+                <div style={{ display: "flex", lineHeight: 1.3 }}>{ogTruncate(e.headline, 62)}</div>
                 {e.source ? (
                   <div style={{ display: "flex", color: "#858b96", fontSize: 22, marginTop: 4 }}>/ {e.source}</div>
                 ) : null}
@@ -83,6 +83,6 @@ export default async function Image() {
         <div style={{ display: "flex", marginTop: "auto", fontSize: 24, color: "#858b96" }}>{site.domain}</div>
       </div>
     ),
-    size
+    { ...size, fonts: ogFonts() }
   );
 }

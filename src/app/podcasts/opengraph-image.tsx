@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { siteIdentity } from "@/lib/site";
 import { loadSiteConfig } from "@/lib/config";
+import { ogFonts, ogTruncate } from "@/lib/og";
 import { adaptiveRanking, rankMedia } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 import { formatViews } from "@/lib/util";
@@ -44,6 +45,7 @@ export default async function Image() {
           color: "#e8e8e4",
           padding: "56px 64px",
           fontSize: 30,
+          fontFamily: "Selawik",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-end", gap: 18 }}>
@@ -62,9 +64,7 @@ export default async function Image() {
                 {i + 1}.
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", lineHeight: 1.3 }}>
-                  {e.title.length > 62 ? `${e.title.slice(0, 61)}…` : e.title}
-                </div>
+                <div style={{ display: "flex", lineHeight: 1.3 }}>{ogTruncate(e.title, 62)}</div>
                 <div style={{ display: "flex", color: "#858b96", fontSize: 22, marginTop: 4 }}>/ {e.sub}</div>
               </div>
             </div>
@@ -73,6 +73,6 @@ export default async function Image() {
         <div style={{ display: "flex", marginTop: "auto", fontSize: 24, color: "#858b96" }}>/podcasts</div>
       </div>
     ),
-    size
+    { ...size, fonts: ogFonts() }
   );
 }
