@@ -400,10 +400,16 @@ export function MediaPlayer({
                   : "watch on YouTube"
                 : "open episode page"}
               </a>{" "}
-              ·{" "}
-              <button type="button" className="linklike" onClick={() => setExpanded((v) => !v)}>
-                {expanded ? "shrink" : "expand"}
-              </button>{" "}
+              {/* a detached window IS the player's whole viewport, so the
+                  expand overlay has nothing to grow into: resize the window */}
+              {!closeWindow ? (
+                <>
+                  ·{" "}
+                  <button type="button" className="linklike" onClick={() => setExpanded((v) => !v)}>
+                    {expanded ? "shrink" : "expand"}
+                  </button>{" "}
+                </>
+              ) : null}
               {fileVideo && audioUrl ? (
                 <>
                   ·{" "}
