@@ -599,10 +599,18 @@ a:hover {
 .summary-episode .media-list {
   margin-top: 0;
 }
+/* the /podcasts list padding and divider have no place in this one-row box */
+.summary-episode .media-item {
+  padding: 0;
+  border-bottom: 0;
+}
 /* the kicker lives inside the text column, hugging the title, so the row
    packs as tight as the section groups above it */
 .summary-episode .media-body .kicker {
   margin: 0 0 1px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 /* summary box section headings link to their pages, dressed as before */
 a.front-summary-sec {
