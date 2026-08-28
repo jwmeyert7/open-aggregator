@@ -219,29 +219,15 @@ export function MediaPlayer({
     const say = (func: string) =>
       frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), YT_EMBED_ORIGIN);
     let unmute: number | undefined;
-    let retry: number | undefined;
     const started = window.setTimeout(() => {
       if (playingRef.current) return;
       say("mute");
       say("playVideo");
-      // try for sound once rolling; Chrome answers a refused unmute by
-      // pausing the player, so a pause right after means "no sound without a
-      // click": resume muted rather than sit frozen, and leave the embed's
-      // own unmute icon as the one-click path to audio
-      unmute = window.setTimeout(() => {
-        say("unMute");
-        retry = window.setTimeout(() => {
-          if (!playingRef.current) {
-            say("mute");
-            say("playVideo");
-          }
-        }, 900);
-      }, 1200);
+      unmute = window.setTimeout(() => say("unMute"), 900);
     }, 1500);
     return () => {
       window.clearTimeout(started);
       if (unmute !== undefined) window.clearTimeout(unmute);
-      if (retry !== undefined) window.clearTimeout(retry);
     };
   }, [detachMode, startPaused, ytId, open]);
 
