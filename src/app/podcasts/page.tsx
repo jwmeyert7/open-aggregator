@@ -5,7 +5,6 @@ import { SectionPill, SourceKicker } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { loadSiteConfig } from "@/lib/config";
 import { adaptiveRanking, episodeStories, rankMedia } from "@/lib/rank";
-import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
 import { formatMoment, formatViews, mediaThumb } from "@/lib/util";
 
@@ -18,7 +17,6 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
   const { play, t } = await searchParams;
   const startAt = t && /^\d+$/.test(t) ? Number(t) : undefined;
   const state = await loadState();
-  const site = siteIdentity();
   const items = (state.mediaItems ?? []).filter((m) => !m.hidden).slice(0, 100);
   const covered = episodeStories(state);
   const cfg = loadSiteConfig();
@@ -33,12 +31,6 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
       <div>
         <div className="section-head">
           <h1>Podcasts</h1>
-          <p>
-            New podcast episodes and videos about {site.topic} from whitelisted shows, newest first. Episodes from
-            broader shows appear only when they are substantially about {site.topic}. Press a thumbnail to play it
-            here, or the title to open it at the source. The full <Link href="/sources#podcasts">show list</Link> is on
-            Sources, and the written news lives on the <Link href="/">front page</Link>.
-          </p>
         </div>
         {items.length === 0 ? <p className="empty-state">Nothing on the shelf yet.</p> : null}
         {top.length >= 3 ? (
