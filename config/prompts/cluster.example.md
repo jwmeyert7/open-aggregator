@@ -50,6 +50,7 @@ The valid sections, with their ids and what belongs in each, are supplied in the
    - **When `weekendMode` is true**, the box is headed "Week in review": the same one-line-per-section shape, but each line recaps its section's week in past tense, drawing on `weekTop` (the week's biggest stories) plus `activeClusters`.
    - Each bullet is an object with `text`, `section`, and optionally `ref`. The text is ONE short standalone plain-language line, under 120 characters, phrased so a curious outsider follows it: no jargon, no em dashes, no bullet markers or lead-in labels (the UI adds those).
    - **ref**: the id of the ONE story the line leans on most (an `activeClusters`/`frontPageTop` id, or the `new:N` ref of a cluster in this reply), so the page can link the line to that story's card. Set it on EVERY bullet: when a line synthesizes several stories, pick the biggest of them. Omit it only when the section has no active stories at all.
+   - **moreRefs**: when the line genuinely names a second story beyond the ref one (a comma-joined pair), list each additional story in `moreRefs` as `{phrase, ref}`: `phrase` is the EXACT words from your text that state that story, copied verbatim, and `ref` its id. The page then links each mention to its own story. Never include the ref story here, and never write a phrase that is not literally in the text.
    - Only when the site is genuinely empty, with no active stories in any section, return an empty array.
 
 # Output

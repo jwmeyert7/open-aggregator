@@ -145,6 +145,8 @@ export function MediaPlayer({
   const frame = useRef<HTMLIFrameElement>(null);
   const audio = useRef<HTMLAudioElement>(null);
   const fileFrame = useRef<HTMLVideoElement>(null);
+  /** how many pixels the detached window grew for the open chapter list */
+  const chapterGrow = useRef(0);
   const ytId = videoUrl ? youtubeId(videoUrl) : kind === "video" ? youtubeId(url) : null;
   // a non-YouTube videoUrl is a direct video file (an IPFS-pinned mp4, say),
   // played in a native video element instead of an embed
@@ -449,7 +451,35 @@ export function MediaPlayer({
               </button>
             </div>
           {chapters && chapters.length > 0 ? (
-            <details className="player-chapters">
+            <details
+              className="player-chapters"
+              onToggle={(e) => {
+                // In a detached player window (popup, or the /player frame
+                // inside the document PiP window) the flex layout would shrink
+                // the video to make room for the list. Grow the window by the
+                // list's height instead, and pull it back on collapse. Where
+                // the browser refuses the resize, the old squeeze stands.
+                const el = e.currentTarget;
+                if (!document.querySelector(".player-page")) return;
+                try {
+                  const host = window.parent !== window ? window.parent : window;
+                  if (el.open) {
+                    const wanted = Math.ceil(el.querySelector("ol")?.getBoundingClientRect().height ?? 0);
+                    const room = Math.max(0, (window.screen?.availHeight ?? 900) - host.outerHeight - 24);
+                    const grow = Math.min(wanted, room);
+                    if (grow > 0) {
+                      host.resizeBy(0, grow);
+                      chapterGrow.current = grow;
+                    }
+                  } else if (chapterGrow.current > 0) {
+                    host.resizeBy(0, -chapterGrow.current);
+                    chapterGrow.current = 0;
+                  }
+                } catch {
+                  chapterGrow.current = 0;
+                }
+              }}
+            >
               <summary>chapters ({chapters.length})</summary>
               <ol>
                 {chapters.map((c) => (

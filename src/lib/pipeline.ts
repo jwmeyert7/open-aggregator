@@ -147,13 +147,27 @@ function joinSummaryLines(lines: SummaryBullet[], resolveRef?: (ref: string) => 
         .map((t, i) => ({
           section: l.section,
           ref: i === 0 ? l.ref : undefined,
+          moreRefs: l.moreRefs,
           text: i === 0 ? t : t.charAt(0).toUpperCase() + t.slice(1),
         }))
     )
     .slice(0, 6)
     .map((l) => {
       const id = l.ref && resolveRef ? resolveRef(l.ref) : undefined;
-      return `[${l.section}${id ? `@${id}` : ""}] ${ogTruncate(l.text, 160)}`;
+      let t = ogTruncate(l.text, 160);
+      // a line naming a second story gets that mention wrapped as an inline
+      // "{phrase@id}" marker, so the UI links each mention to its own story.
+      // Phrases embed only when they resolve, survive the truncation, and
+      // appear verbatim, so a marker never points nowhere.
+      for (const mr of l.moreRefs ?? []) {
+        const mid = mr.ref && resolveRef ? resolveRef(mr.ref) : undefined;
+        const phrase = (mr.phrase ?? "").trim();
+        if (!mid || mid === id || !phrase || /[{}\n]/.test(phrase)) continue;
+        const at = t.indexOf(phrase);
+        if (at < 0) continue;
+        t = `${t.slice(0, at)}{${phrase}@${mid}}${t.slice(at + phrase.length)}`;
+      }
+      return `[${l.section}${id ? `@${id}` : ""}] ${t}`;
     })
     .join("\n");
 }
@@ -169,7 +183,7 @@ function carryForwardSummary(newText: string, prevText: string | undefined): str
   const covered = new Set(parseSummaryLines(newText).map((l) => l.section));
   const carried = parseSummaryLines(prevText)
     .filter((l) => l.section && !covered.has(l.section))
-    .map((l) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.text}`);
+    .map((l) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.raw}`);
   return [newText, ...carried].join("\n");
 }
 
@@ -1605,7 +1619,15 @@ export async function reconsiderFrontSummary(state: SiteState, cfg: SiteConfig):
   if (!llmAvailable()) return { note: "LLM not configured. Front summary left unchanged.", changed: false };
   const lines = parseSummaryLines(summary.text)
     .filter((l) => l.section)
-    .map((l) => ({ section: l.section!, ref: l.ref ?? undefined, text: l.text }));
+    .map((l) => ({
+      section: l.section!,
+      ref: l.ref ?? undefined,
+      text: l.text,
+      // phrase-level refs ride along so a verbatim keep echoes them back
+      ...(l.segments.some((s) => s.ref)
+        ? { moreRefs: l.segments.filter((s) => s.ref).map((s) => ({ phrase: s.text, ref: s.ref! })) }
+        : {}),
+    }));
   const weekend = weekendMode(cfg.ranking, new Date(), state.weekendSchedule);
   const top = weekend ? weekInReview(state, cfg.ranking, new Set()) : topStories(state, cfg.ranking).slice(0, 6);
   const bullets = await refreshFrontSummary(lines, top, weekend);
@@ -1918,7 +1940,9 @@ export async function runPipeline(): Promise<RunReport> {
   if (state.frontSummary?.text) {
     if (
       !state.frontSummary.stale &&
-      parseSummaryLines(state.frontSummary.text).some((l) => l.ref && (!state.clusters[l.ref] || state.clusters[l.ref].killed))
+      parseSummaryLines(state.frontSummary.text).some((l) =>
+        [l.ref, ...l.segments.map((s) => s.ref)].some((r) => r && (!state.clusters[r] || state.clusters[r].killed))
+      )
     ) {
       state.frontSummary.stale = true;
     }

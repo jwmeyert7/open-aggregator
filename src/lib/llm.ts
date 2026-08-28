@@ -51,6 +51,17 @@ function summaryBulletSchema(navIds: string[]) {
       .describe(
         "the id of the ONE story this line leans on most (an activeClusters/frontPageTop id, or the new:N ref of a cluster in this reply), so the site can link the line to it; omit when no single story anchors the line"
       ),
+    moreRefs: z
+      .array(
+        z.object({
+          phrase: z.string().describe("the EXACT words from this line's text that state the additional story, verbatim"),
+          ref: z.string().describe("that story's id (an activeClusters/frontPageTop id, or a new:N ref)"),
+        })
+      )
+      .optional()
+      .describe(
+        "when the line names MORE stories than the ref one (a comma-joined pair), each additional story's exact phrase plus its id, so the site links each mention to its own story"
+      ),
   });
 }
 
@@ -58,6 +69,7 @@ export interface SummaryBullet {
   text: string;
   section: string;
   ref?: string;
+  moreRefs?: Array<{ phrase: string; ref: string }>;
 }
 
 export interface EditorOutput {

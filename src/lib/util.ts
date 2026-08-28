@@ -195,12 +195,25 @@ export type SummarySection = string;
  * Summary storage is a newline-joined string whose lines may carry a leading
  * "[<sectionId>]" marker so the UI can group bullets by section, optionally
  * extended to "[<sectionId>@<clusterId>]" when the editor tied the line to
- * one story (the UI then links the line to that story's card). Lines written
+ * one story (the UI then links the line to that story's card). A line naming
+ * several stories may additionally wrap a phrase in "{phrase@<clusterId>}" so
+ * that mention links to ITS story rather than the line's. Lines written
  * without markers parse with section null and render as one flat list.
+ *
+ * Each parsed line carries: `text` with every marker stripped (for email and
+ * plain rendering), `raw` with inline phrase markers intact (for
+ * re-serialization), and `segments`, the text split at phrase markers with
+ * each linked phrase carrying its ref.
  */
 export function parseSummaryLines(
   text: string
-): Array<{ section: SummarySection | null; ref: string | null; text: string }> {
+): Array<{
+  section: SummarySection | null;
+  ref: string | null;
+  text: string;
+  raw: string;
+  segments: Array<{ text: string; ref: string | null }>;
+}> {
   return text
     .split("\n")
     .map((l) => l.trim())
@@ -218,11 +231,20 @@ export function parseSummaryLines(
         .split(/;\s*/)
         .map((t) => t.trim())
         .filter(Boolean)
-        .map((t, i) => ({
-          section,
-          ref: i === 0 ? ref : null,
-          text: i === 0 ? t : t.charAt(0).toUpperCase() + t.slice(1),
-        }));
+        .map((raw, i) => {
+          const segments: Array<{ text: string; ref: string | null }> = [];
+          const re = /\{([^{}\n]+)@([a-z0-9]+)\}/g;
+          let last = 0;
+          for (let mm = re.exec(raw); mm; mm = re.exec(raw)) {
+            if (mm.index > last) segments.push({ text: raw.slice(last, mm.index), ref: null });
+            segments.push({ text: mm[1], ref: mm[2] });
+            last = re.lastIndex;
+          }
+          if (last < raw.length) segments.push({ text: raw.slice(last), ref: null });
+          if (i > 0 && segments[0]) segments[0].text = segments[0].text.charAt(0).toUpperCase() + segments[0].text.slice(1);
+          const plain = segments.map((s) => s.text).join("");
+          return { section, ref: i === 0 ? ref : null, text: plain, raw, segments };
+        });
     })
     .filter((l) => l.text);
 }

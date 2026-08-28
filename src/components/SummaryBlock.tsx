@@ -48,12 +48,31 @@ export function SummaryBlock({
   const knownIds = new Set(sections.map((s) => s.id));
   const untagged = lines.filter((l) => l.section === null || !knownIds.has(l.section));
   const tagged = lines.filter((l) => l.section !== null && knownIds.has(l.section));
-  const bullet = (l: { section: SummarySection | null; ref: string | null; text: string }) => {
-    const href =
+  const bullet = (l: {
+    section: SummarySection | null;
+    ref: string | null;
+    text: string;
+    segments: Array<{ text: string; ref: string | null }>;
+  }) => {
+    const lineHref =
       (l.ref ? storyHrefs?.get(l.ref) : undefined) ??
       (l.section && fallbackHref ? fallbackHref(l.section, l.text) : undefined);
-    return href ? (
-      <a href={href} className="summary-jump">
+    // a line naming several stories carries phrase-level refs: each linked
+    // phrase goes to ITS story, the rest of the line to the line's own
+    if (l.segments.some((s) => s.ref && storyHrefs?.get(s.ref))) {
+      return l.segments.map((s, i) => {
+        const href = (s.ref ? storyHrefs?.get(s.ref) : undefined) ?? lineHref;
+        return href ? (
+          <a key={i} href={href} className="summary-jump">
+            {s.text}
+          </a>
+        ) : (
+          <span key={i}>{s.text}</span>
+        );
+      });
+    }
+    return lineHref ? (
+      <a href={lineHref} className="summary-jump">
         {l.text}
       </a>
     ) : (
