@@ -9,7 +9,7 @@ import { hasSidebarContent, NewestRail, Sidebar, sidebarSponsored } from "@/comp
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { loadSiteConfig } from "@/lib/config";
 import { maybeDevSeed } from "@/lib/devSeed";
-import { adaptiveRanking, leadLink, liveClusters, newestEntries, rankMedia, sectionStories, topStories, weekendMode, weekInReview } from "@/lib/rank";
+import { adaptiveRanking, leadLink, liveClusters, newestEntries, rankMedia, sectionStories, summaryLinkable, topStories, weekendMode, weekInReview } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS, sponsoredPlacements, type Cluster, type SectionId } from "@/lib/types";
 import { bestMatchIndex, echoesHeadline, formatViews, hoursAgo, mediaThumb, parseSummaryLines } from "@/lib/util";
@@ -147,10 +147,12 @@ export default async function HomePage() {
         // a bullet's story jumps in page when its card is below, and falls
         // back to the story permalink when it ranks off the front page
         storyHrefs={storyHref}
-        // a refless bullet fuzzy-matches to the story it is plainly about;
+        // a refless bullet fuzzy-matches to the story it is plainly about,
+        // among stories active this week only (an old story with a similar
+        // headline once won and sent a "Latest in" line 43 days back);
         // its section page is the last resort when nothing matches
         fallbackHref={(section, text) => {
-          const cands = liveClusters(state).filter((c) => c.section === section);
+          const cands = liveClusters(state).filter((c) => c.section === section && summaryLinkable(c));
           const i = bestMatchIndex(text, cands.map((c) => `${c.headline} ${(c.keywords ?? []).join(" ")}`));
           return i >= 0 ? storyHref.get(cands[i].id) : `/${section}`;
         }}

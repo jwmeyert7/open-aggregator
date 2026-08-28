@@ -3,7 +3,7 @@ import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sen
 import { sendAdminEmail } from "./mail";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
-import { liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, topStories, weekInReview, weekendMode } from "./rank";
+import { clusterActivityAt, liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, summaryLinkable, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
@@ -40,15 +40,7 @@ export function digestClusters(state: SiteState, cfg: SiteConfig["ingest"]): Clu
   // updatedAt also moves on admin actions and other passes, and any phantom
   // bump here walks a weeks-old story into the editor's context and from
   // there into the front summary as if it were news.
-  const activity = new Map(
-    liveClusters(state).map((c) => [
-      c.id,
-      c.links.reduce((max, l) => {
-        const at = l.addedAt || l.publishedAt;
-        return at > max ? at : max;
-      }, c.createdAt),
-    ])
-  );
+  const activity = new Map(liveClusters(state).map((c) => [c.id, clusterActivityAt(c)]));
   return liveClusters(state)
     .filter((c) => hoursAgo(activity.get(c.id)!) <= cfg.digestClusterDays * 24)
     .sort((a, b) => activity.get(b.id)!.localeCompare(activity.get(a.id)!))
@@ -1633,7 +1625,7 @@ export async function reconsiderFrontSummary(state: SiteState, cfg: SiteConfig):
   const bullets = await refreshFrontSummary(lines, top, weekend);
   const resolveRef = (ref: string): string | undefined => {
     const c = state.clusters[ref];
-    return c && !c.killed && /^[a-z0-9]+$/.test(ref) ? ref : undefined;
+    return summaryLinkable(c) && /^[a-z0-9]+$/.test(ref) ? ref : undefined;
   };
   const text = joinSummaryLines(bullets, resolveRef);
   if (!text) {
@@ -1895,7 +1887,7 @@ export async function runPipeline(): Promise<RunReport> {
     const resolveRef = (ref: string): string | undefined => {
       const id = applied.clusterIdByRef.get(ref) ?? ref;
       const c = state.clusters[id];
-      return c && !c.killed && /^[a-z0-9]+$/.test(id) ? id : undefined;
+      return summaryLinkable(c) && /^[a-z0-9]+$/.test(id) ? id : undefined;
     };
     const summaryText = report.usedLlm && out.frontSummary ? joinSummaryLines(out.frontSummary, resolveRef) : "";
     if (summaryText) {
@@ -1940,8 +1932,10 @@ export async function runPipeline(): Promise<RunReport> {
   if (state.frontSummary?.text) {
     if (
       !state.frontSummary.stale &&
+      // a ref whose story died OR aged past the link window makes the box
+      // stale: the reconsider pass then rewrites or unlinks the line
       parseSummaryLines(state.frontSummary.text).some((l) =>
-        [l.ref, ...l.segments.map((s) => s.ref)].some((r) => r && (!state.clusters[r] || state.clusters[r].killed))
+        [l.ref, ...l.segments.map((s) => s.ref)].some((r) => r && !summaryLinkable(state.clusters[r]))
       )
     ) {
       state.frontSummary.stale = true;

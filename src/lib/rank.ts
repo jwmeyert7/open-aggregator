@@ -219,6 +219,24 @@ export function liveClusters(state: SiteState): Cluster[] {
   return Object.values(state.clusters).filter((c) => !c.killed);
 }
 
+/** When the cluster last saw real coverage: its newest link's arrival (never updatedAt, which admin actions bump). */
+export function clusterActivityAt(c: Cluster): string {
+  return c.links.reduce((max, l) => {
+    const at = l.addedAt || l.publishedAt;
+    return at > max ? at : max;
+  }, c.createdAt);
+}
+
+/**
+ * Whether a "Latest in" line may link to this story: alive, and active within
+ * the last week. The box is about NOW, so a link that lands on a weeks-old
+ * story reads as a bug however plausible the word match was.
+ */
+export const SUMMARY_LINK_MAX_AGE_HOURS = 7 * 24;
+export function summaryLinkable(c: Cluster | undefined): c is Cluster {
+  return Boolean(c && !c.killed && hoursAgo(clusterActivityAt(c)) <= SUMMARY_LINK_MAX_AGE_HOURS);
+}
+
 export function rankClusters(clusters: Cluster[], cfg: SiteConfig["ranking"], now: Date = new Date()): Cluster[] {
   return [...clusters].sort((a, b) => {
     if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
