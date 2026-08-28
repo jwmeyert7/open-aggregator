@@ -119,7 +119,7 @@ export default async function HomePage() {
           >
             <div className="media-body">
               <SourceKicker name={topEpisode.sourceName} />
-              <
+              <a
                 href={topEpisode.videoUrl ?? topEpisode.url}
                 rel="noopener"
                 title={topEpisode.displayTitle ? `Show's title: ${topEpisode.title}` : undefined}
