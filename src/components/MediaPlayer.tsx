@@ -147,6 +147,8 @@ export function MediaPlayer({
   const fileFrame = useRef<HTMLVideoElement>(null);
   /** how many pixels the detached window grew for the open chapter list */
   const chapterGrow = useRef(0);
+  /** whether the embed's last state report said it is playing or buffering */
+  const playingRef = useRef(false);
   // detached players quietly name their mode in the link row: the /player
   // page sits framed inside the document PiP window when floating, bare in a
   // plain popup. Set after mount so server render stays mode-free.
@@ -186,6 +188,7 @@ export function MediaPlayer({
           const d = data?.info?.duration;
           if (typeof d === "number" && Number.isFinite(d) && d > 0) setDur(d);
           const ps = data?.info?.playerState;
+          if (typeof ps === "number") playingRef.current = ps === 1 || ps === 3;
           if (typeof ps === "number" && memoryKey) savePlayState(memoryKey, ps === 1 || ps === 3 ? 1 : 2);
           if (memoryKey) savePos(memoryKey, t, typeof data?.info?.duration === "number" ? data.info.duration : undefined);
         }
@@ -203,6 +206,30 @@ export function MediaPlayer({
       window.clearTimeout(stop);
     };
   }, [open, ytId, id, memoryKey]);
+
+  // The float sometimes loses the opening click's activation before the
+  // nested embed loads (Chrome gates audible autoplay inside the PiP window
+  // on its media engagement score), leaving a player that should be running
+  // sitting paused. Rescue: if the floating player reports no playback
+  // shortly after load, start it muted (always allowed), then unmute once it
+  // is rolling. Worst case the reader clicks the embed's unmute instead of
+  // play, and the picture never visibly stalls.
+  useEffect(() => {
+    if (detachMode !== "floating" || startPaused || !ytId || !open) return;
+    const say = (func: string) =>
+      frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), YT_EMBED_ORIGIN);
+    let unmute: number | undefined;
+    const started = window.setTimeout(() => {
+      if (playingRef.current) return;
+      say("mute");
+      say("playVideo");
+      unmute = window.setTimeout(() => say("unMute"), 900);
+    }, 1500);
+    return () => {
+      window.clearTimeout(started);
+      if (unmute !== undefined) window.clearTimeout(unmute);
+    };
+  }, [detachMode, startPaused, ytId, open]);
 
   useEffect(() => {
     if (!expanded) return;
