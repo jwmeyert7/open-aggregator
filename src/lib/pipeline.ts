@@ -609,14 +609,15 @@ async function threadFirstTweet(
   const inWindow = media.filter((m) => Date.now() - Date.parse(m.publishedAt) <= podcastWindowHours * 3600000);
   const ep = preferredEpisode ?? inWindow[0] ?? media[0];
 
+  // bare section labels with a dash bullet under each: "Protocol\n- headline"
   const blocks: Array<{ label: string; text: string; suffix: string; max: number }> = [];
   for (const s of cfg.sections) {
     const c = pick(s.id);
-    if (c) blocks.push({ label: `${s.title}:`, text: c.headline, suffix: "", max: 52 });
+    if (c) blocks.push({ label: s.title, text: c.headline, suffix: "", max: 52 });
   }
   if (ep) {
     const suffix = ` (${ep.sourceName})`;
-    blocks.push({ label: "Podcast:", text: ep.displayTitle ?? ep.title, suffix, max: Math.max(30, 52 - suffix.length) });
+    blocks.push({ label: "Podcast", text: ep.displayTitle ?? ep.title, suffix, max: Math.max(30, 52 - suffix.length) });
   }
 
   // the editor model rewrites each line as a complete phrase inside its
@@ -637,7 +638,7 @@ async function threadFirstTweet(
 
   for (let squeeze = 0; squeeze <= 4; squeeze++) {
     const body = blocks
-      .map((b, i) => `${b.label}\n${squeeze === 0 ? texts[i] : ogTruncate(texts[i], Math.max(24, blocks[i].max - squeeze * 6))}${b.suffix}`)
+      .map((b, i) => `${b.label}\n- ${squeeze === 0 ? texts[i] : ogTruncate(texts[i], Math.max(24, blocks[i].max - squeeze * 6))}${b.suffix}`)
       .join("\n\n");
     const text = `${heading}\n\n${body}`;
     if (text.length <= 279) return text;
