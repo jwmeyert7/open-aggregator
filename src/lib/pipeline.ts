@@ -1144,7 +1144,13 @@ export async function addMediaByUrl(state: SiteState, rawUrl: string, cfg: SiteC
   state.mediaItems = [item, ...items]
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, MAX_MEDIA_ITEMS);
+  // pair right away, so adding a show's video upgrades its podcast row to
+  // video in this same click instead of waiting for the next hourly ingest
+  const paired = pairPodcastsWithVideos(state.mediaItems);
   const mentions = await linkEpisodesToStories(state);
+  if (paired > 0 && item.hidden) {
+    return `Added \u201c${item.title}\u201d and paired it as the video for its podcast episode. The podcast row now plays video.`;
+  }
   return `Added \u201c${item.title}\u201d to the shelf${mentions > 0 ? ` with ${mentions} story mention(s) from its notes` : ""}. It ranks like any episode.`;
 }
 
@@ -1344,6 +1350,17 @@ export async function ingestMedia(
   let held = 0;
   let heldReason = "";
   const gateSection = new Map<string, SectionId>();
+  const twinOnly = new Set<string>();
+  // A gate-rejected video may still be the video half of a podcast episode
+  // the shelf already carries (a roundup's YouTube upload can be retitled
+  // into something the gate rightly fails). Such a video shelves HIDDEN
+  // instead of dropping, so the twin pairing below can adopt it.
+  const podSibling = (item: MediaCandidate): boolean => {
+    const near = (m: { kind?: string; sourceName: string; publishedAt: string; videoUrl?: string }) =>
+      m.kind === "podcast" && !m.videoUrl && m.sourceName === item.sourceName &&
+      Math.abs(Date.parse(m.publishedAt) - Date.parse(item.publishedAt)) <= 48 * 60 * 60000;
+    return (state.mediaItems ?? []).some(near) || kept.some(near);
+  };
 
   if (gated.length > 0) {
     if (llmAvailable()) {
@@ -1357,6 +1374,9 @@ export async function ingestMedia(
           if (v?.onTopic) {
             kept.push(item);
             if (v.section) gateSection.set(item.id, v.section);
+          } else if (item.kind === "video" && podSibling(item)) {
+            kept.push(item);
+            twinOnly.add(item.id);
           } else rejected += 1;
         }
       } catch (err) {
@@ -1411,6 +1431,12 @@ export async function ingestMedia(
     ...(i.chapters && i.chapters.length > 0 ? { chapters: i.chapters } : {}),
     ...(i.excerpt ? { excerpt: truncate(i.excerpt, 300) } : {}),
   }));
+  for (const s of shelved) {
+    if (twinOnly.has(s.id)) {
+      s.hidden = true;
+      delete s.section;
+    }
+  }
   state.mediaItems = [...shelved, ...(state.mediaItems ?? [])]
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, MAX_MEDIA_ITEMS);
@@ -1462,7 +1488,7 @@ export async function ingestMedia(
 
   const note =
     fresh.length > 0 || held > 0 || mentions > 0 || scheduled > 0
-      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}${mentions > 0 ? `, ${mentions} story mention(s) from show notes` : ""}${scheduled > 0 ? `, ${scheduled} scheduled premiere(s) waiting to air` : ""}.`
+      ? `Media: ${shelved.length} episode(s) shelved, ${rejected} gated out${twinOnly.size > 0 ? `, ${twinOnly.size} gate-rejected video(s) kept hidden as twin candidate(s)` : ""}${held > 0 ? `, ${held} held for retry (gate failed: ${truncate(heldReason, 160)})` : ""}${mentions > 0 ? `, ${mentions} story mention(s) from show notes` : ""}${scheduled > 0 ? `, ${scheduled} scheduled premiere(s) waiting to air` : ""}.`
       : undefined;
   return { errors, note };
 }
