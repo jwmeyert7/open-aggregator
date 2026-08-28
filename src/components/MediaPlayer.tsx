@@ -147,6 +147,18 @@ export function MediaPlayer({
   const fileFrame = useRef<HTMLVideoElement>(null);
   /** how many pixels the detached window grew for the open chapter list */
   const chapterGrow = useRef(0);
+  // detached players quietly name their mode in the link row: the /player
+  // page sits framed inside the document PiP window when floating, bare in a
+  // plain popup. Set after mount so server render stays mode-free.
+  const [detachMode, setDetachMode] = useState<"floating" | "window" | null>(null);
+  useEffect(() => {
+    if (!closeWindow) return;
+    try {
+      setDetachMode(window.parent !== window ? "floating" : "window");
+    } catch {
+      setDetachMode("window");
+    }
+  }, [closeWindow]);
   const ytId = videoUrl ? youtubeId(videoUrl) : kind === "video" ? youtubeId(url) : null;
   // a non-YouTube videoUrl is a direct video file (an IPFS-pinned mp4, say),
   // played in a native video element instead of an embed
@@ -393,6 +405,7 @@ export function MediaPlayer({
               />
             )}
             <div className="org media-player-links">
+              {detachMode ? <>{detachMode} · </> : null}
               <a href={watchHref} rel="noopener" onClick={pauseHere} onAuxClick={pauseHere}>
                 {ytId
                 ? seconds > 0
