@@ -607,7 +607,16 @@ async function threadFirstTweet(
     pool.find((c) => c.section === sec || c.alsoIn === sec) ?? sectionStories(state, sec, cfg.ranking)[0];
   const media = rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, cfg.ranking);
   const inWindow = media.filter((m) => Date.now() - Date.parse(m.publishedAt) <= podcastWindowHours * 3600000);
-  const ep = preferredEpisode ?? inWindow[0] ?? media[0];
+  // the tweet's podcast slot skips roundup episodes (their titles are broad
+  // grab-bags, a bad ambassador for a focused site): the top substantially
+  // on-topic episode leads, and the roundup fills in only when nothing else
+  // aired in the window
+  const ep =
+    (preferredEpisode && !preferredEpisode.roundup ? preferredEpisode : undefined) ??
+    inWindow.find((m) => !m.roundup) ??
+    preferredEpisode ??
+    inWindow[0] ??
+    media[0];
 
   // bare section labels with a dash bullet under each: "Protocol\n- headline"
   const blocks: Array<{ label: string; text: string; suffix: string; max: number }> = [];
@@ -617,7 +626,7 @@ async function threadFirstTweet(
   }
   if (ep) {
     const suffix = ` (${ep.sourceName})`;
-    blocks.push({ label: "Podcast", text: ep.displayTitle ?? ep.title, suffix, max: Math.max(30, 52 - suffix.length) });
+    blocks.push({ label: "Podcasts", text: ep.displayTitle ?? ep.title, suffix, max: Math.max(30, 52 - suffix.length) });
   }
 
   // the editor model rewrites each line as a complete phrase inside its
