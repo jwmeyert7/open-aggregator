@@ -95,10 +95,13 @@ export default async function HomePage() {
   // mobile only: the top-ranked episode rides at the bottom of the above-nav
   // summary box, so podcasts have a presence before the long scroll to the
   // rail. The desktop rail copy never renders it (the rail sits right there).
-  const topEpisode = media[0];
+  // the box says "Latest in", so it carries the NEWEST episode (the ranked
+  // pick still leads the rail); the kicker sits inside the text column so
+  // the row packs as tight as the section groups above it
+  const topEpisode = [...media].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0] ?? media[0];
   const episodeRow = topEpisode ? (
     <div className="front-summary-group summary-episode">
-      <div className="front-summary-sec podcasts">Podcasts</div>
+      <a className="front-summary-sec podcasts" href="/podcasts">Podcasts</a>
       <ul className="media-list">
         <li className="media-item">
           <MediaPlayer
@@ -113,10 +116,10 @@ export default async function HomePage() {
             audioUrl={topEpisode.audioUrl}
             videoUrl={topEpisode.videoUrl}
             compact
-            header={<SourceKicker name={topEpisode.sourceName} />}
           >
             <div className="media-body">
-              <a
+              <SourceKicker name={topEpisode.sourceName} />
+              <
                 href={topEpisode.videoUrl ?? topEpisode.url}
                 rel="noopener"
                 title={topEpisode.displayTitle ? `Show's title: ${topEpisode.title}` : undefined}

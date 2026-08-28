@@ -9,7 +9,9 @@ import { timeAgo } from "@/lib/util";
  */
 export function AgeStamp({ iso }: { iso: string }) {
   const age = Date.now() - new Date(iso).getTime();
-  if (age < 15 * 60000) return <span className="fresh-ago new-tag">new</span>;
+  // the hover tooltip carries the exact moment behind the rounded age
+  const exact = new Date(iso).toUTCString().replace(/ GMT$/, " UTC");
+  if (age < 15 * 60000) return <span className="fresh-ago new-tag" title={exact}>new</span>;
   const cls = age < 2 * 60 * 60000 ? "fresh-ago" : age < 24 * 60 * 60000 ? "hours-ago" : "days-ago";
-  return <span className={cls}>{timeAgo(iso)}</span>;
+  return <span className={cls} title={exact}>{timeAgo(iso)}</span>;
 }

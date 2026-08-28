@@ -435,9 +435,8 @@ export interface DigestSubscriber {
   daily: boolean;
   weekly: boolean;
   /**
-   * Absent on subscribers from before the monthly checkbox existed: they are
-   * grandfathered to their weekly choice, since the monthly used to ride the
-   * weekly list.
+   * Explicit opt-in only: absent (subscribers from before the checkbox
+   * existed) means NOT subscribed. Every frequency is a deliberate choice.
    */
   monthly?: boolean;
   /** Unsubscribe/confirmation token carried in the email links. */

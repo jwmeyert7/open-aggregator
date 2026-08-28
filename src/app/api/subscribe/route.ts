@@ -56,9 +56,12 @@ export async function POST(req: NextRequest) {
   const subs = (state.digestSubscribers ??= []);
   const existing = subs.find((s) => s.email === email);
   if (existing) {
-    existing.daily = daily;
-    existing.weekly = weekly;
-    existing.monthly = monthly;
+    // the public form only ever ADDS frequencies: anyone can type any email
+    // here, so an unchecked box must never cancel an existing subscription.
+    // Removal happens only through the emailed unsubscribe link.
+    existing.daily = existing.daily || daily;
+    existing.weekly = existing.weekly || weekly;
+    existing.monthly = Boolean(existing.monthly) || monthly;
     await saveState(state);
     if (existing.confirmed === false) {
       // still unconfirmed: a re-signup is the natural "resend the link" gesture
@@ -70,7 +73,10 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ ok: true, message: "Almost done: click the confirmation link we just emailed you." });
     }
-    return NextResponse.json({ ok: true, message: "Preferences updated. See you in the next edition." });
+    return NextResponse.json({
+      ok: true,
+      message: "Your choices were added. To drop an edition, use the unsubscribe link in any email from us.",
+    });
   }
   if (subs.length >= MAX_SUBSCRIBERS) {
     return NextResponse.json({ ok: false, message: "Signups are closed for the moment." }, { status: 503 });

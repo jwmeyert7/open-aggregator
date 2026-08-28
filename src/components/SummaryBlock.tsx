@@ -97,7 +97,7 @@ export function SummaryBlock({
             const group = tagged.filter((l) => l.section === s.id);
             return (
               <div className="front-summary-group" key={s.id}>
-                <div className="front-summary-sec">{s.title}</div>
+                <a className="front-summary-sec" href={`/${s.id}`}>{s.title}</a>
                 {group.length > 0 ? (
                   <ul>
                     {group.map((l) => (

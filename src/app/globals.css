@@ -597,7 +597,20 @@ a:hover {
   margin-top: 8px;
 }
 .summary-episode .media-list {
-  margin-top: 2px;
+  margin-top: 0;
+}
+/* the kicker lives inside the text column, hugging the title, so the row
+   packs as tight as the section groups above it */
+.summary-episode .media-body .kicker {
+  margin: 0 0 1px;
+}
+/* summary box section headings link to their pages, dressed as before */
+a.front-summary-sec {
+  display: block;
+  text-decoration: none;
+}
+a.front-summary-sec:hover {
+  text-decoration: underline;
 }
 /* the thumbnail tops align with the episode title */
 .summary-episode .media-row {

@@ -231,9 +231,10 @@ export async function sendEditionTo(email: string, e: Edition, unsubUrl?: string
 
 /** Subscribers eligible to receive anything: the confirmation link was clicked (or they predate double opt-in). */
 function eligible(subs: DigestSubscriber[] | undefined, kind: "daily" | "weekly" | "monthly"): DigestSubscriber[] {
-  // monthly's grandfather rule: subscribers from before the monthly checkbox
-  // follow their weekly choice, since the monthly used to ride the weekly list
-  return (subs ?? []).filter((s) => (kind === "monthly" ? (s.monthly ?? s.weekly) : s[kind]) && s.confirmed !== false);
+  // every frequency is a deliberate opt-in: the monthly used to ride the
+  // weekly list, but nobody is grandfathered onto it, so only an explicit
+  // monthly checkbox receives it
+  return (subs ?? []).filter((s) => s[kind] === true && s.confirmed !== false);
 }
 
 /** Sequential sends (Gmail dislikes bursts); every failure is reported. */
