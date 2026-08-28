@@ -73,6 +73,13 @@ export function MiniPlayer() {
         f.allowFullscreen = true;
         f.style.cssText = "border:0;display:block;width:100vw;height:100vh";
         pip.document.body.appendChild(f);
+        // Chrome remembers the PiP window's last size per site, so a float
+        // once grown for its chapter list would come back tall forever.
+        // Normalize to video size on every open (delta against the inner
+        // size, so the window chrome doesn't skew it).
+        try {
+          pip.resizeBy(480 - pip.innerWidth, 292 - pip.innerHeight);
+        } catch {}
         win = pip;
       }
       if (!win) return;

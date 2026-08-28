@@ -231,6 +231,21 @@ export function MediaPlayer({
     };
   }, [detachMode, startPaused, ytId, open]);
 
+  // leaving a detached window with the chapters open: give back the growth,
+  // so the size the browser remembers for the next window is the video's
+  useEffect(() => {
+    if (!closeWindow) return;
+    const onHide = () => {
+      if (chapterGrow.current <= 0) return;
+      try {
+        (window.parent !== window ? window.parent : window).resizeBy(0, -chapterGrow.current);
+      } catch {}
+      chapterGrow.current = 0;
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [closeWindow]);
+
   useEffect(() => {
     if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
