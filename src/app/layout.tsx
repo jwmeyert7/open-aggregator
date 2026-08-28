@@ -51,6 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <link rel="alternate" type="application/rss+xml" title={site.siteName} href="/feed.xml" />
       </head>
       <body>
         {/* one wrapper so header and mobile section nav stick as a single
