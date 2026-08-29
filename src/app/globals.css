@@ -634,13 +634,16 @@ a:hover {
   color: var(--hover-mint);
 }
 /* the underline covers only the clickable words, never the seal's space:
-   "Verify this edition" whole, and just "Verified" once it has run */
-.verify-ok,
-.verify-idle {
+   "Verify this edition" whole, and just "Verified" once it has run.
+   scoped under .verify-seal so this outranks .linklike's blanket underline */
+.verify-seal .verify-ok,
+.verify-seal .verify-idle,
+.verify-seal .verify-work-toggle {
   text-decoration: none;
 }
-.verify-ok .verify-word,
-.verify-idle .verify-word {
+.verify-seal .verify-ok .verify-word,
+.verify-seal .verify-idle .verify-word,
+.verify-seal .verify-work-toggle:hover {
   text-decoration: underline;
 }
 .verify-bad {
