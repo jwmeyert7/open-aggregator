@@ -601,6 +601,10 @@ a:hover {
 .day-colophon a {
   color: var(--fg-soft);
 }
+/* the full sha256 shows honestly and wraps instead of overflowing */
+.edition-hash {
+  word-break: break-all;
+}
 /* mobile-only top-podcast box at the bottom of the above-nav summary: the
    same compact box treatment as the section groups above it */
 .summary-episode {

@@ -79,19 +79,20 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
           </p>
           {digest.contentHash ? (
             <p className="day-colophon">
-              edition hash: {digest.contentHash.slice(0, 16)}…
+              edition hash:{" "}
               {digest.attestationUid ? (
-                <>
-                  {" "}
-                  <a
-                    href={`https://base.easscan.org/attestation/view/${digest.attestationUid}`}
-                    rel="noopener"
-                    title="This edition's content hash, attested onchain the day it froze"
-                  >
-                    attested onchain
-                  </a>
-                </>
-              ) : null}
+                <a
+                  className="edition-hash"
+                  href={`https://base.easscan.org/attestation/view/${digest.attestationUid}`}
+                  rel="noopener"
+                  title="This edition's content hash, attested onchain the day it froze. Opens the attestation."
+                >
+                  {digest.contentHash}
+                </a>
+              ) : (
+                <span className="edition-hash">{digest.contentHash}</span>
+              )}
+              {digest.attestationUid ? <> (attested onchain)</> : null}
             </p>
           ) : null}
         </div>
