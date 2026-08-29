@@ -44,7 +44,7 @@ export default async function VerifyPage() {
         <h2>The full check, without trusting this site</h2>
         <ol>
           <li>
-            Download the sealed file (<em>download what was hashed</em>, beside the hash).
+            Download the sealed file (<em>download the hashed json</em>, under the hash).
           </li>
           <li>
             Windows: <code>Get-FileHash edition-2026-08-28.json -Algorithm SHA256</code>

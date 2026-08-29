@@ -92,9 +92,10 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
                 </a>
               ) : (
                 <span className="edition-hash">{digest.contentHash}</span>
-              )}{" "}
-              · <a href={`/day/${date}/edition.json`} title="The sealed edition file: sha256 of this exact download equals the hash">
-                download what was hashed
+              )}
+              <br />
+              <a href={`/day/${date}/edition.json`} title="The sealed edition file: sha256 of this exact download equals the hash">
+                download the hashed json
               </a>
               {digest.attestationUid ? (
                 <>
