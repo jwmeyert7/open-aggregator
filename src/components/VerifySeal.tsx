@@ -121,7 +121,7 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
             onClick={() => setShowWork((s) => !s)}
             title="The steps each verify run took, newest last"
           >
-            {showWork ? "hide the work ▴" : "show the work ▾"}
+            <span className="verify-word">{showWork ? "hide the work" : "show the work"}</span> {showWork ? "▴" : "▾"}
           </button>
         </>
       ) : null}

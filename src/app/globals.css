@@ -645,7 +645,7 @@ a:hover {
 }
 .verify-seal .verify-ok .verify-word,
 .verify-seal .verify-idle .verify-word,
-.verify-seal .verify-work-toggle:hover {
+.verify-seal .verify-work-toggle:hover .verify-word {
   text-decoration: underline;
 }
 .verify-bad {
