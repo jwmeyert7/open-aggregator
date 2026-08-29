@@ -487,11 +487,13 @@ export interface DailyDigest {
   takenAt: string;
   /**
    * sha256 of the frozen edition's content (everything except post-freeze
-   * bookkeeping: tweetId, castHash, this field). Written once at freeze.
-   * Groundwork for collectible editions: the hash an edition NFT or onchain
-   * attestation would carry as proof of the day's real record.
+   * bookkeeping: tweetId, castHash, attestationUid, this field). Written once
+   * at freeze. The hash an edition NFT or onchain attestation carries as
+   * proof of the day's real record.
    */
   contentHash?: string;
+  /** UID of the edition's EAS attestation on Base, once one has been made. */
+  attestationUid?: string;
   clusters: Cluster[]; // the day's top stories, pre-sorted by magnitude
   /** Hash of the digest's Farcaster cast, when it really posted. */
   castHash?: string;
@@ -518,6 +520,8 @@ export interface MonthlyDigest {
   takenAt: string;
   /** sha256 of the frozen content, as on DailyDigest. */
   contentHash?: string;
+  /** UID of the edition's EAS attestation on Base, once one has been made. */
+  attestationUid?: string;
   clusters: Cluster[]; // the month's top stories, importance first then magnitude
   /** The month's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];
@@ -537,6 +541,8 @@ export interface YearlyDigest {
   takenAt: string;
   /** sha256 of the frozen content, as on DailyDigest. */
   contentHash?: string;
+  /** UID of the edition's EAS attestation on Base, once one has been made. */
+  attestationUid?: string;
   clusters: Cluster[]; // the year's top stories, pooled from the monthly digests
   /** One podcast per month: each frozen month's top episode, in month order. */
   episodes?: MediaItem[];
@@ -553,6 +559,8 @@ export interface WeeklyDigest {
   takenAt: string;
   /** sha256 of the frozen content, as on DailyDigest. */
   contentHash?: string;
+  /** UID of the edition's EAS attestation on Base, once one has been made. */
+  attestationUid?: string;
   clusters: Cluster[]; // the week's top stories, importance first then magnitude
   /** The week's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];

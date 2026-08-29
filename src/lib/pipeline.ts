@@ -1,5 +1,6 @@
 import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
 import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sendDailyEmail, sendMonthlyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC, yearlyTop } from "./digest";
+import { attestAvailable, attestEdition } from "./attest";
 import { sendAdminEmail } from "./mail";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
@@ -89,9 +90,29 @@ export function markSeen(state: SiteState, item: CandidateItem): void {
  * NFT or onchain attestation would carry as proof of the period's record.
  */
 function digestContentHash(digest: object): string {
-  const { castHash, tweetId, contentHash, inProgress, ...core } = digest as Record<string, unknown>;
-  void castHash; void tweetId; void contentHash; void inProgress;
+  const { castHash, tweetId, contentHash, attestationUid, inProgress, ...core } = digest as Record<string, unknown>;
+  void castHash; void tweetId; void contentHash; void attestationUid; void inProgress;
   return sha256(JSON.stringify(core));
+}
+
+/**
+ * Attests a freshly frozen edition's content hash on Base (EAS), when the
+ * attestation key is configured. Best effort at freeze time: a failure is a
+ * note and the daily gets retried by its thread step; the freeze itself never
+ * waits on a chain.
+ */
+async function attestFrozenEdition(
+  digest: { contentHash?: string; attestationUid?: string },
+  edition: string,
+  notes: string[]
+): Promise<void> {
+  if (!attestAvailable() || !digest.contentHash || digest.attestationUid) return;
+  try {
+    digest.attestationUid = await attestEdition(edition, digest.contentHash);
+    notes.push(`attested ${edition} on Base (${digest.attestationUid.slice(0, 10)}…)`);
+  } catch (err) {
+    notes.push(`attestation failed for ${edition}: ${truncate(err instanceof Error ? err.message : String(err), 160)}`);
+  }
 }
 
 /**
@@ -550,6 +571,7 @@ async function makeDailyDigest(
     notes.push(`cast failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
   }
   digest.contentHash = digestContentHash(digest);
+  await attestFrozenEdition(digest, `day:${digest.date}`, notes);
   // the X side is the day THREAD, posted (and retried) by its own pipeline
   // step once the digest exists, so a failed post never blocks the freeze
   await saveDailyDigest(digest);
@@ -683,6 +705,14 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
   if (cfg.bots.x.dailyThread === false) return;
   const yesterday = utcDay(new Date(Date.now() - 24 * 60 * 60000).toISOString());
   const digest = await loadDailyDigest(yesterday);
+  // a freeze-time attestation that failed retries here for the same 36 hours
+  // the thread does, riding a step that already loads and saves this digest
+  if (digest && !digest.inProgress && hoursAgo(digest.takenAt) <= 36 && attestAvailable() && digest.contentHash && !digest.attestationUid) {
+    const attNotes: string[] = [];
+    await attestFrozenEdition(digest, `day:${digest.date}`, attNotes);
+    if (digest.attestationUid) await saveDailyDigest(digest);
+    report.notes.push(...attNotes);
+  }
   // an inProgress digest means yesterday's freeze hasn't run (or failed):
   // the thread must never post a preview as the day's edition
   if (!digest || digest.inProgress || digest.tweetId || hoursAgo(digest.takenAt) > 36) return;
@@ -2016,6 +2046,7 @@ export async function runPipeline(): Promise<RunReport> {
         ).slice(0, 5);
         if (weekEps.length > 0) weekly.episodes = JSON.parse(JSON.stringify(weekEps)) as MediaItem[];
         weekly.contentHash = digestContentHash(weekly);
+        await attestFrozenEdition(weekly, `week:${weekly.end}`, report.notes);
         await saveWeeklyDigest(weekly);
         state.weeklyDigestDates = rememberDate(state.weeklyDigestDates, weekly.end);
         report.notes.push(`Weekly digest ${weekly.end}: ${weekly.clusters.length} stories frozen`);
@@ -2105,6 +2136,7 @@ export async function runPipeline(): Promise<RunReport> {
         ).slice(0, 6);
         if (monthEps.length > 0) monthly.episodes = JSON.parse(JSON.stringify(monthEps)) as MediaItem[];
         monthly.contentHash = digestContentHash(monthly);
+        await attestFrozenEdition(monthly, `month:${monthly.month}`, report.notes);
         await saveMonthlyDigest(monthly);
         state.monthlyDigestMonths = rememberDate(state.monthlyDigestMonths, prevMonth);
         report.notes.push(`Monthly digest ${prevMonth}: ${monthly.clusters.length} stories frozen`);
@@ -2181,6 +2213,7 @@ export async function runPipeline(): Promise<RunReport> {
           ...(y.episodes.length > 0 ? { episodes: JSON.parse(JSON.stringify(y.episodes)) as MediaItem[] } : {}),
         };
         yearly.contentHash = digestContentHash(yearly);
+        await attestFrozenEdition(yearly, `year:${yearly.year}`, report.notes);
         await saveYearlyDigest(yearly);
         state.yearlyDigestYears = rememberDate(state.yearlyDigestYears, prevYear);
         report.notes.push(`Yearly digest ${prevYear}: ${yearly.clusters.length} stories frozen`);

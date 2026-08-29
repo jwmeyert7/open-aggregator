@@ -591,6 +591,16 @@ a:hover {
 .front-summary.above-nav {
   margin: 0;
 }
+/* quiet technical footer line on archive pages (edition hash, attestation) */
+.day-colophon {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.day-colophon a {
+  color: var(--fg-soft);
+}
 /* mobile-only top-podcast box at the bottom of the above-nav summary: the
    same compact box treatment as the section groups above it */
 .summary-episode {
