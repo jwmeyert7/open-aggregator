@@ -36,7 +36,7 @@ export default async function VerifyPage() {
 
         <h2>The quick check</h2>
         <p>
-          On any <Link href="/day">archived day</Link> that was hashed and attested to EAS, there will be a{" "}
+          On any <Link href="/archive/daily">archived day</Link> that was hashed and attested to EAS, there will be a{" "}
           <em>verify this edition</em> button. That button asks your browser to recompute the fingerprint and compare
           it against the public record.
         </p>

@@ -44,7 +44,7 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
             <p>The month&apos;s top ranked stories, frozen when the monthly edition went out.</p>
           )}
           <p>
-            Individual days live in the <Link href="/day">daily archive</Link>
+            Individual days live in the <Link href="/archive/daily">daily archive</Link>
             {digest.tweetId ? (
               <>
                 {" "}

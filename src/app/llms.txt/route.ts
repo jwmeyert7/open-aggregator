@@ -24,6 +24,7 @@ Pages are server-rendered HTML and readable as-is. The machine surfaces:
 
 ## Archives
 
+- Index: ${base}/archive — links the daily, weekly, monthly, and per-update archives
 - Day: ${base}/day/YYYY-MM-DD — frozen at UTC midnight, carries a sha256 content hash of the edition
 - Week: ${base}/week/YYYY-MM-DD — Saturday through Friday, addressed by the Friday date
 - Month: ${base}/month/YYYY-MM

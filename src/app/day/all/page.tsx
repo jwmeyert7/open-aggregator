@@ -55,7 +55,7 @@ export default async function AllDaysPage({
         <div className="month-nav">
           <span>{newer ? <Link href={`/day/all?month=${newer.month}`}>← {monthLabel(newer.month)}</Link> : null}</span>
           <span>
-            <Link href="/day">Recent days</Link>
+            <Link href="/archive/daily">Recent days</Link>
           </span>
           <span>{older ? <Link href={`/day/all?month=${older.month}`}>{monthLabel(older.month)} →</Link> : null}</span>
         </div>

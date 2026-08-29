@@ -59,7 +59,7 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
             <p>The day&apos;s top ranked stories.</p>
           )}
           <p>
-            All days are in the <Link href="/day">daily archive</Link>
+            All days are in the <Link href="/archive/daily">daily archive</Link>
             {(digest.castHash && fcHandle) || digest.tweetId ? " and posted to " : ""}
             {digest.castHash && fcHandle ? (
               <a

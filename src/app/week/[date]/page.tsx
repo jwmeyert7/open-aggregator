@@ -48,7 +48,7 @@ export default async function WeekPage({ params }: { params: Promise<{ date: str
             <p>The week&apos;s top ranked stories, frozen when the weekly edition went out.</p>
           )}
           <p>
-            Individual days live in the <Link href="/day">daily archive</Link>
+            Individual days live in the <Link href="/archive/daily">daily archive</Link>
             {digest.tweetId ? (
               <>
                 {" "}

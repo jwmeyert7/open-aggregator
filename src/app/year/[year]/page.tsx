@@ -42,7 +42,7 @@ export default async function YearPage({ params }: { params: Promise<{ year: str
             <p>The year&apos;s top ranked stories, frozen on January 1.</p>
           )}
           <p>
-            Individual days live in the <Link href="/day">daily archive</Link>.
+            Individual days live in the <Link href="/archive/daily">daily archive</Link>.
           </p>
         </div>
         {digest.clusters.map((c) => (

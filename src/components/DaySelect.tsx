@@ -27,7 +27,7 @@ export function DaySelect({
         value={selected ?? ""}
         onChange={(e) => {
           const day = e.target.value;
-          if (day) router.push(target === "archive" ? `/archive?date=${day}` : `/day/${day}`);
+          if (day) router.push(target === "archive" ? `/archive/per-update?date=${day}` : `/day/${day}`);
         }}
       >
         {selected ? null : <option value="">Choose a day</option>}

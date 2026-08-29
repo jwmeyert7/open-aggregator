@@ -64,7 +64,7 @@ export default function AboutPage() {
         </p>
         <p>
           Everything on the site flows from that: the <Link href="/stream">stream</Link> is the raw feed of accepted
-          items, the <Link href="/day">daily archive</Link> freezes each day at UTC midnight, and clicking the date in
+          items, the <Link href="/archive/daily">daily archive</Link> freezes each day at UTC midnight, and clicking the date in
           the header time travels to any archived front page.
         </p>
         <h2>Connect an AI assistant</h2>
