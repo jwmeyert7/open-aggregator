@@ -100,11 +100,11 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
     <span className={`verify-seal${state === "ok" ? " sealed" : ""}`}>
       {state === "ok" ? (
         <button type="button" className="linklike verify-ok" onClick={run} title="Verify again">
-          {seal} Verified. {detail}
+          {seal} <span className="verify-word">Verified</span>. {detail}
         </button>
       ) : (
-        <button type="button" className="linklike" onClick={run} disabled={state === "working"}>
-          {seal} {state === "working" ? "checking…" : "verify this edition"}
+        <button type="button" className="linklike verify-idle" onClick={run} disabled={state === "working"}>
+          {seal} <span className="verify-word">{state === "working" ? "checking…" : "Verify this edition"}</span>
         </button>
       )}{" "}
       <a href="/verify" className="verify-help" title="How verification works">

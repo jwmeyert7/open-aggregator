@@ -633,6 +633,16 @@ a:hover {
 .verify-ok {
   color: var(--hover-mint);
 }
+/* the underline covers only the clickable words, never the seal's space:
+   "Verify this edition" whole, and just "Verified" once it has run */
+.verify-ok,
+.verify-idle {
+  text-decoration: none;
+}
+.verify-ok .verify-word,
+.verify-idle .verify-word {
+  text-decoration: underline;
+}
 .verify-bad {
   color: var(--warn);
 }
