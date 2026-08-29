@@ -37,21 +37,33 @@ export async function sealedRecord(uid: string): Promise<{ hash: string; sealedA
 export function VerifySeal({ date, uid }: { date: string; uid: string }) {
   const [state, setState] = useState<"idle" | "working" | "ok" | "bad" | "error">("idle");
   const [detail, setDetail] = useState("");
+  const [work, setWork] = useState<string[]>([]);
+  const [showWork, setShowWork] = useState(false);
 
   const run = async () => {
     setState("working");
     setDetail("");
+    const runNumber = work.filter((l) => l.startsWith("run ")).length + 1;
+    const lines: string[] = [`run ${runNumber} · ${new Date().toUTCString().slice(17, 25)} UTC`];
+    const finish = () => setWork((prev) => [...prev, ...lines]);
     try {
       const [fileText, record] = await Promise.all([
         fetch(`/day/${date}/edition.json`).then((r) => r.text()),
         sealedRecord(uid),
       ]);
+      lines.push(`fetched /day/${date}/edition.json · ${new TextEncoder().encode(fileText).length} bytes`);
       if (!record) {
+        lines.push("could not reach base.easscan.org for the sealed hash");
+        finish();
         setState("error");
         setDetail("Could not reach the public record. The do-it-yourself steps on /verify work without it.");
         return;
       }
       const recomputed = await sha256Hex(fileText);
+      lines.push(`sha256 of those bytes in this browser: ${recomputed}`);
+      lines.push(`sealed hash read from base.easscan.org: ${record.hash}`);
+      lines.push(recomputed === record.hash ? "compare: match" : "compare: MISMATCH");
+      finish();
       if (recomputed === record.hash) {
         setState("ok");
         setDetail(`Unchanged since it was sealed in public on ${record.sealedAt}.`);
@@ -60,6 +72,8 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
         setDetail("This content does not match the sealed record. Either the edition changed after sealing or the tooling has a bug. Use the do-it-yourself steps on /verify to confirm independently.");
       }
     } catch {
+      lines.push("something failed before the comparison");
+      finish();
       setState("error");
       setDetail("Something failed while checking. The do-it-yourself steps on /verify work without this button.");
     }
@@ -96,8 +110,30 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
       <a href="/verify" className="verify-help" title="How verification works">
         ?
       </a>
+      {work.length > 0 ? (
+        <>
+          {" "}
+          <button
+            type="button"
+            className="linklike verify-work-toggle"
+            onClick={() => setShowWork((s) => !s)}
+            title="The steps each verify run took, newest last"
+          >
+            {showWork ? "hide the work ▴" : "show the work ▾"}
+          </button>
+        </>
+      ) : null}
       {state === "bad" ? <span className="verify-bad"> ✗ {detail}</span> : null}
       {state === "error" ? <span className="verify-err"> {detail}</span> : null}
+      {showWork && work.length > 0 ? (
+        <span className="verify-steps">
+          {work.map((line, i) => (
+            <span key={i} className={`verify-step${line.startsWith("run ") ? " run" : ""}`}>
+              {line}
+            </span>
+          ))}
+        </span>
+      ) : null}
     </span>
   );
 }

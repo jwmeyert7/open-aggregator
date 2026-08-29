@@ -639,6 +639,30 @@ a:hover {
 .verify-err {
   color: var(--muted);
 }
+/* the nerd dropdown: every step each verify run took, runs stacking up */
+.verify-work-toggle {
+  color: var(--muted);
+}
+.verify-steps {
+  display: block;
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-soft);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.verify-step {
+  display: block;
+  word-break: break-all;
+}
+.verify-step.run {
+  color: var(--fg-soft);
+  margin-top: 4px;
+}
+.verify-step.run:first-child {
+  margin-top: 0;
+}
 .tamper-demo .text {
   width: 100%;
   max-width: 560px;
