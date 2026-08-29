@@ -2025,25 +2025,29 @@ export async function runPipeline(): Promise<RunReport> {
   // and monthlies for a month. The yearly never auto-attests (see the freeze).
   try {
     if (attestAvailable()) {
-      const wkEnd = state.weeklyDigestDates?.[0];
-      if (wkEnd) {
+      // the newest key in each date list is usually the CURRENT period's
+      // in-progress preview, so look past it to the newest frozen edition
+      for (const wkEnd of (state.weeklyDigestDates ?? []).slice(0, 3)) {
         const w = await loadWeeklyDigest(wkEnd);
-        if (w && !w.inProgress && w.contentHash && !w.attestationUid && hoursAgo(w.takenAt) <= 31 * 24) {
+        if (!w || w.inProgress) continue;
+        if (w.contentHash && !w.attestationUid && hoursAgo(w.takenAt) <= 31 * 24) {
           const attNotes: string[] = [];
           await attestFrozenEdition(w, `week:${w.end}`, attNotes);
           if (w.attestationUid) await saveWeeklyDigest(w);
           report.notes.push(...attNotes);
         }
+        break;
       }
-      const month = state.monthlyDigestMonths?.[0];
-      if (month) {
+      for (const month of (state.monthlyDigestMonths ?? []).slice(0, 3)) {
         const m = await loadMonthlyDigest(month);
-        if (m && !m.inProgress && m.contentHash && !m.attestationUid && hoursAgo(m.takenAt) <= 31 * 24) {
+        if (!m || m.inProgress) continue;
+        if (m.contentHash && !m.attestationUid && hoursAgo(m.takenAt) <= 31 * 24) {
           const attNotes: string[] = [];
           await attestFrozenEdition(m, `month:${m.month}`, attNotes);
           if (m.attestationUid) await saveMonthlyDigest(m);
           report.notes.push(...attNotes);
         }
+        break;
       }
     }
   } catch (err) {
