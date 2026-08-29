@@ -605,6 +605,45 @@ a:hover {
 .edition-hash {
   word-break: break-all;
 }
+/* the seal starts gray (unverified) and turns solid blue once the check passes */
+.verify-seal .seal-icon {
+  color: var(--muted);
+  vertical-align: -2px;
+}
+.verify-seal.sealed .seal-icon {
+  color: var(--link);
+  fill: var(--link);
+}
+/* the small circled question mark linking how-verification-works */
+.verify-help {
+  display: inline-block;
+  min-width: 14px;
+  text-align: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 50%;
+  font-size: 0.7rem;
+  line-height: 14px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.verify-help:hover {
+  color: var(--fg-soft);
+}
+/* verification results speak in color: match, mismatch, could-not-check */
+.verify-ok {
+  color: var(--hover-mint);
+}
+.verify-bad {
+  color: var(--warn);
+}
+.verify-err {
+  color: var(--muted);
+}
+.tamper-demo .text {
+  width: 100%;
+  max-width: 560px;
+  margin: 6px 0;
+}
 /* mobile-only top-podcast box at the bottom of the above-nav summary: the
    same compact box treatment as the section groups above it */
 .summary-episode {
@@ -1072,7 +1111,8 @@ body:has(.notfound) .main-nav {
 }
 /* the global reset zeroes list padding, which hangs markers outside the text
    column: restore an indent so bullets line up under the prose, not left of it */
-.prose ul {
+.prose ul,
+.prose ol {
   margin: 0 0 16px;
   padding-left: 20px;
   max-width: 640px;

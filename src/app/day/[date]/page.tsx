@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ClusterCard } from "@/components/ClusterCard";
 import { DigestEpisodes } from "@/components/DigestEpisodes";
 import { SummaryBlock } from "@/components/SummaryBlock";
+import { VerifySeal } from "@/components/VerifySeal";
 import { loadSiteConfig } from "@/lib/config";
 import { loadDailyDigest } from "@/lib/state";
 import { siteIdentity } from "@/lib/site";
@@ -79,7 +80,7 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
           </p>
           {digest.contentHash ? (
             <p className="day-colophon">
-              edition hash:{" "}
+              {digest.attestationUid ? "attested via EAS: " : "edition hash: "}
               {digest.attestationUid ? (
                 <a
                   className="edition-hash"
@@ -91,8 +92,16 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
                 </a>
               ) : (
                 <span className="edition-hash">{digest.contentHash}</span>
-              )}
-              {digest.attestationUid ? <> (attested onchain)</> : null}
+              )}{" "}
+              · <a href={`/day/${date}/edition.json`} title="The sealed edition file: sha256 of this exact download equals the hash">
+                download what was hashed
+              </a>
+              {digest.attestationUid ? (
+                <>
+                  <br />
+                  <VerifySeal date={date} uid={digest.attestationUid} />
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>

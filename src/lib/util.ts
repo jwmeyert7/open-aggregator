@@ -250,6 +250,20 @@ export function parseSummaryLines(
 }
 
 /**
+ * The hashed core of a frozen edition: everything except post-freeze
+ * bookkeeping. This is THE serialization contract behind contentHash and the
+ * public verification flow (sha256 of JSON.stringify of this core, exactly),
+ * shared by the freeze-time hasher and the edition.json download so the
+ * downloaded bytes always re-hash to the sealed value. Change it and every
+ * existing attestation stops verifying, so never change it.
+ */
+export function editionCore(digest: object): Record<string, unknown> {
+  const { castHash, tweetId, contentHash, attestationUid, inProgress, ...core } = digest as Record<string, unknown>;
+  void castHash; void tweetId; void contentHash; void attestationUid; void inProgress;
+  return core;
+}
+
+/**
  * Server-side fetches of admin- or visitor-supplied URLs must never reach
  * internal infrastructure. Name-pattern check only: cheap, and catches the
  * loopback, link-local, and RFC-1918 targets that matter on typical hosts.

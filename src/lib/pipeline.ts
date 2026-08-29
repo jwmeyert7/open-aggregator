@@ -14,7 +14,7 @@ import { loadDailyDigest, loadMonthlyDigest, loadState, loadWeeklyDigest, saveDa
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
 import { ogTruncate } from "./og";
-import { bestMatchIndex, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, stripHtml, truncate, utcDay } from "./util";
+import { bestMatchIndex, editionCore, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, stripHtml, truncate, utcDay } from "./util";
 
 /** Gate counters are kept a little longer than the leaderboard's 30 day window. */
 export const SOURCE_STATS_RETENTION_DAYS = 35;
@@ -90,9 +90,9 @@ export function markSeen(state: SiteState, item: CandidateItem): void {
  * NFT or onchain attestation would carry as proof of the period's record.
  */
 function digestContentHash(digest: object): string {
-  const { castHash, tweetId, contentHash, attestationUid, inProgress, ...core } = digest as Record<string, unknown>;
-  void castHash; void tweetId; void contentHash; void attestationUid; void inProgress;
-  return sha256(JSON.stringify(core));
+  // editionCore is the serialization contract: the same bytes the public
+  // edition.json download serves, so anyone can re-derive this hash
+  return sha256(JSON.stringify(editionCore(digest)));
 }
 
 /**
