@@ -66,7 +66,7 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
       finish();
       if (recomputed === record.hash) {
         setState("ok");
-        setDetail(`Unchanged since it was sealed in public on ${record.sealedAt}.`);
+        setDetail(`Same as published onchain on ${record.sealedAt}.`);
       } else {
         setState("bad");
         setDetail("This content does not match the sealed record. Either the edition changed after sealing or the tooling has a bug. Use the do-it-yourself steps on /verify to confirm independently.");

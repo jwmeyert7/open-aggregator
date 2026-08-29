@@ -640,6 +640,8 @@ a:hover {
 .verify-seal .verify-idle,
 .verify-seal .verify-work-toggle {
   text-decoration: none;
+  /* buttons center their text by default, which shows when the sentence wraps on mobile */
+  text-align: left;
 }
 .verify-seal .verify-ok .verify-word,
 .verify-seal .verify-idle .verify-word,
