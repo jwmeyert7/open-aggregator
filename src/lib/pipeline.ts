@@ -10,7 +10,7 @@ import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
 import { castRaw, postToFarcaster, farcasterPostedToday } from "./social/farcaster";
 import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from "./social/x";
-import { loadDailyDigest, loadState, saveDailyDigest, saveMonthlyDigest, saveSnapshot, saveState, saveWeeklyDigest, saveYearlyDigest } from "./state";
+import { loadDailyDigest, loadMonthlyDigest, loadState, loadWeeklyDigest, saveDailyDigest, saveMonthlyDigest, saveSnapshot, saveState, saveWeeklyDigest, saveYearlyDigest } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
 import { ogTruncate } from "./og";
@@ -2020,6 +2020,36 @@ export async function runPipeline(): Promise<RunReport> {
     report.notes.push(`day thread failed: ${err instanceof Error ? err.message : err}`);
   }
 
+  // an edition frozen before the attestation key existed (or whose attempt
+  // failed) retries after its freeze, mirroring the daily's retry: weeklies
+  // and monthlies for a month. The yearly never auto-attests (see the freeze).
+  try {
+    if (attestAvailable()) {
+      const wkEnd = state.weeklyDigestDates?.[0];
+      if (wkEnd) {
+        const w = await loadWeeklyDigest(wkEnd);
+        if (w && !w.inProgress && w.contentHash && !w.attestationUid && hoursAgo(w.takenAt) <= 31 * 24) {
+          const attNotes: string[] = [];
+          await attestFrozenEdition(w, `week:${w.end}`, attNotes);
+          if (w.attestationUid) await saveWeeklyDigest(w);
+          report.notes.push(...attNotes);
+        }
+      }
+      const month = state.monthlyDigestMonths?.[0];
+      if (month) {
+        const m = await loadMonthlyDigest(month);
+        if (m && !m.inProgress && m.contentHash && !m.attestationUid && hoursAgo(m.takenAt) <= 31 * 24) {
+          const attNotes: string[] = [];
+          await attestFrozenEdition(m, `month:${m.month}`, attNotes);
+          if (m.attestationUid) await saveMonthlyDigest(m);
+          report.notes.push(...attNotes);
+        }
+      }
+    }
+  } catch (err) {
+    report.notes.push(`attestation retry failed: ${err instanceof Error ? err.message : err}`);
+  }
+
   // Saturday-morning weekly edition: the prior Saturday to Friday's top
   // stories, assembled from the frozen daily digests, once per Saturday. The
   // frozen /week page comes FIRST so the email and thread can link a page
@@ -2213,7 +2243,9 @@ export async function runPipeline(): Promise<RunReport> {
           ...(y.episodes.length > 0 ? { episodes: JSON.parse(JSON.stringify(y.episodes)) as MediaItem[] } : {}),
         };
         yearly.contentHash = digestContentHash(yearly);
-        await attestFrozenEdition(yearly, `year:${yearly.year}`, report.notes);
+        // the yearly deliberately does NOT auto-attest: it may get hand
+        // curation after the freeze, and an attestation would seal the
+        // uncurated version. Attesting a year is a manual decision.
         await saveYearlyDigest(yearly);
         state.yearlyDigestYears = rememberDate(state.yearlyDigestYears, prevYear);
         report.notes.push(`Yearly digest ${prevYear}: ${yearly.clusters.length} stories frozen`);
