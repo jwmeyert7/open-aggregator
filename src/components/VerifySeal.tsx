@@ -66,7 +66,7 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
       finish();
       if (recomputed === record.hash) {
         setState("ok");
-        setDetail(`Same as published onchain on ${record.sealedAt}.`);
+        setDetail(`Hash matches ${record.sealedAt} onchain attestation.`);
       } else {
         setState("bad");
         setDetail("This content does not match the sealed record. Either the edition changed after sealing or the tooling has a bug. Use the do-it-yourself steps on /verify to confirm independently.");
@@ -114,14 +114,14 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
       {state === "error" ? <span className="verify-err"> {detail}</span> : null}
       {work.length > 0 ? (
         <>
-          <br />
+          {" "}
           <button
             type="button"
             className="linklike verify-work-toggle"
             onClick={() => setShowWork((s) => !s)}
             title="The steps each verify run took, newest last"
           >
-            <span className="verify-word">{showWork ? "hide the work" : "show the work"}</span> {showWork ? "▴" : "▾"}
+            <span className="verify-word">{showWork ? "hide" : "show"}</span> {showWork ? "▴" : "▾"}
           </button>
         </>
       ) : null}
