@@ -110,9 +110,11 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
       <a href="/verify" className="verify-help" title="How verification works">
         ?
       </a>
+      {state === "bad" ? <span className="verify-bad"> ✗ {detail}</span> : null}
+      {state === "error" ? <span className="verify-err"> {detail}</span> : null}
       {work.length > 0 ? (
         <>
-          {" "}
+          <br />
           <button
             type="button"
             className="linklike verify-work-toggle"
@@ -123,8 +125,6 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
           </button>
         </>
       ) : null}
-      {state === "bad" ? <span className="verify-bad"> ✗ {detail}</span> : null}
-      {state === "error" ? <span className="verify-err"> {detail}</span> : null}
       {showWork && work.length > 0 ? (
         <span className="verify-steps">
           {work.map((line, i) => (
