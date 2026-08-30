@@ -88,7 +88,7 @@ export function SubmitForm({ story, sections }: { story?: string; sections: stri
         />
       </label>
       <label>
-        Your email <span className="org">(optional, never shown)</span>
+        Your email <span className="org">(optional, never shown. Used once to email you the decision.)</span>
         <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
       {/* honeypot: hidden from people, filled by bots */}

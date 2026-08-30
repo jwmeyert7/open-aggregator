@@ -3,7 +3,7 @@ import { ADMIN_COOKIE, checkPassword, cookieValue, isAdmin, LAYOUT_PREVIEW_COOKI
 import { effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
 import { buildDailyEdition, buildWeeklyEdition, confirmationEmail, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
 import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAgent } from "@/lib/feeds";
-import { sendMail } from "@/lib/mail";
+import { notifySubmitter, sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable, summarizeRelease } from "@/lib/llm";
 import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
@@ -720,10 +720,12 @@ async function handle(req: NextRequest) {
     const sub = (state.submissions ?? []).find((s) => s.id === String(body.id ?? ""));
     if (!sub) return fail("Unknown submission.");
     if (sub.status !== "pending") return fail("Already handled.");
+    const editorNote = String(body.note ?? "").trim();
     if (body.action === "dismissSubmission") {
       sub.status = "dismissed";
       await saveState(state);
-      return ok("Dismissed.");
+      const mailed = await notifySubmitter(sub, "dismissed", editorNote);
+      return ok(`Dismissed.${mailed}`);
     }
     // a submission aimed at a specific story attaches straight to it, no
     // editorial gate: the reader already told us where it belongs, and the
@@ -747,7 +749,8 @@ async function handle(req: NextRequest) {
     if (target) await takeSnapshot(state);
     sub.status = "approved";
     await saveState(state);
-    return ok(`Approved. ${message}`);
+    const mailed = await notifySubmitter(sub, "approved", editorNote, target?.slug);
+    return ok(`Approved. ${message}${mailed}`);
   }
 
   if (body.action === "setSponsorPage") {

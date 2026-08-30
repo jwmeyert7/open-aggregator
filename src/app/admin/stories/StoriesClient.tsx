@@ -576,7 +576,8 @@ function SubmissionCard({
   act: (action: string, payload?: Record<string, unknown>, confirmText?: string) => Promise<void>;
 }) {
   const [section, setSection] = useState(s.sections?.[0] ?? "");
-  const confirmed = section ? { section } : {};
+  const [note, setNote] = useState("");
+  const confirmed = { ...(section ? { section } : {}), ...(note.trim() ? { note: note.trim() } : {}) };
   return (
     <div className="admin-card">
       <div className="headline">
@@ -602,6 +603,19 @@ function SubmissionCard({
         {s.email ? ` · from ${s.email}` : ""}
       </div>
       {s.note ? <div className="sub">“{s.note}”</div> : null}
+      {s.email ? (
+        // the submitter left an email, so the decision emails them either way;
+        // this box rides along in the editor's own words
+        <input
+          className="text"
+          style={{ width: "100%", margin: "6px 0" }}
+          placeholder="Optional note to the submitter, emailed with your decision"
+          maxLength={500}
+          value={note}
+          disabled={busy}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      ) : null}
       <div className="btn-row">
         <button
           className="btn primary"
@@ -610,7 +624,11 @@ function SubmissionCard({
         >
           Approve
         </button>
-        <button className="btn" disabled={busy} onClick={() => act("dismissSubmission", { id: s.id })}>
+        <button
+          className="btn"
+          disabled={busy}
+          onClick={() => act("dismissSubmission", { id: s.id, ...(note.trim() ? { note: note.trim() } : {}) })}
+        >
           Dismiss
         </button>
         {s.newSource ? (

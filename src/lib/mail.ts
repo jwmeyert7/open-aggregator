@@ -52,3 +52,39 @@ export async function sendAdminEmail(subject: string, text: string): Promise<boo
   if (err) console.error(`[mail] admin email failed: ${err}`);
   return !err;
 }
+
+/**
+ * Tell a submitter what happened to their link, when they left an email.
+ * Best effort: the decision stands either way, and the returned string is a
+ * short suffix for the admin's result toast (" Submitter emailed." or the
+ * failure reason). The optional note is the editor's own words, sent as-is.
+ */
+export async function notifySubmitter(
+  sub: { url: string; email?: string },
+  outcome: "approved" | "dismissed",
+  note?: string,
+  storySlug?: string
+): Promise<string> {
+  if (!sub.email) return "";
+  const site = siteIdentity();
+  const lines =
+    outcome === "approved"
+      ? [
+          `Good news. The link you suggested to ${site.siteName} was accepted and is on the site now.`,
+          "",
+          sub.url,
+          ...(storySlug ? ["", `It joined this story: https://${site.domain}/story/${storySlug}`] : []),
+        ]
+      : [
+          `Thanks for your suggestion to ${site.siteName}. An editor reviewed it and decided not to use it this time.`,
+          "",
+          sub.url,
+        ];
+  if (note) lines.push("", `A note from the editor: ${note}`);
+  lines.push("", "Thanks for reading and for pitching in.", site.siteName);
+  const subject =
+    outcome === "approved" ? `Your ${site.siteName} suggestion made it on` : `About your ${site.siteName} suggestion`;
+  const err = await sendMail(sub.email, subject, lines.join("\n"));
+  if (err) console.error(`[mail] submitter email failed: ${err}`);
+  return err ? ` (email to submitter failed: ${err})` : " Submitter emailed.";
+}
