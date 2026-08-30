@@ -2846,6 +2846,10 @@ body:has(.player-page) {
 }
 .player-chapters li {
   padding: 2px 0;
+  /* prose pages space their list items generously; chapter rows stay tight */
+  margin: 0;
+  line-height: 1.45;
+  font-size: inherit;
 }
 .player-chapters button {
   width: 100%;
