@@ -147,6 +147,8 @@ export function MediaPlayer({
   const fileFrame = useRef<HTMLVideoElement>(null);
   /** how many pixels the detached window grew for the open chapter list */
   const chapterGrow = useRef(0);
+  /** a chapter tapped in the closed row's list: where the opening player starts */
+  const chapterStart = useRef(0);
   /** whether the embed's last state report said it is playing or buffering */
   const playingRef = useRef(false);
   // detached players quietly name their mode in the link row: the /player
@@ -167,9 +169,13 @@ export function MediaPlayer({
   const fileVideo = !ytId && videoUrl ? videoUrl : null;
   const memoryKey = ytId ?? (fileVideo ? `video:${fileVideo}` : audioUrl ? `audio:${audioUrl}` : "");
 
-  // the remembered spot is read on the client only (no storage on the server)
+  // the remembered spot is read on the client only (no storage on the server);
+  // a chapter tapped in the closed row beats both the prop and the memory
   useEffect(() => {
-    if (startAt !== undefined && startAt > 0) setResumeAt(startAt);
+    if (chapterStart.current > 0) {
+      setResumeAt(chapterStart.current);
+      chapterStart.current = 0;
+    } else if (startAt !== undefined && startAt > 0) setResumeAt(startAt);
     else if (memoryKey) setResumeAt(loadPos(memoryKey));
   }, [memoryKey, open, startAt]);
   const playable = Boolean(ytId || fileVideo || (kind === "podcast" && audioUrl));
@@ -383,6 +389,30 @@ export function MediaPlayer({
         ) : null}
         {children}
       </div>
+      {!open && playable && chapters && chapters.length > 0 ? (
+        // the show notes' table of contents, readable without loading the
+        // player; a tapped chapter opens the player right at that moment
+        <details className="player-chapters row-chapters">
+          <summary>chapters ({chapters.length})</summary>
+          <ol>
+            {chapters.map((c) => (
+              <li key={c.at}>
+                <button
+                  type="button"
+                  className="linklike"
+                  onClick={() => {
+                    chapterStart.current = c.at;
+                    setOpen(true);
+                  }}
+                >
+                  <span className="chap-at">{fmt(c.at)}</span>
+                  {c.label}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
       {open && playable ? (
         <div
           className={`media-player${compact ? " compact" : ""}${expanded ? " expanded" : ""}`}

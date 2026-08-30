@@ -2855,6 +2855,10 @@ body:has(.player-page) {
 .player-page .player-chapters {
   flex: none;
 }
+/* the closed row's copy of the list sits under the row, slightly indented */
+.row-chapters {
+  margin: 2px 0 6px;
+}
 
 /* the criteria and submit pointer breathes below the tables */
 .sources-foot {
