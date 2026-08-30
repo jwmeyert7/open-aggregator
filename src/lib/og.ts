@@ -16,6 +16,19 @@ export function ogFonts(): Array<{ name: string; data: Buffer; weight: 400 | 600
   ];
 }
 
+/**
+ * The word map's own face: Pixelify Sans (OFL), the blocky construction the
+ * cloud renders in on the page, so the PNG artwork matches pixel for pixel.
+ */
+export function wordmapFonts(): Array<{ name: string; data: Buffer; weight: 500 | 600 | 700; style: "normal" }> {
+  const dir = join(process.cwd(), "config", "fonts");
+  return [
+    { name: "Pixelify Sans", data: readFileSync(join(dir, "pixelify-500.ttf")), weight: 500, style: "normal" },
+    { name: "Pixelify Sans", data: readFileSync(join(dir, "pixelify-600.ttf")), weight: 600, style: "normal" },
+    { name: "Pixelify Sans", data: readFileSync(join(dir, "pixelify-700.ttf")), weight: 700, style: "normal" },
+  ];
+}
+
 /** Cut at a word boundary, never mid-word, with the ellipsis outside the cut. */
 export function ogTruncate(text: string, max: number): string {
   if (text.length <= max) return text;

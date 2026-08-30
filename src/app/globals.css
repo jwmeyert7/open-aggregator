@@ -2597,6 +2597,7 @@ button.status-date {
 .wordmap-word {
   position: absolute;
   line-height: 1;
+  font-family: var(--font-pixel, ui-monospace, monospace);
   font-weight: 600;
   white-space: nowrap;
   text-decoration: none;

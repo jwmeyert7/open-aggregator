@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pixelify_Sans } from "next/font/google";
 import { WordmapCloud } from "./WordmapCloud";
 import { NotLoggedIn } from "../server";
 import { isAdmin } from "@/lib/auth";
@@ -10,6 +11,9 @@ import { editionTexts, extractWords, layoutCloud, wordmapColors, wordmapStats, W
 import type { CSSProperties } from "react";
 
 type WordmapKind = "day" | "week" | "month" | "year";
+
+/** The cloud's blocky face; the PNG route bundles the same family's TTFs. */
+const pixel = Pixelify_Sans({ subsets: ["latin"], variable: "--font-pixel" });
 
 /**
  * "The news on August 26, 2026" for a day, "The news, August 22-28, 2026"
@@ -112,7 +116,7 @@ export default async function WordmapPage({
         ))}
         {digest ? (
           <>
-            <div className="wordmap-card">
+            <div className={`wordmap-card ${pixel.variable}`}>
               <div className="wordmap-title">
                 <div className="wordmap-title-main">
                   {wordmapTitle(kind, kind === "week" ? (digest as { start?: string; end?: string }) : null, picked)}

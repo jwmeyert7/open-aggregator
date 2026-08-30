@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { isAdmin } from "@/lib/auth";
-import { ogFonts } from "@/lib/og";
+import { ogFonts, wordmapFonts } from "@/lib/og";
 import { loadDailyDigest, loadMonthlyDigest, loadWeeklyDigest, loadYearlyDigest } from "@/lib/state";
 import { monthLabel, subjectRangeLabel } from "@/lib/digest";
 import {
@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
                 position: "absolute",
                 left: Math.round(w.x - box.w / 2),
                 top: Math.round(w.y - box.h / 2),
+                fontFamily: "Pixelify Sans",
                 fontSize: w.size,
                 lineHeight: 1.05,
                 fontWeight: wordFontWeight(w.size),
@@ -100,6 +101,6 @@ export async function GET(req: NextRequest) {
         })}
       </div>
     ),
-    { width: WORDMAP_W, height: WORDMAP_H, fonts: ogFonts() }
+    { width: WORDMAP_W, height: WORDMAP_H, fonts: [...ogFonts(), ...wordmapFonts()] }
   );
 }
