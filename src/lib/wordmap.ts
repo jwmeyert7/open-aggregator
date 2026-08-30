@@ -146,7 +146,8 @@ export function extractWords(texts: WordmapSource[], site: WordmapSiteConfig): W
   >();
   const stop = stopWords(site.extraStop);
   for (const t of texts) {
-    for (const raw of t.text.split(/[^A-Za-z0-9'’.-]+/)) {
+    // \p{L}\p{N} instead of A-Za-z0-9 so accented names ("Hegotá") keep their letters
+    for (const raw of t.text.split(/[^\p{L}\p{N}'’.-]+/u)) {
       const cleaned = raw.replace(/^['’.-]+|['’.-]+$/g, "");
       if (cleaned.length < 3) continue;
       // numbers and number-ish fragments ("8.5", "2,026", "11.3B", "50k") say nothing alone
