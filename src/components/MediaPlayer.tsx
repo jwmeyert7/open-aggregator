@@ -149,6 +149,9 @@ export function MediaPlayer({
   const chapterGrow = useRef(0);
   /** a chapter tapped in the closed row's list: where the opening player starts */
   const chapterStart = useRef(0);
+  // one open/closed state for the chapter list, shared by the closed row's
+  // copy and the player's, so opening a chapter never collapses the list
+  const [chaptersOpen, setChaptersOpen] = useState(false);
   /** whether the embed's last state report said it is playing or buffering */
   const playingRef = useRef(false);
   // detached players quietly name their mode in the link row: the /player
@@ -392,7 +395,11 @@ export function MediaPlayer({
       {!open && playable && chapters && chapters.length > 0 ? (
         // the show notes' table of contents, readable without loading the
         // player; a tapped chapter opens the player right at that moment
-        <details className="player-chapters row-chapters">
+        <details
+          className="player-chapters row-chapters"
+          open={chaptersOpen}
+          onToggle={(e) => setChaptersOpen(e.currentTarget.open)}
+        >
           <summary>chapters ({chapters.length})</summary>
           <ol>
             {chapters.map((c) => (
@@ -544,7 +551,9 @@ export function MediaPlayer({
           {chapters && chapters.length > 0 ? (
             <details
               className="player-chapters"
+              open={chaptersOpen}
               onToggle={(e) => {
+                setChaptersOpen(e.currentTarget.open);
                 // In a detached player window (popup, or the /player frame
                 // inside the document PiP window) the flex layout would shrink
                 // the video to make room for the list. Grow the window by the
