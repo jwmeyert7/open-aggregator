@@ -1103,7 +1103,14 @@ function pairPodcastsWithVideos(items: MediaItem[]): number {
   const byTwin = new Map(items.filter((m) => m.twinOf).map((m) => [m.twinOf as string, m]));
   for (const pod of items) {
     const twin = byTwin.get(pod.id);
-    if (!twin || twin.views === undefined) continue;
+    if (!twin) continue;
+    // the podcast half is the visible one, so it adopts the video's chapters
+    // (YouTube descriptions carry them far more often than podcast RSS does)
+    if ((!pod.chapters || pod.chapters.length === 0) && twin.chapters && twin.chapters.length > 0) {
+      pod.chapters = twin.chapters;
+      delete pod.notesLinkedAt;
+    }
+    if (twin.views === undefined) continue;
     pod.views = twin.views;
     if (twin.likes !== undefined) pod.likes = twin.likes;
     if (twin.statsAt) pod.statsAt = twin.statsAt;
@@ -1390,8 +1397,8 @@ export async function ingestMedia(
   // notes get to match against stories on the next linking pass
   const storedById = new Map((state.mediaItems ?? []).map((m) => [m.id, m]));
   for (const cand of results.flatMap((r) => r.items)) {
-    const id = (cand as { id?: string }).id;
-    const stored = id ? storedById.get(id) : undefined;
+    // raw candidates carry no id; shelved items were keyed off their url
+    const stored = storedById.get(dedupeKeyUrl(cand.url).slice(0, 12));
     if (stored && (!stored.chapters || stored.chapters.length === 0) && cand.chapters && cand.chapters.length > 0) {
       stored.chapters = cand.chapters;
       delete stored.notesLinkedAt;
