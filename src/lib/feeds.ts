@@ -68,7 +68,10 @@ export function extractChapters(text: string | undefined): Array<{ at: number; l
   if (!text) return [];
   const out: Array<{ at: number; label: string; links?: string[] }> = [];
   for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
+    // shows decorate chapter lines with emoji or bullets ("\ud83c\udfe6 00:00 Why\u2026");
+    // shave anything that is not a letter, digit, or opening bracket, but
+    // still require the timestamp right after so prose times don't match
+    const line = rawLine.trim().replace(/^[^\p{L}\p{N}(\[]+/u, "");
     const m = line.match(/^[\(\[]?((?:\d{1,2}:)?\d{1,2}:\d{2})[\)\]]?\s*[-\u2013\u2014:|]?\s*(.+)$/);
     if (!m) continue;
     const parts = m[1].split(":").map(Number);
