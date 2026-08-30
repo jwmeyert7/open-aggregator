@@ -119,7 +119,10 @@ export default async function WordmapPage({
             <div className={`wordmap-card ${pixel.variable}`}>
               <div className="wordmap-title">
                 <div className="wordmap-title-main">
-                  {wordmapTitle(kind, kind === "week" ? (digest as { start?: string; end?: string }) : null, picked)}
+                  {/* the title walks to the edition it maps */}
+                  <Link href={`/${kind}/${picked}`} title="Open this edition's archive page">
+                    {wordmapTitle(kind, kind === "week" ? (digest as { start?: string; end?: string }) : null, picked)}
+                  </Link>
                 </div>
                 <div className="wordmap-title-sub">{siteIdentity().siteName}</div>
               </div>

@@ -2619,6 +2619,14 @@ button.status-date {
   color: var(--fg);
   line-height: 1.1;
 }
+/* the title links its edition but dresses like plain text until hovered */
+.wordmap-title-main a {
+  color: inherit;
+  text-decoration: none;
+}
+.wordmap-title-main a:hover {
+  text-decoration: underline;
+}
 .wordmap-title-sub {
   font-size: 1.6cqw;
   color: var(--wm-brand);
