@@ -32,6 +32,7 @@ export default async function StreamPage() {
         ...(m.durationSec ? { durationSec: m.durationSec } : {}),
         ...(m.audioUrl ? { audioUrl: m.audioUrl } : {}),
         ...(m.videoUrl ? { videoUrl: m.videoUrl } : {}),
+        ...(m.chapters && m.chapters.length > 0 ? { chapters: m.chapters } : {}),
       },
     }));
   const items: StreamItem[] = byPublished(state.items)

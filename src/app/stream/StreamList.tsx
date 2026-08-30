@@ -20,7 +20,7 @@ export interface StreamItem {
   /** episodes: the video's view count, when it has one worth saying */
   views?: number;
   /** episodes: what the row needs to play in place */
-  episode?: { id: string; url: string; kind: "video" | "podcast"; title: string; thumbnail?: string; durationSec?: number; audioUrl?: string; videoUrl?: string };
+  episode?: { id: string; url: string; kind: "video" | "podcast"; title: string; thumbnail?: string; durationSec?: number; audioUrl?: string; videoUrl?: string; chapters?: Array<{ at: number; label: string }> };
 }
 
 /** Client-rendered so dates and times appear in the visitor's own timezone. */
@@ -65,6 +65,7 @@ export function StreamList({ items }: { items: StreamItem[] }) {
                     durationSec={i.episode.durationSec}
                     audioUrl={i.episode.audioUrl}
                     videoUrl={i.episode.videoUrl}
+                    chapters={i.episode.chapters}
                     compact
                   >
                     <div className="media-body">

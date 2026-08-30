@@ -34,6 +34,7 @@ export default async function NewPage() {
                   durationSec={i.episode.durationSec}
                   audioUrl={i.episode.audioUrl}
                   videoUrl={i.episode.videoUrl}
+                  chapters={i.episode.chapters}
                   compact
                 >
                   <div className="media-body">
