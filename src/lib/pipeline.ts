@@ -1384,6 +1384,20 @@ export async function ingestMedia(
   const errors = results.filter((r) => r.error).map((r) => ({ feedId: r.feed.id, error: r.error! }));
   const fresh = selectNewItems(state, results.flatMap((r) => r.items)) as Array<MediaCandidate & { id: string }>;
 
+  // chapters ride the feed text, so a parser improvement (emoji-prefixed
+  // chapter lines) reaches already-shelved episodes here: any stored item
+  // still missing chapters adopts them from its feed entry, and its show
+  // notes get to match against stories on the next linking pass
+  const storedById = new Map((state.mediaItems ?? []).map((m) => [m.id, m]));
+  for (const cand of results.flatMap((r) => r.items)) {
+    const id = (cand as { id?: string }).id;
+    const stored = id ? storedById.get(id) : undefined;
+    if (stored && (!stored.chapters || stored.chapters.length === 0) && cand.chapters && cand.chapters.length > 0) {
+      stored.chapters = cand.chapters;
+      delete stored.notesLinkedAt;
+    }
+  }
+
   // a show segment that always belongs (a weekly roundup) skips the gate on
   // its feed's alwaysPattern and takes the feed's section label
   const alwaysRe = new Map(mediaFeeds.filter((f) => f.alwaysPattern).map((f) => [f.id, new RegExp(f.alwaysPattern!, "i")]));
