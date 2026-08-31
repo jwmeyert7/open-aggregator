@@ -2871,6 +2871,17 @@ body:has(.player-page) {
 .row-chapters {
   margin: 2px 0 6px;
 }
+/* the page-wide chapters switch above the episode list */
+.chapters-all {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.chapters-all:hover {
+  color: var(--fg-soft);
+}
 
 /* the criteria and submit pointer breathes below the tables */
 .sources-foot {

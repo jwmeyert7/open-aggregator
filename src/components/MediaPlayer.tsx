@@ -152,6 +152,15 @@ export function MediaPlayer({
   // one open/closed state for the chapter list, shared by the closed row's
   // copy and the player's, so opening a chapter never collapses the list
   const [chaptersOpen, setChaptersOpen] = useState(false);
+
+  // a page-level "show all chapters" control (the Podcasts page has one)
+  // speaks over a window event; players with chapters obey, others ignore it
+  useEffect(() => {
+    if (!chapters || chapters.length === 0) return;
+    const onAll = (e: Event) => setChaptersOpen(Boolean((e as CustomEvent).detail?.open));
+    window.addEventListener("podcast:chapters-all", onAll);
+    return () => window.removeEventListener("podcast:chapters-all", onAll);
+  }, [chapters]);
   /** whether the embed's last state report said it is playing or buffering */
   const playingRef = useRef(false);
   // detached players quietly name their mode in the link row: the /player

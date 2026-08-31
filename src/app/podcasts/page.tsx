@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
+import { ChaptersAllToggle } from "@/components/ChaptersAllToggle";
 import { SectionPill, SourceKicker } from "@/components/ClusterCard";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { loadSiteConfig } from "@/lib/config";
@@ -47,9 +48,10 @@ export default async function PodcastsPage({ searchParams }: { searchParams: Pro
                 </li>
               ))}
             </ol>
-            <h2 className="list-label">All episodes, newest first</h2>
+            <h2 className="list-label">All episodes</h2>
           </section>
         ) : null}
+        {items.some((m) => m.chapters && m.chapters.length > 0) ? <ChaptersAllToggle /> : null}
         <ul className="media-list">
           {items.map((m) => (
             <li key={m.id} id={`m-${m.id}`} className="media-item">
