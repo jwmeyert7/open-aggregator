@@ -245,21 +245,41 @@ export function rankClusters(clusters: Cluster[], cfg: SiteConfig["ranking"], no
 }
 
 /**
- * Top stories: biggest clusters regardless of section. Never pad with weak
- * stories: eligibility needs corroboration (2+ sources) or real importance,
- * so quiet periods shrink the list instead of crowning routine posts.
- * Everything still appears in its section page and the Newest rail.
+ * Top stories: biggest clusters regardless of section, but every section that
+ * has stories at all gets its best one seated first. The eligibility bar
+ * (corroboration or real importance) still gates the rest of the list, so a
+ * quiet period shows one honest story per section instead of a single-card
+ * front page, and never a pile of routine posts.
  */
 export function topStories(state: SiteState, cfg: SiteConfig["ranking"], now: Date = new Date()): Cluster[] {
   const ranked = rankClusters(liveClusters(state), cfg, now);
-  return ranked
-    .filter((c) => {
-      if (c.pinned) return true;
-      const b = scoreBreakdown(c, cfg, now);
-      const effImportance = b.importanceCapped ? FORUM_IMPORTANCE_CAP : c.importance;
-      return (b.uniqueSources >= 2 || effImportance >= 3) && b.total >= cfg.minTopScore;
-    })
-    .slice(0, cfg.maxTopStories);
+  const eligible = ranked.filter((c) => {
+    if (c.pinned) return true;
+    const b = scoreBreakdown(c, cfg, now);
+    const effImportance = b.importanceCapped ? FORUM_IMPORTANCE_CAP : c.importance;
+    return (b.uniqueSources >= 2 || effImportance >= 3) && b.total >= cfg.minTopScore;
+  });
+  // seat each section's champion (its best eligible story, else its best
+  // story outright), then fill the remaining slots from the eligible list
+  const seated = new Set<string>();
+  const picks: Cluster[] = [];
+  for (const sec of new Set(ranked.map((c) => c.section).filter((s) => s && s !== "general"))) {
+    const champ = eligible.find((c) => c.section === sec) ?? ranked.find((c) => c.section === sec);
+    if (champ && !seated.has(champ.id) && picks.length < cfg.maxTopStories) {
+      picks.push(champ);
+      seated.add(champ.id);
+    }
+  }
+  for (const c of eligible) {
+    if (picks.length >= cfg.maxTopStories) break;
+    if (!seated.has(c.id)) {
+      picks.push(c);
+      seated.add(c.id);
+    }
+  }
+  // display order stays the ranking's, whatever order the seats filled in
+  const chosen = new Set(picks.map((c) => c.id));
+  return ranked.filter((c) => chosen.has(c.id));
 }
 
 export function sectionStories(state: SiteState, section: SectionId, cfg: SiteConfig["ranking"], now: Date = new Date()): Cluster[] {
