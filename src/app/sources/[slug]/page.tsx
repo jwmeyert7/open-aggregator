@@ -89,7 +89,7 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
         <div className="prose">
           <h1>{feed.name}</h1>
           <p>
-            Everything from <a href={show} rel="noopener">{feed.name}</a> that&apos;s on {siteIdentity().siteName}.
+            Everything from <a href={show} rel="noopener">{feed.name}</a>{" "}that&apos;s on {siteIdentity().siteName}.
             Press a thumbnail to play it here.
             The full show list is on <Link href="/sources">Sources</Link>, and every show&apos;s episodes mix on the{" "}
             <Link href="/podcasts">podcasts page</Link>.
@@ -128,7 +128,7 @@ export default async function SourcePage({ params }: { params: Promise<{ slug: s
       <div className="prose">
         <h1>{feed.name}</h1>
         <p>
-          Everything from <a href={site} rel="noopener">{feed.name}</a> that&apos;s on {siteIdentity().siteName}. Each
+          Everything from <a href={site} rel="noopener">{feed.name}</a>{" "}that&apos;s on {siteIdentity().siteName}. Each
           item links the story it appeared in. The full whitelist is on <Link href="/sources">Sources</Link>.
         </p>
         <ul>

@@ -21,27 +21,32 @@ const TYPES: SourceType[] = ["news", "forum", "primary", "podcast"];
  * the list; either outer column header sorts.
  */
 export function SourcesTable({ rows }: { rows: SourceRow[] }) {
-  // alphabetical by default: readers scan for a name; the count column is one
-  // click away for the curious
-  const [key, setKey] = useState<"name" | "count">("name");
+  // alphabetical by default: readers scan for a name; the other columns are
+  // one click away for the curious (type sort doubles as grouping)
+  const [key, setKey] = useState<"name" | "type" | "count">("name");
   const [asc, setAsc] = useState(true);
   const [only, setOnly] = useState<SourceType | null>(null);
 
   const shown = only ? rows.filter((r) => r.types.includes(only)) : rows;
   const sorted = [...shown].sort((a, b) => {
-    const d = key === "name" ? a.name.localeCompare(b.name) : a.count - b.count;
+    const d =
+      key === "name"
+        ? a.name.localeCompare(b.name)
+        : key === "type"
+          ? a.types.join(", ").localeCompare(b.types.join(", "))
+          : a.count - b.count;
     return (asc ? d : -d) || a.name.localeCompare(b.name);
   });
 
-  function toggle(k: "name" | "count") {
+  function toggle(k: "name" | "type" | "count") {
     if (key === k) setAsc((v) => !v);
     else {
       setKey(k);
-      setAsc(k === "name");
+      setAsc(k !== "count");
     }
   }
 
-  const arrow = (k: "name" | "count") => (key === k ? (asc ? " ↑" : " ↓") : "");
+  const arrow = (k: "name" | "type" | "count") => (key === k ? (asc ? " ↑" : " ↓") : "");
 
   return (
     <>
@@ -67,7 +72,10 @@ export function SourcesTable({ rows }: { rows: SourceRow[] }) {
               Source
               {arrow("name")}
             </th>
-            <th>Type</th>
+            <th className="sortable" onClick={() => toggle("type")}>
+              Type
+              {arrow("type")}
+            </th>
             <th className="sortable" onClick={() => toggle("count")}>
               Items, last 30 days
               {arrow("count")}
