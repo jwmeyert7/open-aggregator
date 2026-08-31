@@ -99,9 +99,14 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
   return (
     <span className={`verify-seal${state === "ok" ? " sealed" : ""}`}>
       {state === "ok" ? (
-        <button type="button" className="linklike verify-ok" onClick={run} title="Verify again">
-          {seal} <span className="verify-word">Verified</span>. {detail}
-        </button>
+        // only the word Verified re-runs the check; the sentence is plain text
+        <span className="verify-ok">
+          {seal}{" "}
+          <button type="button" className="linklike verify-word" onClick={run} title="Verify again">
+            Verified
+          </button>
+          . {detail}
+        </span>
       ) : (
         <button type="button" className="linklike verify-idle" onClick={run} disabled={state === "working"}>
           {seal} <span className="verify-word">{state === "working" ? "checking…" : "Verify this edition"}</span>
