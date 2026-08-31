@@ -6,7 +6,7 @@ import { DigestEpisodes } from "@/components/DigestEpisodes";
 import { SummaryBlock } from "@/components/SummaryBlock";
 import { VerifySeal } from "@/components/VerifySeal";
 import { loadSiteConfig } from "@/lib/config";
-import { loadDailyDigest } from "@/lib/state";
+import { loadDailyDigest, loadState } from "@/lib/state";
 import { siteIdentity } from "@/lib/site";
 import { parseSummaryLines, truncate } from "@/lib/util";
 
@@ -39,17 +39,38 @@ export async function generateMetadata({ params }: { params: Promise<{ date: str
   };
 }
 
+/** "Sun, Aug 30" for the walk-the-archive arrows. */
+function shortLabel(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default async function DayPage({ params }: { params: Promise<{ date: string }> }) {
   const { date } = await params;
   const digest = await loadDailyDigest(date);
   if (!digest) notFound();
   const fcHandle = siteIdentity().social?.farcasterHandle;
+  // neighbors from the archive's own date list, so gaps are skipped honestly
+  const days = [...((await loadState()).dailyDigestDates ?? [])].sort();
+  const at = days.indexOf(date);
+  const prev = at > 0 ? days[at - 1] : undefined;
+  const next = at >= 0 && at < days.length - 1 ? days[at + 1] : undefined;
 
   return (
     <main className="wrap page single">
       <div>
         <div className="section-head">
           <h1>{siteIdentity().siteName}: {dateLabel(date)}</h1>
+          {prev || next ? (
+            <div className="month-nav day-nav">
+              <span>{prev ? <Link href={`/day/${prev}`}>← {shortLabel(prev)}</Link> : null}</span>
+              <span>{next ? <Link href={`/day/${next}`}>{shortLabel(next)} →</Link> : null}</span>
+            </div>
+          ) : null}
           {digest.inProgress ? (
             <p>
               <span className="live-dot" aria-hidden="true" />
