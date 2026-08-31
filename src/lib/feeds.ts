@@ -864,6 +864,7 @@ export async function fetchVideoManifest(feed: FeedConfig, timeoutMs: number): P
         datetime?: number;
         live?: boolean;
         page?: string;
+        manifestUrl?: string;
         chapters?: Array<{ tStart?: number; title?: string }>;
         media?: { video?: { url?: string }; card?: { url?: string; previewCid?: string } };
       }>;
@@ -883,6 +884,20 @@ export async function fetchVideoManifest(feed: FeedConfig, timeoutMs: number): P
       const chapters = (e.chapters ?? [])
         .filter((c) => typeof c.tStart === "number" && c.title)
         .map((c) => ({ at: Math.max(0, Math.round(c.tStart!)), label: String(c.title) }));
+      // a first chapter claiming 0:00 usually means "the start", but these
+      // recordings open with a preroll: the episode's own manifest carries the
+      // real content start (meta.startSeconds), so chapter one gets clamped to
+      // it, exactly as the show's own site does. Best effort, 0 stands if the
+      // manifest is unreachable.
+      if (chapters.length > 0 && chapters[0].at === 0 && chapters[1] && e.manifestUrl) {
+        try {
+          const meta = (JSON.parse(await fetchText(e.manifestUrl, timeoutMs)) as { meta?: { startSeconds?: number } }).meta;
+          const start = meta?.startSeconds;
+          if (typeof start === "number" && start > 0 && start < chapters[1].at) chapters[0].at = Math.round(start);
+        } catch {
+          // the sidecar's 0 stands
+        }
+      }
       map.set(e.slug, {
         slug: e.slug,
         ...(e.title ? { title: e.title } : {}),

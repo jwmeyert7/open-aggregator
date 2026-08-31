@@ -1399,9 +1399,13 @@ export async function ingestMedia(
   for (const cand of results.flatMap((r) => r.items)) {
     // raw candidates carry no id; shelved items were keyed off their url
     const stored = storedById.get(dedupeKeyUrl(cand.url).slice(0, 12));
-    if (stored && (!stored.chapters || stored.chapters.length === 0) && cand.chapters && cand.chapters.length > 0) {
+    if (!stored || !cand.chapters || cand.chapters.length === 0) continue;
+    // adopt missing chapters, and refresh ones the source has since corrected
+    // (a fixed timestamp upstream should not be frozen wrong here forever)
+    const had = stored.chapters && stored.chapters.length > 0;
+    if (!had || JSON.stringify(stored.chapters) !== JSON.stringify(cand.chapters)) {
       stored.chapters = cand.chapters;
-      delete stored.notesLinkedAt;
+      if (!had) delete stored.notesLinkedAt;
     }
   }
 
