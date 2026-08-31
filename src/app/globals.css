@@ -642,6 +642,9 @@ a:hover {
   text-decoration: none;
   /* buttons center their text by default, which shows when the sentence wraps on mobile */
   text-align: left;
+  /* the sentence keeps the colophon's quiet color (the mint .verify-ok is for
+     the tamper demo's verdict, not this line) */
+  color: inherit;
 }
 .verify-seal .verify-ok .verify-word,
 .verify-seal .verify-idle .verify-word,
