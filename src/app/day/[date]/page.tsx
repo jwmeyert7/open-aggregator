@@ -64,13 +64,13 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
     <main className="wrap page single">
       <div>
         <div className="section-head">
-          <h1>{siteIdentity().siteName}: {dateLabel(date)}</h1>
           {prev || next ? (
             <div className="month-nav day-nav">
               <span>{prev ? <Link href={`/day/${prev}`}>← {shortLabel(prev)}</Link> : null}</span>
               <span>{next ? <Link href={`/day/${next}`}>{shortLabel(next)} →</Link> : null}</span>
             </div>
           ) : null}
+          <h1>{siteIdentity().siteName}: {dateLabel(date)}</h1>
           {digest.inProgress ? (
             <p>
               <span className="live-dot" aria-hidden="true" />

@@ -1252,9 +1252,9 @@ body:has(.notfound) .main-nav {
   width: auto;
 }
 
-/* the day page's walk-the-archive arrows sit tight under the title */
+/* the day page's walk-the-archive arrows sit tight above the title */
 .month-nav.day-nav {
-  margin: 4px 0 2px;
+  margin: 0 0 8px;
 }
 /* month pager on the full daily archive: older on the right, newer on the left */
 .month-nav {
