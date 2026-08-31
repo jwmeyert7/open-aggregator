@@ -291,4 +291,34 @@ const handler = createMcpHandler(
   { serverInfo: { name: siteIdentity().siteName.toLowerCase().replace(/\s+/g, "-"), version: "1.0.0" } }
 );
 
-export { handler as GET, handler as POST };
+/**
+ * A person clicking the MCP link in a browser gets a one-paragraph explainer
+ * instead of a protocol error. Real MCP clients speak JSON-RPC over POST, or
+ * GET with an event-stream Accept header, and both pass straight through.
+ */
+function browserExplainer(): Response {
+  const site = siteIdentity();
+  const base = siteUrl();
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${site.siteName} MCP server</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{background:#15171b;color:#e8e8e4;font-family:system-ui,sans-serif;max-width:640px;margin:80px auto;padding:0 20px;line-height:1.6}a{color:#8b8ff0}code{background:#23262f;padding:2px 6px;border-radius:4px}h1{font-size:1.4rem}p{color:#b8bcc4}</style>
+</head><body>
+<h1>This is the ${site.siteName} MCP server</h1>
+<p>It speaks a machine protocol, so there is nothing to see in a browser. Add the URL
+<code>${base}/api/mcp</code> to Claude, ChatGPT, or any MCP-capable assistant as a custom connector and it
+gains read-only tools: top stories, the newest items, search, daily digests, the week in review, and
+podcasts, all ranked exactly as the live site ranks them.</p>
+<p>Prefer a feed? There is <a href="${base}/feed.xml">RSS</a>. Prefer a page for humans? That is
+<a href="${base}">${site.domain}</a>.</p>
+</body></html>`;
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
+async function GET(req: Request) {
+  const accept = req.headers.get("accept") ?? "";
+  if (accept.includes("text/html") && !accept.includes("text/event-stream")) return browserExplainer();
+  return handler(req);
+}
+
+export { GET };
+export { handler as POST };
