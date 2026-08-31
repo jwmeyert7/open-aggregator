@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { adminLayoutPreview } from "@/lib/auth";
+import { adminLayoutPreview, isAdmin } from "@/lib/auth";
+import { scoreBreakdown } from "@/lib/rank";
 import { AdminEditLink } from "@/components/AdminEditLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import { ClusterCard, SectionPill, SourceKicker, SponsoredCard } from "@/components/ClusterCard";
@@ -35,6 +36,23 @@ export default async function HomePage() {
   // admins can force either layout in their own browser to inspect and tweak
   // it; the schedule (default or admin-edited) decides for everyone else
   const preview = await adminLayoutPreview();
+  // the ranking X-ray: admins see each card's score arithmetic and when the
+  // summary was last rewritten; visitors never do
+  const admin = await isAdmin();
+  const rankDebug = (c: Cluster): string => {
+    const b = scoreBreakdown(c, ranking);
+    return [
+      `score ${b.total.toFixed(2)}`,
+      `sources ${b.uniqueSources} (weight ${b.sourceWeight.toFixed(1)}, decayed ${b.decayedSourceWeight.toFixed(1)})`,
+      b.velocityBoost > 0 ? `velocity +${b.velocityBoost.toFixed(1)} (${b.velocityLinks} fresh)` : null,
+      `importance ${b.importance}${b.importanceCapped ? " (forum-capped)" : ""} ×${b.importanceFactor.toFixed(2)}`,
+      b.forumFactor !== 1 ? `forum ×${b.forumFactor.toFixed(2)}` : null,
+      b.centralityFactor !== 1 ? `centrality ×${b.centralityFactor.toFixed(2)}` : null,
+      `decay ×${b.decay.toFixed(2)} (freshest ${Math.round(b.freshestAgeHours)}h, half-life ${Math.round(b.decayHalfLifeHours)}h)`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
   const scheduledWeekend = weekendMode(cfg.ranking, new Date(), state.weekendSchedule);
   const weekend = preview ? preview === "weekend" : scheduledWeekend;
   const week = weekend ? weekInReview(state, ranking, new Set()) : [];
@@ -176,6 +194,13 @@ export default async function HomePage() {
           copy is mobile's, the rail copy is desktop's (CSS shows one each). */}
       {summaryAt(true)}
       <ColumnHeads sections={cfg.sections} active="top" />
+      {admin && state.frontSummary ? (
+        <div className="org rank-debug" style={{ gridColumn: "1 / -1" }}>
+          summary rewritten {Math.round(hoursAgo(state.frontSummary.at) * 60)}m ago
+          {state.frontSummary.stale ? " · marked stale" : ""}
+          {summary ? "" : " · hidden from visitors (over the freshness window)"}
+        </div>
+      ) : null}
       <div className="stories-col">
         {leadWithWeek ? (
           <section className="week-review lead">
@@ -225,7 +250,7 @@ export default async function HomePage() {
             );
           }
           return latest.flatMap((c, i) => {
-            const card = <ClusterCard key={c.id} cluster={c} showSection />;
+            const card = <ClusterCard key={c.id} cluster={c} showSection debug={admin ? rankDebug(c) : undefined} />;
             // sponsored post sits after the 2nd story
             if (ad && i === Math.min(2, latest.length - 1)) {
               return [<SponsoredCard key="sponsored" post={ad} />, card];

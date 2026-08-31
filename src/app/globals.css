@@ -1252,6 +1252,13 @@ body:has(.notfound) .main-nav {
   width: auto;
 }
 
+/* the admin ranking X-ray: quiet monospace arithmetic under a card */
+.rank-debug {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
 /* the day page's walk-the-archive arrows sit tight above the title */
 .month-nav.day-nav {
   margin: 0 0 8px;

@@ -193,11 +193,38 @@ function joinSummaryLines(lines: SummaryBullet[], resolveRef?: (ref: string) => 
  */
 function carryForwardSummary(newText: string, prevText: string | undefined): string {
   if (!prevText) return newText;
-  const covered = new Set(parseSummaryLines(newText).map((l) => l.section));
-  const carried = parseSummaryLines(prevText)
-    .filter((l) => l.section && !covered.has(l.section))
-    .map((l) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.raw}`);
-  return [newText, ...carried].join("\n");
+  const newLines = parseSummaryLines(newText);
+  const prevLines = parseSummaryLines(prevText);
+  const asRaw = (l: (typeof newLines)[number]) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.raw}`;
+  // the stories a section's lines actually cite (line refs plus phrase refs)
+  const refsFor = (lines: typeof newLines, section: string) => {
+    const refs = new Set<string>();
+    for (const l of lines) {
+      if (l.section !== section) continue;
+      if (l.ref) refs.add(l.ref);
+      for (const s of l.segments) if (s.ref) refs.add(s.ref);
+    }
+    return refs;
+  };
+  const covered = new Set(newLines.map((l) => l.section));
+  const out: string[] = [];
+  for (const sec of covered) {
+    if (!sec) {
+      out.push(...newLines.filter((l) => !l.section).map((l) => l.raw));
+      continue;
+    }
+    // wording only changes when the SET OF STORIES changes: a section whose
+    // new lines cite exactly the stories the old ones did keeps the old
+    // sentences verbatim, so readers stop seeing the same news re-phrased
+    const nr = refsFor(newLines, sec);
+    const pr = refsFor(prevLines, sec);
+    const sameStories = nr.size > 0 && nr.size === pr.size && [...nr].every((r) => pr.has(r));
+    const source = sameStories ? prevLines : newLines;
+    out.push(...source.filter((l) => l.section === sec).map(asRaw));
+  }
+  // sections the new summary skipped keep their old lines alive, as before
+  out.push(...prevLines.filter((l) => l.section && !covered.has(l.section)).map(asRaw));
+  return out.join("\n");
 }
 
 /**

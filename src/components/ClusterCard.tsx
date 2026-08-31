@@ -67,11 +67,14 @@ export function ClusterCard({
   cluster,
   showSection = false,
   pageSection,
+  debug,
 }: {
   cluster: Cluster;
   showSection?: boolean;
   /** the section page this card sits on: its own label is implied there, any other label still shows */
   pageSection?: string;
+  /** admin-only ranking X-ray, rendered as a quiet line under the card */
+  debug?: string;
 }) {
   // labels are labels, not buckets: a story wears every section it carries,
   // minus the one the page already stands for
@@ -160,6 +163,7 @@ export function ClusterCard({
           suggest a link
         </a>
       </div>
+      {debug ? <div className="org rank-debug">{debug}</div> : null}
     </article>
   );
 }
