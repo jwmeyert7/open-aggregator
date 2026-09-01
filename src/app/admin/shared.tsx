@@ -140,25 +140,23 @@ export function AdminChrome({ chrome }: { chrome: AdminChromeData }) {
               </Link>
             );
           })}
+          <button className="linklike" disabled={busy} onClick={() => act("logout")}>
+            Log out
+          </button>
         </nav>
       </div>
-      {/* the pipeline button and feed-health notice are global status, so they
-          live on the Overview only; every other page keeps just its own tools */}
-      <p className="status-line">
-        Stream: {chrome.riverCount} items · X this month: {chrome.xMonthly.used}/{chrome.xMonthly.cap} · email subs:{" "}
-        {chrome.subscribers.daily} daily / {chrome.subscribers.weekly} weekly · state updated{" "}
-        {new Date(chrome.updatedAt).toUTCString().replace("GMT", "UTC")} ·{" "}
-        {pathname === "/admin" ? (
-          <>
-            <button className="btn" disabled={busy} onClick={() => act("runPipeline")}>
-              Run pipeline now
-            </button>{" "}
-          </>
-        ) : null}
-        <button className="btn" disabled={busy} onClick={() => act("logout")}>
-          Log out
-        </button>
-      </p>
+      {/* global status (the stream/X/subs strip, the pipeline button, feed
+          health) lives on the Overview only; other pages keep their own tools */}
+      {pathname === "/admin" ? (
+        <p className="status-line">
+          Stream: {chrome.riverCount} items · X this month: {chrome.xMonthly.used}/{chrome.xMonthly.cap} · email subs:{" "}
+          {chrome.subscribers.daily} daily / {chrome.subscribers.weekly} weekly · state updated{" "}
+          {new Date(chrome.updatedAt).toUTCString().replace("GMT", "UTC")} ·{" "}
+          <button className="btn" disabled={busy} onClick={() => act("runPipeline")}>
+            Run pipeline now
+          </button>
+        </p>
+      ) : null}
       <Toast status={status} onClear={() => setStatus("")} />
       {pathname === "/admin" && chrome.unhealthyFeeds.length > 0 ? (
         <div className="notice">
