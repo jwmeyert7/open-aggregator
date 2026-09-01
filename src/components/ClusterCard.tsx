@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminEditLink } from "@/components/AdminEditLink";
+import { AdminXray } from "@/components/AdminXray";
 import { MentionLink } from "@/components/MentionLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import type { Cluster, SponsoredPost } from "@/lib/types";
@@ -163,7 +164,11 @@ export function ClusterCard({
           suggest a link
         </a>
       </div>
-      {debug ? <div className="org rank-debug">{debug}</div> : null}
+      {debug ? (
+        <AdminXray>
+          <div className="org rank-debug">{debug}</div>
+        </AdminXray>
+      ) : null}
     </article>
   );
 }

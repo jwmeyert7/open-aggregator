@@ -35,7 +35,7 @@ export function EditLinksToggle() {
           window.dispatchEvent(new Event("editlinks-pref"));
         }}
       />{" "}
-      edit links
+      admin mode
     </label>
   );
 }

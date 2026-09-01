@@ -2,6 +2,7 @@ import Link from "next/link";
 import { adminLayoutPreview, isAdmin } from "@/lib/auth";
 import { scoreBreakdown } from "@/lib/rank";
 import { AdminEditLink } from "@/components/AdminEditLink";
+import { AdminXray } from "@/components/AdminXray";
 import { AgeStamp } from "@/components/AgeStamp";
 import { ClusterCard, SectionPill, SourceKicker, SponsoredCard } from "@/components/ClusterCard";
 import { ColumnHeads } from "@/components/ColumnHeads";
@@ -195,11 +196,13 @@ export default async function HomePage() {
       {summaryAt(true)}
       <ColumnHeads sections={cfg.sections} active="top" />
       {admin && state.frontSummary ? (
-        <div className="org rank-debug" style={{ gridColumn: "1 / -1" }}>
-          summary rewritten {Math.round(hoursAgo(state.frontSummary.at) * 60)}m ago
-          {state.frontSummary.stale ? " · marked stale" : ""}
-          {summary ? "" : " · hidden from visitors (over the freshness window)"}
-        </div>
+        <AdminXray>
+          <div className="org rank-debug" style={{ gridColumn: "1 / -1" }}>
+            summary rewritten {Math.round(hoursAgo(state.frontSummary.at) * 60)}m ago
+            {state.frontSummary.stale ? " · marked stale" : ""}
+            {summary ? "" : " · hidden from visitors (over the freshness window)"}
+          </div>
+        </AdminXray>
       ) : null}
       <div className="stories-col">
         {leadWithWeek ? (
