@@ -1252,6 +1252,48 @@ body:has(.notfound) .main-nav {
   width: auto;
 }
 
+/* the email page: signup growth bars (solid = confirmed) and the preview frame */
+.email-growth {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 10px 0;
+}
+.email-growth-col {
+  text-align: center;
+}
+.email-growth-bar {
+  position: relative;
+  width: 26px;
+  height: 48px;
+}
+.email-growth-bar .all,
+.email-growth-bar .conf {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 3px 3px 0 0;
+}
+.email-growth-bar .all {
+  background: color-mix(in srgb, var(--link) 25%, transparent);
+}
+.email-growth-bar .conf {
+  background: var(--link);
+}
+.email-growth-label {
+  font-size: 0.66rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.email-preview {
+  width: 100%;
+  height: 560px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 10px;
+}
 /* the admin ranking X-ray: quiet monospace arithmetic under a card */
 .rank-debug {
   font-family: ui-monospace, Menlo, Consolas, monospace;

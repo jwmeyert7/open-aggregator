@@ -14,6 +14,17 @@ export default async function AdminEmailPage() {
   const state = await loadState();
   const cfg = loadSiteConfig();
   const chrome = buildChrome(state, cfg);
+  // the newest send-report note per cadence, straight from the run log
+  const sendHealth: Array<{ kind: string; at: string; note: string }> = [];
+  for (const kind of ["daily", "weekly", "monthly"]) {
+    for (const r of state.runLog ?? []) {
+      const note = (r.notes ?? []).find((n) => n.startsWith(`${kind} email:`));
+      if (note) {
+        sendHealth.push({ kind, at: r.at, note });
+        break;
+      }
+    }
+  }
   const data: EmailData = {
     subscribers: chrome.subscribers,
     emailSubscribers: (state.digestSubscribers ?? []).map((s) => ({
@@ -24,6 +35,7 @@ export default async function AdminEmailPage() {
       confirmed: s.confirmed !== false,
       addedAt: s.addedAt,
     })),
+    sendHealth,
   };
 
   return (

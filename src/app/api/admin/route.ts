@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, checkPassword, cookieValue, isAdmin, LAYOUT_PREVIEW_COOKIE } from "@/lib/auth";
 import { effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
-import { buildDailyEdition, buildWeeklyEdition, confirmationEmail, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
+import { buildDailyEdition, buildMonthlyEdition, buildWeeklyEdition, confirmationEmail, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
 import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAgent } from "@/lib/feeds";
 import { notifySubmitter, sendMail } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
@@ -555,6 +555,11 @@ async function handle(req: NextRequest) {
     if (body.kind === "weekly") {
       edition = await buildWeeklyEdition(state, cfg);
       if (!edition) return fail("Nothing to send: no stories in the last week.");
+    } else if (body.kind === "monthly") {
+      const month = (state.monthlyDigestMonths ?? [])[0];
+      if (!month) return fail("No monthly digest exists yet. The first freezes on the 1st.");
+      edition = await buildMonthlyEdition(state, cfg, month);
+      if (!edition) return fail(`Could not build the ${month} monthly edition.`);
     } else {
       // the newest FROZEN day: today's in-progress preview was never sent
       const today = new Date().toISOString().slice(0, 10);
@@ -565,7 +570,43 @@ async function handle(req: NextRequest) {
       edition = buildDailyEdition(digest, recentEpisodes(state, 24, 3));
     }
     const err = await sendEditionTo(to, edition, unsub);
-    return err ? fail(`Send failed: ${err}`) : ok(`Test ${body.kind === "weekly" ? "weekly" : "daily"} edition sent to ${to}.`);
+    const kindLabel = body.kind === "weekly" ? "weekly" : body.kind === "monthly" ? "monthly" : "daily";
+    return err ? fail(`Send failed: ${err}`) : ok(`Test ${kindLabel} edition sent to ${to}.`);
+  }
+
+  if (body.action === "addSubscriber") {
+    // the person who said "sign me up" in a DM: added by the admin's hand,
+    // so the double opt-in is considered done (the admin IS the consent)
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail("That does not look like an email address.");
+    if ((state.digestSubscribers ?? []).some((s) => s.email === email)) return fail("Already subscribed.");
+    const daily = body.daily !== false;
+    const weekly = Boolean(body.weekly);
+    const monthly = Boolean(body.monthly);
+    if (!daily && !weekly && !monthly) return fail("Pick at least one cadence.");
+    (state.digestSubscribers ??= []).push({
+      email,
+      daily,
+      weekly,
+      ...(monthly ? { monthly } : {}),
+      token: `${newId()}${newId()}`,
+      addedAt: new Date().toISOString(),
+      confirmed: true,
+    });
+    await saveState(state);
+    return ok(`Added ${email} (${[daily ? "daily" : null, weekly ? "weekly" : null, monthly ? "monthly" : null].filter(Boolean).join(" + ")}).`);
+  }
+
+  if (body.action === "pruneUnconfirmed") {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60000;
+    const before = (state.digestSubscribers ?? []).length;
+    state.digestSubscribers = (state.digestSubscribers ?? []).filter(
+      (s) => s.confirmed !== false || new Date(s.addedAt).getTime() >= cutoff
+    );
+    const gone = before - state.digestSubscribers.length;
+    if (gone === 0) return ok("Nothing to prune: no unconfirmed signups older than 30 days.");
+    await saveState(state);
+    return ok(`Pruned ${gone} unconfirmed signup${gone === 1 ? "" : "s"} older than 30 days.`);
   }
 
   if (body.action === "resendConfirmation") {
