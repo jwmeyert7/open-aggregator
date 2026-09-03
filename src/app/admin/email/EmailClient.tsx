@@ -23,6 +23,7 @@ export function EmailClient({ chrome, data }: { chrome: AdminChromeData; data: E
   const [preview, setPreview] = useState<"daily" | "weekly" | "monthly" | null>(null);
   const [addEmail, setAddEmail] = useState("");
   const [addFlags, setAddFlags] = useState({ daily: true, weekly: false, monthly: false });
+  const [hideUnconfirmed, setHideUnconfirmed] = useState(true);
 
   const subs = [...data.emailSubscribers].sort((a, b) => b.addedAt.localeCompare(a.addedAt));
   const confirmed = subs.filter((s) => s.confirmed);
@@ -164,7 +165,17 @@ export function EmailClient({ chrome, data }: { chrome: AdminChromeData; data: E
         </button>
       </form>
 
-      {subs.map((s) => (
+      <div className="source-filters">
+        <span className="filter-label">Show</span>
+        <button type="button" className={`filter-chip${hideUnconfirmed ? " on" : ""}`} onClick={() => setHideUnconfirmed(true)}>
+          confirmed ({confirmed.length})
+        </button>
+        <button type="button" className={`filter-chip${hideUnconfirmed ? "" : " on"}`} onClick={() => setHideUnconfirmed(false)}>
+          everyone ({subs.length})
+        </button>
+      </div>
+
+      {(hideUnconfirmed ? confirmed : subs).map((s) => (
         <div key={s.email} className="admin-card">
           <div className="sub">
             <strong>{s.email}</strong> · {s.confirmed ? "confirmed" : <span className="health-bad">unconfirmed</span>} · joined{" "}

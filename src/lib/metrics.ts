@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { BlobNotFoundError, del, head, list, put } from "@vercel/blob";
+import { sha256 } from "./util";
 
 /**
  * Distribution metrics: who is actually consuming the machine surfaces (the
@@ -45,6 +46,8 @@ export interface DayMetrics {
     /** function invocations, i.e. CDN misses only; the readers table is the audience number */
     hits: number;
     readers: Record<string, FeedReaderStat>;
+    /** distinct callers that day, keyed by a salted hash of address and agent that cannot be reversed or joined across days */
+    distinct?: Record<string, 1>;
   };
   mcp: {
     tools: Record<string, number>;
@@ -52,6 +55,8 @@ export interface DayMetrics {
     clients: Record<string, number>;
     initializes: number;
     htmlViews: number;
+    /** distinct callers that day, same keying as feed.distinct */
+    distinct?: Record<string, 1>;
   };
   clicks: {
     total: number;
@@ -69,9 +74,9 @@ export interface DayMetrics {
 }
 
 type MetricEvent =
-  | { date: string; kind: "feedHit"; reader?: { name: string; subs?: number } }
-  | { date: string; kind: "mcpTool"; tool: string }
-  | { date: string; kind: "mcpInit"; client?: string }
+  | { date: string; kind: "feedHit"; reader?: { name: string; subs?: number }; who?: string }
+  | { date: string; kind: "mcpTool"; tool: string; who?: string }
+  | { date: string; kind: "mcpInit"; client?: string; who?: string }
   | { date: string; kind: "mcpHtml" }
   | { date: string; kind: "click"; clusterId?: string; domain?: string; sponsored?: boolean }
   | { date: string; kind: "search"; query: string; hits: number };
@@ -95,6 +100,31 @@ function clean(name: string): string {
   return name.replace(/[^\w .:/+-]/g, "").slice(0, 60).trim() || "unknown";
 }
 
+/** Note one distinct caller for the day; past the cap the set stops growing and the count reads as "at least". */
+function noteDistinct(map: Record<string, 1> | undefined, who: string | undefined, cap: number): Record<string, 1> | undefined {
+  if (!who) return map;
+  const m = map ?? {};
+  if (m[who] === undefined && Object.keys(m).length >= cap) return m;
+  m[who] = 1;
+  return m;
+}
+
+/** How many distinct callers a day (or a merged bucket of days) saw. */
+export function distinctCount(map: Record<string, 1> | undefined): number {
+  return map ? Object.keys(map).length : 0;
+}
+
+/**
+ * A caller's key for the day: a salted hash of the address and user agent,
+ * 16 hex chars. The date is the salt, so the same reader is one key all day
+ * and a different key tomorrow, which is what distinct-per-day needs and
+ * nothing more. Nothing about the caller is stored or recoverable.
+ */
+function visitorKey(ip: string | null | undefined, userAgent: string | null | undefined): string | undefined {
+  if (!ip) return undefined;
+  return sha256(`${new Date().toISOString().slice(0, 10)}:${ip.trim()}:${userAgent ?? ""}`).slice(0, 16);
+}
+
 /** Bump map[key], folding overflow past the cap into "other" so a day file stays small. */
 function bump(map: Record<string, number>, key: string, cap: number, by = 1): void {
   const k = clean(key);
@@ -108,6 +138,7 @@ function bump(map: Record<string, number>, key: string, cap: number, by = 1): vo
 function applyEvent(day: DayMetrics, ev: MetricEvent): void {
   if (ev.kind === "feedHit") {
     day.feed.hits += 1;
+    day.feed.distinct = noteDistinct(day.feed.distinct, ev.who, 5000);
     if (ev.reader) {
       const name = clean(ev.reader.name);
       const existing = day.feed.readers[name];
@@ -120,9 +151,11 @@ function applyEvent(day: DayMetrics, ev: MetricEvent): void {
     }
   } else if (ev.kind === "mcpTool") {
     bump(day.mcp.tools, ev.tool, 50);
+    day.mcp.distinct = noteDistinct(day.mcp.distinct, ev.who, 5000);
   } else if (ev.kind === "mcpInit") {
     day.mcp.initializes += 1;
     bump(day.mcp.clients, ev.client ?? "unknown", 50);
+    day.mcp.distinct = noteDistinct(day.mcp.distinct, ev.who, 5000);
   } else if (ev.kind === "mcpHtml") {
     day.mcp.htmlViews += 1;
   } else if (ev.kind === "search") {
@@ -154,6 +187,8 @@ function mergeDay(target: DayMetrics, src: DayMetrics): void {
   for (const [k, v] of Object.entries(src.mcp.clients)) bump(target.mcp.clients, k, 50, v);
   target.mcp.initializes += src.mcp.initializes;
   target.mcp.htmlViews += src.mcp.htmlViews;
+  for (const who of Object.keys(src.feed.distinct ?? {})) target.feed.distinct = noteDistinct(target.feed.distinct, who, 5000);
+  for (const who of Object.keys(src.mcp.distinct ?? {})) target.mcp.distinct = noteDistinct(target.mcp.distinct, who, 5000);
   target.clicks.total += src.clicks.total;
   target.clicks.sponsored += src.clicks.sponsored;
   for (const [k, v] of Object.entries(src.clicks.stories)) bump(target.clicks.stories, k, 400, v);
@@ -362,10 +397,11 @@ export function parseFeedReader(ua: string): { name: string; subs?: number } | n
   return product ? { name: product[1] } : null;
 }
 
-export async function recordFeedHit(userAgent: string | null): Promise<void> {
+export async function recordFeedHit(userAgent: string | null, ip?: string | null): Promise<void> {
   try {
     const reader = parseFeedReader(userAgent ?? "");
-    await record({ kind: "feedHit", ...(reader ? { reader } : {}) });
+    const who = visitorKey(ip, userAgent);
+    await record({ kind: "feedHit", ...(reader ? { reader } : {}), ...(who ? { who } : {}) });
   } catch {}
 }
 
@@ -376,17 +412,18 @@ export async function recordMcpHtmlView(): Promise<void> {
 }
 
 /** One JSON-RPC message or a batch: count tools/call per tool and initialize per client. */
-export async function recordMcpBody(body: unknown): Promise<void> {
+export async function recordMcpBody(body: unknown, ip?: string | null, userAgent?: string | null): Promise<void> {
   try {
+    const who = visitorKey(ip, userAgent);
     const messages = Array.isArray(body) ? body : [body];
     for (const m of messages) {
       if (!m || typeof m !== "object") continue;
       const msg = m as { method?: unknown; params?: { name?: unknown; clientInfo?: { name?: unknown } } };
       if (msg.method === "tools/call" && typeof msg.params?.name === "string") {
-        await record({ kind: "mcpTool", tool: msg.params.name });
+        await record({ kind: "mcpTool", tool: msg.params.name, ...(who ? { who } : {}) });
       } else if (msg.method === "initialize") {
         const client = msg.params?.clientInfo?.name;
-        await record({ kind: "mcpInit", ...(typeof client === "string" && client ? { client } : {}) });
+        await record({ kind: "mcpInit", ...(typeof client === "string" && client ? { client } : {}), ...(who ? { who } : {}) });
       }
     }
   } catch {}
@@ -462,6 +499,83 @@ export async function loadRecentMetrics(days: number): Promise<DayMetrics[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Every day in a window that has metrics, newest first, for the long views.
+ * One listing call finds the rollups that exist, so a year back costs as
+ * many fetches as there are recorded days, not one probe per calendar day.
+ * Today's and yesterday's uncompacted deltas ride along like loadRecentMetrics.
+ */
+export async function loadMetricsRange(days: number): Promise<DayMetrics[]> {
+  try {
+    const since = new Date(Date.now() - (days - 1) * 24 * 60 * 60000).toISOString().slice(0, 10);
+    // date -> blob url in blob mode, null in local mode, undefined when only deltas exist for the day
+    const existing = new Map<string, string | null | undefined>();
+    if (useBlob()) {
+      const { blobs } = await list({ prefix: `${ROLLUP_DIR}/`, limit: 1000 });
+      for (const b of blobs) {
+        const date = b.pathname.slice(b.pathname.lastIndexOf("/") + 1).replace(/\.json$/, "");
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= since) existing.set(date, b.url);
+      }
+    } else {
+      for (const base of localList(path.join("metrics", "day"))) {
+        const date = base.replace(/\.json$/, "");
+        if (date >= since) existing.set(date, null);
+      }
+    }
+    const allDeltas = (await listDeltas()).filter((d) => d.date >= since);
+    for (const d of allDeltas) if (!existing.has(d.date)) existing.set(d.date, undefined);
+    const loaded = await Promise.all(
+      [...existing.entries()].map(async ([date, url]) => {
+        let rollup: DayMetrics | null = null;
+        if (url) {
+          try {
+            const res = await fetch(url, { cache: "no-store" });
+            rollup = res.ok ? ((await res.json()) as DayMetrics) : null;
+          } catch {
+            rollup = null;
+          }
+        } else if (url === null) {
+          rollup = await readRollup(date);
+        }
+        return assembleDay(date, rollup, allDeltas.filter((d) => d.date === date));
+      })
+    );
+    return loaded.filter((d): d is DayMetrics => d !== null).sort((a, b) => b.date.localeCompare(a.date));
+  } catch {
+    return [];
+  }
+}
+
+/** A day with nothing recorded, for charts that draw every bucket in a window. */
+export function emptyMetrics(date: string): DayMetrics {
+  return emptyDay(date);
+}
+
+/** ISO week's Monday for a date, as YYYY-MM-DD. */
+function weekStart(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Days folded into weeks or months for the long views: counts add up,
+ * reader subscriber gauges take the max, and the bucket wears its first
+ * day's date so the charts label it like a day. Newest first, like the input.
+ */
+export function bucketMetrics(days: DayMetrics[], by: "day" | "week" | "month"): DayMetrics[] {
+  if (by === "day") return days;
+  const keyOf = (date: string) => (by === "week" ? weekStart(date) : `${date.slice(0, 7)}-01`);
+  const buckets = new Map<string, DayMetrics>();
+  for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+    const key = keyOf(d.date);
+    const target = buckets.get(key) ?? emptyDay(key);
+    mergeDay(target, d);
+    buckets.set(key, target);
+  }
+  return [...buckets.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /**

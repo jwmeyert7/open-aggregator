@@ -26,6 +26,12 @@ export interface SiteIdentity {
    * the bylines coming out of your feeds look right.
    */
   writersPublic?: boolean;
+  /**
+   * Optional links to your analytics dashboards, shown on the admin
+   * Distribution page (VERCEL_ANALYTICS_URL and GOOGLE_ANALYTICS_URL env
+   * override them). Unset means no link.
+   */
+  analytics?: { vercelUrl?: string; googleUrl?: string };
 }
 
 const configDir = path.join(process.cwd(), "config");

@@ -5,13 +5,21 @@ import type { DayMetrics } from "@/lib/metrics";
 import type { RedditPostRecord } from "@/lib/types";
 import { AdminChrome, call, Toast, useAdminAct, type AdminChromeData } from "../shared";
 
+/** How many distinct callers a bucket saw (kept here: the metrics module touches the filesystem and must never reach a client chunk). */
+function distinctCount(map: Record<string, 1> | undefined): number {
+  return map ? Object.keys(map).length : 0;
+}
+
 export interface DistributionData {
-  /** newest first, up to 14 days */
+  /** newest first, one entry per day, week, or month depending on the view */
   days: DayMetrics[];
+  view: { range: "14" | "30" | "90" | "365" | "all"; by: "day" | "week" | "month"; windowDays: number };
+  /** optional dashboard links from config/site.json (analytics.vercelUrl, analytics.googleUrl); the line hides when both are unset */
+  analytics: { vercelUrl?: string; googleUrl?: string };
   /** clicked cluster ids resolved to headlines (aged-out ids resolve to themselves) */
   stories: Record<string, { headline: string; slug?: string }>;
   email: {
-    /** oldest first, 14 days */
+    /** oldest first, one entry per bucket of the view */
     signups: Array<{ date: string; all: number; confirmed: number }>;
     total: number;
     unconfirmed: number;
@@ -38,7 +46,7 @@ function sumMaps(days: DayMetrics[], pick: (d: DayMetrics) => Record<string, num
 }
 
 /**
- * One bar per day, oldest left, for a 14 day metric. A second series draws
+ * One bar per bucket (day, week, or month), oldest left. A second series draws
  * inside the first as a darker bar (sessions inside tool calls, misses
  * inside searches), the same idiom as the email growth bars.
  */
@@ -141,6 +149,51 @@ export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; 
     <div>
       <AdminChrome chrome={chrome} />
       <Toast status={status} onClear={() => setStatus("")} />
+
+      <div className="source-filters">
+        <span className="filter-label">Range</span>
+        {(
+          [
+            ["14", "14 days"],
+            ["30", "30 days"],
+            ["90", "90 days"],
+            ["365", "1 year"],
+            ["all", "all"],
+          ] as const
+        ).map(([k, label]) => (
+          <a key={k} className={`filter-chip${data.view.range === k ? " on" : ""}`} href={`/admin/distribution?days=${k}&by=${data.view.by}`}>
+            {label}
+          </a>
+        ))}
+        <span className="filter-label" style={{ marginLeft: 12 }}>
+          By
+        </span>
+        {(["day", "week", "month"] as const).map((b) => (
+          <a key={b} className={`filter-chip${data.view.by === b ? " on" : ""}`} href={`/admin/distribution?days=${data.view.range}&by=${b}`}>
+            {b}
+          </a>
+        ))}
+      </div>
+
+      {data.analytics.vercelUrl || data.analytics.googleUrl ? (
+        <p className="status-line">
+          Inbound traffic and its sources live in{" "}
+          {[
+            data.analytics.vercelUrl ? { href: data.analytics.vercelUrl, label: "Vercel Analytics" } : null,
+            data.analytics.googleUrl ? { href: data.analytics.googleUrl, label: "Google Analytics" } : null,
+          ]
+            .filter((l): l is { href: string; label: string } => l !== null)
+            .map((l, i) => (
+              <span key={l.href}>
+                {i > 0 ? " and " : ""}
+                <a href={l.href} rel="noopener">
+                  {l.label}
+                </a>
+              </span>
+            ))}
+          . This page is the consumption side the site measures itself.
+        </p>
+      ) : null}
 
       <h2 id="email">Email</h2>
       <div className="admin-card">
@@ -254,10 +307,11 @@ export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; 
       <div className="admin-card">
         <div className="headline">Requests by day</div>
         <div className="sub">
-          Hits count CDN misses only (the feed is cached five minutes at the edge). The subscriber column below is the
-          real audience number: readers report it themselves in their User-Agent.
+          Hits count CDN misses only (the feed is cached five minutes at the edge), with distinct callers as the darker
+          bar: different addresses and agents that fetched the feed that day. The subscriber column below is the real
+          audience number for readers that report it in their User-Agent.
         </div>
-        <DayBars days={days} value={(d) => d.feed.hits} label="hits" />
+        <DayBars days={days} value={(d) => d.feed.hits} inner={(d) => distinctCount(d.feed.distinct)} label="hits" innerLabel="distinct callers" />
       </div>
       {readerRows.length > 0 ? (
         <div className="admin-card">
@@ -275,17 +329,20 @@ export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; 
       <h2 id="mcp">MCP server</h2>
       <div className="admin-card">
         <div className="headline">By day</div>
-        <div className="sub">Tool calls per day, with sessions (client connections) as the darker bar inside.</div>
+        <div className="sub">
+          Tool calls per bucket, with distinct callers (different addresses and agents) as the darker bar. A caller
+          keyed the same all day counts once however many calls it makes.
+        </div>
         <DayBars
           days={days}
           value={(d) => Object.values(d.mcp.tools).reduce((n, v) => n + v, 0)}
-          inner={(d) => d.mcp.initializes}
+          inner={(d) => distinctCount(d.mcp.distinct)}
           label="tool calls"
-          innerLabel="sessions"
+          innerLabel="distinct callers"
         />
       </div>
       <div className="admin-card">
-        <div className="headline">Tool calls, last {days.length} day{days.length === 1 ? "" : "s"}</div>
+        <div className="headline">Tool calls in the window</div>
         {toolTotals.length === 0 ? <div className="sub">No tool calls recorded yet.</div> : null}
         {toolTotals.map(([tool, n]) => (
           <div key={tool} className="sub" style={{ margin: "4px 0" }}>
@@ -383,7 +440,7 @@ export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; 
 
       <p className="status-line">
         This page covers the consumption side (feed, MCP, outbound clicks, site search). Inbound attribution per channel lives in
-        Vercel Analytics and Google Analytics under utm_source x, farcaster, reddit, and email.
+        your web analytics under utm_source x, farcaster, reddit, and email.
       </p>
     </div>
   );

@@ -26,7 +26,7 @@ function esc(value: string): string {
 export async function GET(req: Request) {
   // counts CDN misses only (the cache header below stays); the per-reader
   // subscriber gauges in the metrics blob are the real audience number
-  after(() => recordFeedHit(req.headers.get("user-agent")));
+  after(() => recordFeedHit(req.headers.get("user-agent"), req.headers.get("x-forwarded-for")?.split(",")[0] ?? null));
   const state = await loadState();
   const base = siteUrl();
   const site = siteIdentity();

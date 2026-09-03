@@ -331,9 +331,11 @@ async function GET(req: Request) {
 // post-response inside after(), so counting costs the caller nothing
 async function POST(req: Request) {
   const clone = req.clone();
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? null;
+  const ua = req.headers.get("user-agent");
   after(async () => {
     try {
-      await recordMcpBody(await clone.json());
+      await recordMcpBody(await clone.json(), ip, ua);
     } catch {}
   });
   return handler(req);

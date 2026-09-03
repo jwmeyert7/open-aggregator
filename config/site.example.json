@@ -1,10 +1,11 @@
 {
-  "$comment": "The site's identity. Copy this file to site.json and edit it, or run as-is to use these placeholder values. siteName appears in the header, page titles, and emails. tagline sits beside the wordmark. topic is one phrase naming what the site covers, used in public page copy. domain is the canonical host (SITE_URL env overrides the derived URL). contactEmail is the public inbound address (MAIL_FROM env overrides the outbound From). social handles are optional: empty strings hide the footer icons and the post links. writersPublic (default false) opens the /by writer pages and byline links to visitors once the bylines your feeds produce look right.",
+  "$comment": "The site's identity. Copy this file to site.json and edit it, or run as-is to use these placeholder values. siteName appears in the header, page titles, and emails. tagline sits beside the wordmark. topic is one phrase naming what the site covers, used in public page copy. domain is the canonical host (SITE_URL env overrides the derived URL). contactEmail is the public inbound address (MAIL_FROM env overrides the outbound From). social handles are optional: empty strings hide the footer icons and the post links. writersPublic (default false) opens the /by writer pages and byline links to visitors once the bylines your feeds produce look right. analytics holds optional links to your Vercel Analytics and Google Analytics dashboards for the admin Distribution page (VERCEL_ANALYTICS_URL and GOOGLE_ANALYTICS_URL env override them), empty strings hide the links.",
   "siteName": "Open Aggregator",
   "tagline": "a curated front page",
   "topic": "technology and science",
   "domain": "example.com",
   "contactEmail": "you@example.com",
   "social": { "xHandle": "", "farcasterHandle": "" },
-  "writersPublic": false
+  "writersPublic": false,
+  "analytics": { "vercelUrl": "", "googleUrl": "" }
 }

@@ -3106,6 +3106,10 @@ body:has(.player-page) {
 .filter-chip:hover {
   color: var(--fg-soft);
 }
+a.filter-chip {
+  display: inline-block;
+  text-decoration: none;
+}
 .filter-chip.on {
   color: var(--fg);
   border-color: var(--fg-soft);
