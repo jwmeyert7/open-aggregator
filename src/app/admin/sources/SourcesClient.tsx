@@ -179,7 +179,7 @@ export function SourcesClient({ chrome, data }: { chrome: AdminChromeData; data:
             {data.sources
               .filter((s) => s.category === cat)
               .map((s) => (
-                <div key={s.id} className="admin-card">
+                <div key={s.id} id={`feed-${s.id}`} className="admin-card">
                   <div className="headline">
                     {s.disabled ? "⏸ " : ""}
                     {s.name} {s.custom ? <span className="sub">(added by admin)</span> : null}

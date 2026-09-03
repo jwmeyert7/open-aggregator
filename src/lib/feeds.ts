@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import { siteIdentity } from "./site";
 import type { CandidateItem, FeedConfig, SiteConfig, SiteState } from "./types";
-import { hoursAgo, isPrivateHost, stripHtml, truncate } from "./util";
+import { cleanByline, hoursAgo, isPrivateHost, stripHtml, truncate } from "./util";
 
 /** Polite bot UA naming the deployment so feed owners can see who is reading. */
 export function userAgent(): string {
@@ -117,7 +117,8 @@ function labelDraftProposals(title: string): string {
   return out.charAt(0).toUpperCase() + out.slice(1);
 }
 
-function candidate(feed: FeedConfig, url: string, title: string, publishedAt: string, excerpt?: string): CandidateItem {
+function candidate(feed: FeedConfig, url: string, title: string, publishedAt: string, excerpt?: string, author?: string): CandidateItem {
+  const byline = cleanByline(author, feed.name);
   return {
     url,
     title: truncate(labelDraftProposals(stripHtml(title)), 300),
@@ -128,7 +129,14 @@ function candidate(feed: FeedConfig, url: string, title: string, publishedAt: st
     tier: feed.tier,
     weight: feed.weight,
     sectionHint: feed.sectionHint,
+    ...(byline ? { byline } : {}),
   };
+}
+
+/** rss-parser puts dc:creator in creator and an Atom author's name in author (untyped). */
+function feedAuthor(i: { creator?: string }): string | undefined {
+  const a = (i as { author?: unknown }).author;
+  return i.creator || (typeof a === "string" ? a : undefined);
 }
 
 async function parseFeedXml(xml: string): Promise<Awaited<ReturnType<Parser["parseString"]>>> {
@@ -160,7 +168,8 @@ async function fetchRss(feed: FeedConfig, timeoutMs: number): Promise<CandidateI
         i.link!,
         i.title!,
         i.isoDate || (i.pubDate ? new Date(i.pubDate).toISOString() : new Date().toISOString()),
-        i.contentSnippet || i.content
+        i.contentSnippet || i.content,
+        feedAuthor(i)
       );
       // release-feed entries carry their full notes so the release-summary
       // step can distill themes; the 500-char excerpt is too little for that
@@ -1040,22 +1049,75 @@ function silentDays(feed: FeedConfig, cfg: SiteConfig["ingest"]): number {
   return isReleaseFeed(feed) ? Math.max(cfg.feedSilentDays, 45) : cfg.feedSilentDays;
 }
 
+export type UnhealthyFeed = {
+  feed: FeedConfig;
+  /** one-line summary, kept for logs and older callers */
+  reason: string;
+  /** failing outright, gone quiet past its threshold, or reachable yet never fruitful */
+  kind: "errors" | "silent" | "empty";
+  /** consecutive failures when kind is errors, days quiet when kind is silent */
+  count: number;
+  lastError?: string;
+};
+
 /** Feeds that are erroring or have gone silent for their silent threshold: feed rot made visible. */
-export function unhealthyFeeds(state: SiteState, feeds: FeedConfig[], cfg: SiteConfig["ingest"]): Array<{ feed: FeedConfig; reason: string }> {
-  const out: Array<{ feed: FeedConfig; reason: string }> = [];
+export function unhealthyFeeds(state: SiteState, feeds: FeedConfig[], cfg: SiteConfig["ingest"]): UnhealthyFeed[] {
+  const out: UnhealthyFeed[] = [];
   for (const feed of feeds) {
     const h = state.feedHealth[feed.id];
     if (!h) continue;
     if (h.consecutiveErrors >= 3) {
-      out.push({ feed, reason: `${h.consecutiveErrors} consecutive errors (last: ${h.lastError})` });
+      out.push({
+        feed,
+        reason: `${h.consecutiveErrors} consecutive errors (last: ${h.lastError})`,
+        kind: "errors",
+        count: h.consecutiveErrors,
+        ...(h.lastError ? { lastError: h.lastError } : {}),
+      });
     } else if (feed.type === "gnews" || feed.type === "farcaster") {
       // query and discovery feeds are quiet by design: a stretch with nothing
       // new is normal, not rot, so only hard errors above count against them
     } else if (h.lastNewItemAt && hoursAgo(h.lastNewItemAt) > silentDays(feed, cfg) * 24) {
-      out.push({ feed, reason: `no new items for ${Math.floor(hoursAgo(h.lastNewItemAt) / 24)} days` });
+      const days = Math.floor(hoursAgo(h.lastNewItemAt) / 24);
+      out.push({ feed, reason: `no new items for ${days} days`, kind: "silent", count: days });
     } else if (!h.lastNewItemAt && h.lastSuccessAt && hoursAgo(h.lastSuccessAt) > silentDays(feed, cfg) * 24) {
-      out.push({ feed, reason: "reachable but has never produced an item" });
+      out.push({ feed, reason: "reachable but has never produced an item", kind: "empty", count: 0 });
     }
   }
   return out;
+}
+
+/**
+ * Plain words for the admin overview: what is wrong with a feed and what to
+ * do about it, guessed from the failure shape. Error text is guidance, not
+ * proof, so the advice always ends at the Sources page where the feed lives.
+ */
+export function describeUnhealthyFeed(u: UnhealthyFeed): { state: string; action: string } {
+  if (u.kind === "silent") {
+    return {
+      state: `Quiet for ${u.count} days.`,
+      action: "Fine if the outlet is just slow. If it has moved or shut down, update or disable it on Sources.",
+    };
+  }
+  if (u.kind === "empty") {
+    return {
+      state: "Reachable but has never produced an item.",
+      action: "The address may be a homepage rather than a feed. Check it on Sources.",
+    };
+  }
+  const err = u.lastError ?? "";
+  const state = `Failing, ${u.count} fetches in a row.${err ? ` Last error: ${truncate(err, 120)}` : ""}`;
+  if (/\b(404|410)\b|not found|gone/i.test(err)) {
+    return { state, action: "The feed address is gone. Look for a new one on the site, or disable it on Sources." };
+  }
+  if (/\b(401|403|429)\b|forbidden|blocked|cloudflare|captcha|rate limit/i.test(err)) {
+    return { state, action: "The site is blocking the fetcher. Try another feed address for the outlet, or disable it on Sources." };
+  }
+  if (/\b5\d\d\b|timeout|timed out|ENOTFOUND|ECONNREFUSED|ECONNRESET|fetch failed|network|socket/i.test(err)) {
+    return { state, action: "The site is not responding. This usually clears on its own. Disable it on Sources if it stays down a week." };
+  }
+  if (/pars|xml|json|invalid|unexpected|not a feed|no items/i.test(err)) {
+    return { state, action: "The address answers but is not a feed. Check it on Sources." };
+  }
+  return { state, action: "Check the feed address on Sources. Disable it there if the outlet has stopped publishing." };
 }

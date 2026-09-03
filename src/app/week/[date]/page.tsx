@@ -66,7 +66,8 @@ export default async function WeekPage({ params }: { params: Promise<{ date: str
         ))}
         {digest.episodes && digest.episodes.length > 0 ? (
           <>
-            <h2 className="list-label">Top podcasts this week</h2>
+            {/* the id anchors the digest email's Podcasts heading link */}
+            <h2 className="list-label" id="podcasts">Top podcasts this week</h2>
             <DigestEpisodes episodes={digest.episodes} idPrefix="week" />
           </>
         ) : null}

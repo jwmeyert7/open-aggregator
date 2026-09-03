@@ -3,7 +3,7 @@ import { ClusterCard } from "@/components/ClusterCard";
 import { byPublished, itemDisplayTitle, liveClusters, rankClusters, score } from "@/lib/rank";
 import { loadSiteConfig } from "@/lib/config";
 import { loadState } from "@/lib/state";
-import { timeAgo } from "@/lib/util";
+import { timeAgo, urlMatches } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +21,19 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
   const stories = query
     ? rankClusters(
-        liveClusters(state).filter((c) => match(c.headline, c.explainer, ...(c.keywords ?? []))),
+        liveClusters(state).filter(
+          (c) =>
+            match(c.headline, c.explainer, ...(c.keywords ?? []), ...c.links.map((l) => l.byline)) ||
+            // a pasted link lands on the story that carries it
+            c.links.some((l) => urlMatches(l.url, query))
+        ),
         cfg.ranking
       ).slice(0, 20)
     : [];
   const storyIds = new Set(stories.map((c) => c.id));
   const items = query
     ? byPublished(state.items)
-        .filter((i) => match(i.title, i.sourceName) && !(i.clusterId && storyIds.has(i.clusterId)))
+        .filter((i) => (match(i.title, i.sourceName, i.byline) || urlMatches(i.url, query)) && !(i.clusterId && storyIds.has(i.clusterId)))
         .slice(0, 30)
     : [];
 
@@ -43,7 +48,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               type="search"
               name="q"
               defaultValue={query}
-              placeholder="Headlines, sources, keywords…"
+              placeholder="Headlines, sources, writers, keywords, or paste a link…"
               autoFocus
             />
             <button className="btn" type="submit">

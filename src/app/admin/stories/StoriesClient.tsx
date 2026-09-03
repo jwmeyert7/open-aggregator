@@ -159,6 +159,19 @@ export function StoriesClient({
       <AdminChrome chrome={chrome} />
       <Toast status={status} onClear={() => setStatus("")} />
 
+      {/* reader suggestions sit first: they are the one thing on this page
+          waiting on a decision, and the story list below runs long */}
+      <h2 id="submissions">Submissions</h2>
+      {data.submissions.length === 0 ? (
+        <p className="status-line">
+          No pending reader suggestions. Links suggested via /submit queue here (and email you). Approve attaches a
+          story-targeted suggestion straight to its story, and runs the Add by URL editorial flow otherwise.
+        </p>
+      ) : null}
+      {data.submissions.map((s) => (
+        <SubmissionCard key={s.id} s={s} sections={data.sections} busy={busy} act={act} />
+      ))}
+
       <h2 id="stories">Stories</h2>
       <div className="form-row">
         <input
@@ -541,16 +554,6 @@ export function StoriesClient({
         </div>
       </form>
 
-      <h2 id="submissions">Submissions</h2>
-      {data.submissions.length === 0 ? (
-        <p className="status-line">
-          No pending reader suggestions. Links suggested via /submit queue here (and email you). Approve attaches a
-          story-targeted suggestion straight to its story, and runs the Add by URL editorial flow otherwise.
-        </p>
-      ) : null}
-      {data.submissions.map((s) => (
-        <SubmissionCard key={s.id} s={s} sections={data.sections} busy={busy} act={act} />
-      ))}
     </div>
   );
 }

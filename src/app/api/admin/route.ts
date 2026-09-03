@@ -12,7 +12,7 @@ import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
 import { sponsoredPlacements } from "@/lib/types";
 import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
-import { isPrivateHost, newId, normalizeUrl, sha256, slugify, socialSourceName, stripHtml, truncate } from "@/lib/util";
+import { cleanByline, isPrivateHost, newId, normalizeUrl, sha256, slugify, socialSourceName, stripHtml, truncate } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -92,6 +92,7 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
   let excerpt = "";
   let publishedAt = new Date().toISOString();
   let siteName = "";
+  let author = "";
   // an undated page must not rank as breaking news off its add time
   let undated = true;
   try {
@@ -106,6 +107,10 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
     const metaDesc =
       /<meta[^>]+(?:name="description"|property="og:description")[^>]+content="([^"]*)"/i.exec(html)?.[1] ?? "";
     siteName = stripHtml(/<meta[^>]+property="og:site_name"[^>]+content="([^"]*)"/i.exec(html)?.[1] ?? "").trim();
+    author =
+      /<meta[^>]+name="author"[^>]+content="([^"]*)"/i.exec(html)?.[1] ??
+      /<meta[^>]+property="article:author"[^>]+content="([^"]*)"/i.exec(html)?.[1] ??
+      "";
     excerpt = truncate(`${stripHtml(metaDesc)} ${stripHtml(html).slice(0, 2000)}`.trim(), 1500);
     // the page's own publish date beats fetch time: without it a re-added
     // old article wears a NEW badge and ranks as if it broke just now
@@ -139,6 +144,7 @@ async function fetchPageAsItem(url: string): Promise<CandidateItem> {
     tier: 1,
     weight: 1.5,
     ...(undated ? { undated: true } : {}),
+    ...(cleanByline(author, siteName) ? { byline: cleanByline(author, siteName) } : {}),
   };
 }
 
@@ -206,6 +212,7 @@ async function attachLinkToCluster(
     weight: item.weight,
     publishedAt: item.publishedAt,
     addedAt: now,
+    ...(item.byline ? { byline: item.byline } : {}),
   });
   cluster.updatedAt = now;
   markSeen(state, item);
@@ -220,6 +227,7 @@ async function attachLinkToCluster(
     ingestedAt: now,
     ...(item.excerpt ? { excerpt: item.excerpt } : {}),
     clusterId: cluster.id,
+    ...(item.byline ? { byline: item.byline } : {}),
   });
   if (as_ === "lead") cluster.leadUrl = url;
   return `Attached ${item.sourceName}${as_ === "lead" ? " as the lead" : ""} to “${truncate(cluster.headline, 60)}”. No editorial gate applied.`;
@@ -525,7 +533,10 @@ async function handle(req: NextRequest) {
     cluster.updatedAt = new Date().toISOString();
     // a story change can invalidate a summary line citing it; flag the
     // summary so the next pipeline run reconsiders it
-    if (body.action !== "postX" && state.frontSummary?.text) state.frontSummary.stale = true;
+    if (body.action !== "postX" && state.frontSummary?.text) {
+      state.frontSummary.stale = true;
+      state.frontSummary.staleReason = `admin action ${body.action}`;
+    }
     if (snapshot && body.action !== "pin") await takeSnapshot(state);
     await saveState(state);
     return ok(message);

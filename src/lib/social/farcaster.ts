@@ -1,4 +1,5 @@
 import type { SiteConfig, SiteState } from "../types";
+import { withUtm } from "../utm";
 import { utcDay } from "../util";
 
 /**
@@ -41,7 +42,7 @@ export async function postToFarcaster(
   cluster: { id: string; headline: string; explainer: string; slug: string },
   cfg: SiteConfig["bots"]
 ): Promise<{ dryRun: boolean; hash?: string }> {
-  const url = `${cfg.siteUrl}/story/${cluster.slug}`;
+  const url = withUtm(`${cfg.siteUrl}/story/${cluster.slug}`, "farcaster", "story");
   const explainer = cluster.explainer
     ? cluster.explainer.charAt(0).toUpperCase() + cluster.explainer.slice(1)
     : "";

@@ -55,6 +55,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "That doesn't look like a valid link." }, { status: 400 });
   }
 
+  // required since 2026-09 so submissions can be discussed and decisions sent;
+  // same shape check the subscribe route uses
+  const email = String(body.email ?? "").trim();
+  if (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ ok: false, message: "Please add a valid email so we can follow up." }, { status: 400 });
+  }
+
   // fresh: this route saves state, and saving a stale fallback would roll the site back
   const state = await loadState({ fresh: true });
   const submissions = state.submissions ?? [];
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
     id: newId(),
     url: url.href,
     note: String(body.note ?? "").trim().slice(0, 500) || undefined,
-    email: String(body.email ?? "").trim().slice(0, 200) || undefined,
+    email,
     ...(storySlug ? { storySlug } : {}),
     ...(body.asStory === true ? { asStory: true } : {}),
     ...(body.asSource === true ? { asSource: true } : {}),

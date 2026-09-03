@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { SiteConfig, SiteState } from "../types";
+import { withUtm } from "../utm";
 import { utcDay, utcMonth } from "../util";
 
 /**
@@ -80,7 +81,7 @@ export async function postToX(
     throw new XCapError("This story was already posted to X.");
   }
 
-  const url = `${cfg.siteUrl}/story/${cluster.slug}`;
+  const url = withUtm(`${cfg.siteUrl}/story/${cluster.slug}`, "x", "story");
   const explainer = cluster.explainer ? cluster.explainer.charAt(0).toUpperCase() + cluster.explainer.slice(1) : "";
   const text = `${cluster.headline}\n\n${explainer ? `${explainer}\n\n` : ""}${url}`;
 

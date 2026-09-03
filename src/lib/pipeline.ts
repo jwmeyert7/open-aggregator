@@ -14,6 +14,7 @@ import { loadDailyDigest, loadMonthlyDigest, loadState, loadWeeklyDigest, saveDa
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
 import { ogTruncate } from "./og";
+import { withUtm, type UtmSource } from "./utm";
 import { bestMatchIndex, editionCore, hoursAgo, newId, normalizeUrl, parseSummaryLines, primaryProposalClaim, proposalConflict, proposalIds, sha256, slugify, snapshotId, stripEmDashes, stripHtml, truncate, utcDay } from "./util";
 
 /** Gate counters are kept a little longer than the leaderboard's 30 day window. */
@@ -191,11 +192,33 @@ function joinSummaryLines(lines: SummaryBullet[], resolveRef?: (ref: string) => 
  * the new summary skips keeps its most recent line from the previous one, so
  * each box always shows the latest word written for that section.
  */
-function carryForwardSummary(newText: string, prevText: string | undefined): string {
+function carryForwardSummary(
+  newText: string,
+  prevText: string | undefined,
+  /**
+   * Line-level keep for the editor's routine pass: a new line about a story
+   * the previous box already covered keeps the OLD sentence verbatim unless
+   * that story gained coverage since the box was last written (updatedAt past
+   * prevAt). New stories arrive in the editor's words, dropped stories leave.
+   * Without this, one new item in a section let the editor re-phrase every
+   * line in it, and the box churned every few minutes saying the same thing.
+   * The stale-reconsider path passes nothing here: its prompt already keeps
+   * accurate lines verbatim and is meant to fix wording.
+   */
+  keep?: { state: SiteState; prevAt: string }
+): string {
   if (!prevText) return newText;
   const newLines = parseSummaryLines(newText);
   const prevLines = parseSummaryLines(prevText);
   const asRaw = (l: (typeof newLines)[number]) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.raw}`;
+  const keepOld = (nl: (typeof newLines)[number]): (typeof newLines)[number] | undefined => {
+    if (!keep || !nl.ref) return undefined;
+    const old = prevLines.find((p) => p.section === nl.section && p.ref === nl.ref);
+    if (!old) return undefined;
+    const story = keep.state.clusters[nl.ref];
+    const developed = story && story.updatedAt > keep.prevAt;
+    return developed ? undefined : old;
+  };
   // the stories a section's lines actually cite (line refs plus phrase refs)
   const refsFor = (lines: typeof newLines, section: string) => {
     const refs = new Set<string>();
@@ -219,8 +242,12 @@ function carryForwardSummary(newText: string, prevText: string | undefined): str
     const nr = refsFor(newLines, sec);
     const pr = refsFor(prevLines, sec);
     const sameStories = nr.size > 0 && nr.size === pr.size && [...nr].every((r) => pr.has(r));
-    const source = sameStories ? prevLines : newLines;
-    out.push(...source.filter((l) => l.section === sec).map(asRaw));
+    if (sameStories) {
+      out.push(...prevLines.filter((l) => l.section === sec).map(asRaw));
+      continue;
+    }
+    // the set changed: still keep each individual line whose story did not move
+    out.push(...newLines.filter((l) => l.section === sec).map((l) => asRaw(keepOld(l) ?? l)));
   }
   // sections the new summary skipped keep their old lines alive, as before
   out.push(...prevLines.filter((l) => l.section && !covered.has(l.section)).map(asRaw));
@@ -452,6 +479,7 @@ export function applyEditorOutput(
       ingestedAt: now,
       excerpt: item.excerpt,
       clusterId: cluster.id,
+      ...(item.byline ? { byline: item.byline } : {}),
     });
     if (!cluster.links.some((l) => normalizeUrl(l.url) === normalizeUrl(item.url))) {
       cluster.links.push({
@@ -464,6 +492,7 @@ export function applyEditorOutput(
         publishedAt: item.publishedAt,
         addedAt: now,
         ...(item.undated ? { undated: true } : {}),
+        ...(item.byline ? { byline: item.byline } : {}),
       });
     }
     cluster.updatedAt = now;
@@ -575,7 +604,7 @@ async function makeDailyDigest(
   const fallbackEps = dayEps.length > 0 ? dayEps : rankMedia((state.mediaItems ?? []).filter((m) => !m.hidden), state, cfg.ranking).slice(0, 1);
   if (fallbackEps.length > 0) digest.episodes = JSON.parse(JSON.stringify(fallbackEps)) as MediaItem[];
 
-  const url = `${cfg.bots.siteUrl}/day/${yesterday}`;
+  const url = withUtm(`${cfg.bots.siteUrl}/day/${yesterday}`, "farcaster", `daily-${yesterday}`);
   // the cast carries the same snapshot text as the X thread's first tweet,
   // with the day page as the embed standing in for the reply's link
   const text = await threadFirstTweet(`${siteIdentity().siteName} - ${tweetDate(yesterday)}`, digest.clusters, state, cfg, 36, digest.episodes?.[0]);
@@ -590,7 +619,7 @@ async function makeDailyDigest(
     // Channel casting usually requires channel membership to stick.
     // the page embed is the cast's "full day in review" link, so the cast
     // only appends the email ask beneath the snapshot
-    const r = await castRaw(`${text}\n\n${subscribeLines(cfg)}`, url, cfg.bots.farcaster.digestChannel || undefined);
+    const r = await castRaw(`${text}\n\n${subscribeLines(cfg, "farcaster")}`, url, cfg.bots.farcaster.digestChannel || undefined);
     cast = !r.dryRun;
     if (r.dryRun) notes.push("cast skipped (dry-run or no credentials)");
     if (r.hash) digest.castHash = r.hash;
@@ -615,14 +644,15 @@ async function makeDailyDigest(
 }
 
 /** The email ask shared by tweet 2 and the digest casts. */
-const subscribeLines = (cfg: SiteConfig): string => `Get regular summary emails:\n${cfg.bots.siteUrl}/subscribe`;
+const subscribeLines = (cfg: SiteConfig, source: UtmSource): string =>
+  `Get regular summary emails:\n${withUtm(`${cfg.bots.siteUrl}/subscribe`, source, "subscribe-ask")}`;
 
 /**
  * Tweet 2 of a digest thread: the archive link, then the email ask. No
  * follow line by decision: not asking is part of the digests' voice.
  */
-function threadSecondTweet(period: "day" | "week" | "month", pageUrl: string, cfg: SiteConfig): string {
-  return `Full ${period} in review:\n${pageUrl}\n\n${subscribeLines(cfg)}`;
+function threadSecondTweet(period: "day" | "week" | "month", pageUrl: string, cfg: SiteConfig, campaign: string): string {
+  return `Full ${period} in review:\n${withUtm(pageUrl, "x", campaign)}\n\n${subscribeLines(cfg, "x")}`;
 }
 
 /** "August 26, 2026" for the daily tweet heading. */
@@ -744,7 +774,7 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
   // the thread must never post a preview as the day's edition
   if (!digest || digest.inProgress || digest.tweetId || hoursAgo(digest.takenAt) > 36) return;
   const first = await threadFirstTweet(`${siteIdentity().siteName} - ${tweetDate(digest.date)}`, digest.clusters, state, cfg, 36, digest.episodes?.[0]);
-  const second = threadSecondTweet("day", `${cfg.bots.siteUrl}/day/${digest.date}`, cfg);
+  const second = threadSecondTweet("day", `${cfg.bots.siteUrl}/day/${digest.date}`, cfg, `daily-${digest.date}`);
   const r = await postThread(first, second);
   if (r.tweetId) {
     digest.tweetId = r.tweetId;
@@ -845,8 +875,9 @@ export function digestPostText(digest: Pick<DailyDigest, "date" | "clusters">, s
     month: "long",
     day: "numeric",
   });
-  return `The top stories from ${dateLabel}:\n\n${siteUrl}/day/${digest.date}`;
+  return `The top stories from ${dateLabel}:\n\n${withUtm(`${siteUrl}/day/${digest.date}`, "x", `daily-${digest.date}`)}`;
 }
+
 
 /**
  * Split the links Farcaster surfaced into two piles.
@@ -1691,6 +1722,48 @@ export async function reeditCluster(state: SiteState, cluster: Cluster): Promise
 }
 
 /**
+ * Replace the front summary text and log what changed and why, so the admin
+ * X-ray can show how much the box actually moves. Only a real text change
+ * makes a history line; an editor pass that confirms the same text just
+ * refreshes the timestamp (the freshness window keys off it).
+ */
+function writeFrontSummary(state: SiteState, text: string, why: string): void {
+  const prev = state.frontSummary;
+  const at = new Date().toISOString();
+  if (prev && prev.text === text) {
+    state.frontSummary = { ...prev, at, stale: false };
+    delete state.frontSummary.staleReason;
+    return;
+  }
+  const prevLines = parseSummaryLines(prev?.text ?? "");
+  const before = new Set(prevLines.map((l) => l.text));
+  const lines = parseSummaryLines(text);
+  const changedLines = lines.filter((l) => !before.has(l.text));
+  const sections = [...new Set(changedLines.map((l) => l.section).filter(Boolean))];
+  const reason = `${why}: ${changedLines.length} of ${lines.length} lines new${sections.length ? ` (${sections.join(", ")})` : ""}`;
+  // pair each changed line with the old line about the same story (or the
+  // old line in that section with nothing left to pair) so the X-ray can show
+  // whether a change said something new or just re-phrased the same news
+  const after = new Set(lines.map((l) => l.text));
+  const spare = prevLines.filter((l) => !after.has(l.text));
+  const diff: NonNullable<NonNullable<SiteState["frontSummary"]>["history"]>[number]["diff"] = [];
+  for (const l of changedLines) {
+    const i = spare.findIndex((p) => p.section === l.section && (l.ref ? p.ref === l.ref : !p.ref));
+    const pair = i >= 0 ? spare.splice(i, 1)[0] : undefined;
+    diff.push({ section: l.section ?? "general", ...(pair ? { before: truncate(pair.text, 200) } : {}), after: truncate(l.text, 200) });
+  }
+  for (const p of spare) diff.push({ section: p.section ?? "general", before: truncate(p.text, 200) });
+  state.frontSummary = {
+    text,
+    at,
+    history: [
+      { at, reason, changed: changedLines.length, total: lines.length, diff: diff.slice(0, 8) },
+      ...(prev?.history ?? []),
+    ].slice(0, 10),
+  };
+}
+
+/**
  * Reconsider the front summary against the page's current stories without a
  * full editor pass. Admin actions that change a story flag the summary stale
  * (a line may now claim something its story no longer says); the refresh
@@ -1729,7 +1802,7 @@ export async function reconsiderFrontSummary(state: SiteState, cfg: SiteConfig):
     summary.stale = false;
     return { note: "Front summary reconsidered: still accurate, unchanged.", changed: false };
   }
-  state.frontSummary = { text: merged, at: new Date().toISOString() };
+  writeFrontSummary(state, merged, `Reconsidered after ${summary.staleReason ?? "being flagged stale"}`);
   return { note: "Front summary refreshed: a line no longer matched its story.", changed: true };
 }
 
@@ -1983,10 +2056,20 @@ export async function runPipeline(): Promise<RunReport> {
     };
     const summaryText = report.usedLlm && out.frontSummary ? joinSummaryLines(out.frontSummary, resolveRef) : "";
     if (summaryText) {
-      state.frontSummary = {
-        text: backfillSummarySections(carryForwardSummary(summaryText, state.frontSummary?.text), state, cfg),
-        at: new Date().toISOString(),
-      };
+      const merged = backfillSummarySections(
+        carryForwardSummary(
+          summaryText,
+          state.frontSummary?.text,
+          state.frontSummary ? { state, prevAt: state.frontSummary.at } : undefined
+        ),
+        state,
+        cfg
+      );
+      writeFrontSummary(
+        state,
+        merged,
+        `Editor pass on ${newItems.length} new item${newItems.length === 1 ? "" : "s"}${applied.clustersCreated ? `, ${applied.clustersCreated} new stor${applied.clustersCreated === 1 ? "y" : "ies"}` : ""}`
+      );
     }
     }
   }
@@ -2031,6 +2114,7 @@ export async function runPipeline(): Promise<RunReport> {
       )
     ) {
       state.frontSummary.stale = true;
+      state.frontSummary.staleReason = "a linked story died or aged out";
     }
     if (state.frontSummary.stale && llmAvailable()) {
       try {
@@ -2165,12 +2249,12 @@ export async function runPipeline(): Promise<RunReport> {
     }
     try {
       if (weekly && weeklyFirst) {
-        const r = await castRaw(`${weeklyFirst}\n\n${subscribeLines(cfg)}`, `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg.bots.farcaster.digestChannel || undefined);
+        const r = await castRaw(`${weeklyFirst}\n\n${subscribeLines(cfg, "farcaster")}`, withUtm(`${cfg.bots.siteUrl}/week/${weekly.end}`, "farcaster", `weekly-${weekly.end}`), cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
       } else {
         const wc = await buildWeeklyCast(state, cfg);
         if (wc) {
-          const r = await castRaw(`${wc.text}\n\n${subscribeLines(cfg)}`, wc.url, cfg.bots.farcaster.digestChannel || undefined);
+          const r = await castRaw(`${wc.text}\n\n${subscribeLines(cfg, "farcaster")}`, withUtm(wc.url, "farcaster", `weekly-${today}`), cfg.bots.farcaster.digestChannel || undefined);
           report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
         } else {
           report.notes.push("Weekly cast skipped (fewer than three stories this week).");
@@ -2182,7 +2266,7 @@ export async function runPipeline(): Promise<RunReport> {
     // the weekly thread on X, same shape as the daily
     if (weekly && weeklyFirst && cfg.bots.x.weeklyThread !== false) {
       try {
-        const second = threadSecondTweet("week", `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg);
+        const second = threadSecondTweet("week", `${cfg.bots.siteUrl}/week/${weekly.end}`, cfg, `weekly-${weekly.end}`);
         const r = await postThread(weeklyFirst, second);
         if (r.tweetId) {
           weekly.tweetId = r.tweetId;
@@ -2254,7 +2338,7 @@ export async function runPipeline(): Promise<RunReport> {
     }
     try {
       if (monthly && monthlyFirst) {
-        const r = await castRaw(`${monthlyFirst}\n\n${subscribeLines(cfg)}`, `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg.bots.farcaster.digestChannel || undefined);
+        const r = await castRaw(`${monthlyFirst}\n\n${subscribeLines(cfg, "farcaster")}`, withUtm(`${cfg.bots.siteUrl}/month/${prevMonth}`, "farcaster", `monthly-${prevMonth}`), cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Monthly cast skipped (dry-run or no credentials)." : "Monthly cast posted.");
       }
     } catch (err) {
@@ -2262,7 +2346,7 @@ export async function runPipeline(): Promise<RunReport> {
     }
     if (monthly && monthlyFirst && cfg.bots.x.monthlyThread !== false) {
       try {
-        const second = threadSecondTweet("month", `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg);
+        const second = threadSecondTweet("month", `${cfg.bots.siteUrl}/month/${prevMonth}`, cfg, `monthly-${prevMonth}`);
         const r = await postThread(monthlyFirst, second);
         if (r.tweetId) {
           monthly.tweetId = r.tweetId;

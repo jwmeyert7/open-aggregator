@@ -7,18 +7,34 @@ import type { Cluster, SponsoredPost } from "@/lib/types";
 import { leadLink } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { sourceSlug } from "@/app/sources/shared";
+import { bylineNames, nameSlug } from "@/lib/util";
 
 /**
  * The Techmeme-style kicker masthead: the vouching source's name reads first,
  * quietly linking its on-site source page (its articles or episodes here).
  * The headline below stays the loud click.
  */
-export function SourceKicker({ name }: { name: string }) {
+export function SourceKicker({ name, byline }: { name: string; byline?: string }) {
   return (
     <div className="kicker">
       <Link href={`/sources/${sourceSlug(name)}`} title={`${name} on ${siteIdentity().siteName}`}>
         {name}
       </Link>
+      {/* Techmeme-style byline: the outlet vouches, the writer gets the credit
+          and a page of their own; multiple names each link separately */}
+      {byline ? (
+        <span className="byline">
+          {" / "}
+          {bylineNames(byline).map((n, i) => (
+            <span key={n}>
+              {i > 0 ? ", " : ""}
+              <Link href={`/by/${nameSlug(n)}`} title={`${n} on ${siteIdentity().siteName}`}>
+                {n}
+              </Link>
+            </span>
+          ))}
+        </span>
+      ) : null}
       :
     </div>
   );
@@ -45,7 +61,7 @@ export function SponsoredCard({ post }: { post?: SponsoredPost }) {
         <>
           {post.sponsor ? <div className="kicker">{post.sponsor}:</div> : null}
           <h2>
-            <a href={post.url} rel="noopener sponsored">
+            <a href={post.url} rel="noopener sponsored" data-oa-sp="1">
               {post.headline}
             </a>
           </h2>
@@ -101,9 +117,9 @@ export function ClusterCard({
       {/* Techmeme-style kicker: the source vouching for the story reads first,
           on its own line, so trust anchors the headline without breaking its
           left edge for scanning */}
-      <SourceKicker name={lead.sourceName} />
+      <SourceKicker name={lead.sourceName} byline={lead.byline} />
       <h2>
-        <a href={lead.url} rel="noopener">
+        <a href={lead.url} rel="noopener" data-oa-story={cluster.id}>
           {cluster.headline}
         </a>
       </h2>
@@ -116,7 +132,7 @@ export function ClusterCard({
           {others.map((l, i) => (
             <span key={l.url}>
               {i > 0 ? " · " : "More: "}
-              <a href={l.url} rel="noopener" title={l.title}>
+              <a href={l.url} rel="noopener" title={l.byline ? `${l.title} (by ${l.byline})` : l.title} data-oa-story={cluster.id}>
                 <span className="src">{l.sourceName}</span>
               </a>
             </span>

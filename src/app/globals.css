@@ -1606,6 +1606,36 @@ select.select {
   font-size: 0.82rem;
   color: var(--fg-soft);
 }
+.kicker .byline {
+  font-weight: 400;
+}
+.summary-log ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.summary-log .summary-diff {
+  list-style: none;
+  padding-left: 12px;
+  margin: 2px 0 6px;
+}
+.summary-log .diff-before {
+  color: var(--bad);
+  opacity: 0.8;
+}
+.summary-log .diff-after {
+  color: var(--good);
+}
+.feed-health ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.feed-health li {
+  margin: 4px 0;
+}
+.feed-health .sub {
+  display: block;
+  color: var(--muted);
+}
 .score-detail {
   display: inline;
 }

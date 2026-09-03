@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { AdminChromeData } from "./shared";
 import { effectiveFeeds } from "@/lib/config";
-import { unhealthyFeeds } from "@/lib/feeds";
+import { describeUnhealthyFeed, unhealthyFeeds } from "@/lib/feeds";
 import { knownSourceHosts } from "@/lib/pipeline";
 import { xMonthlyCount } from "@/lib/social/x";
 import type { SiteConfig, SiteState, SourceCandidate } from "@/lib/types";
@@ -34,8 +34,9 @@ export function buildChrome(state: SiteState, cfg: SiteConfig): AdminChromeData 
     },
     updatedAt: state.updatedAt,
     unhealthyFeeds: unhealthyFeeds(state, effectiveFeeds(state), cfg.ingest).map((u) => ({
+      id: u.feed.id,
       name: u.feed.name,
-      reason: u.reason,
+      ...describeUnhealthyFeed(u),
     })),
     submissions: (state.submissions ?? []).filter((s) => s.status === "pending").length,
     candidates: undecidedCandidates(state).length,

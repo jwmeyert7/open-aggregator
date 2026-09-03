@@ -81,7 +81,7 @@ export interface AdminChromeData {
   xMonthly: { used: number; cap: number };
   subscribers: { daily: number; weekly: number };
   updatedAt: string;
-  unhealthyFeeds: Array<{ name: string; reason: string }>;
+  unhealthyFeeds: Array<{ id: string; name: string; state: string; action: string }>;
   /** pending reader submissions, badged on the Stories link */
   submissions: number;
   /** undecided source candidates, badged on the Sources link */
@@ -101,6 +101,7 @@ const TOOLS: Array<{ href: string; label: string }> = [
   { href: "/admin/sponsored", label: "Sponsored" },
   { href: "/admin/leaderboard", label: "Leaderboard" },
   { href: "/admin/farcaster", label: "Farcaster" },
+  { href: "/admin/distribution", label: "Distribution" },
 ];
 
 export function AdminChrome({ chrome }: { chrome: AdminChromeData }) {
@@ -159,13 +160,18 @@ export function AdminChrome({ chrome }: { chrome: AdminChromeData }) {
       ) : null}
       <Toast status={status} onClear={() => setStatus("")} />
       {pathname === "/admin" && chrome.unhealthyFeeds.length > 0 ? (
-        <div className="notice">
-          <strong>Feed health:</strong>{" "}
-          {chrome.unhealthyFeeds.map((f) => (
-            <span key={f.name} className="health-bad">
-              {f.name} ({f.reason}){" "}
-            </span>
-          ))}
+        <div className="notice feed-health">
+          <strong>Feed health</strong>
+          <ul>
+            {chrome.unhealthyFeeds.map((f) => (
+              <li key={f.id}>
+                <Link href={`/admin/sources#feed-${f.id}`} className="health-bad">
+                  {f.name}
+                </Link>{" "}
+                {f.state} <span className="sub">{f.action}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </>

@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { siteUrl } from "@/lib/config";
+import { recordFeedHit } from "@/lib/metrics";
 import { liveClusters } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
@@ -21,7 +23,10 @@ function esc(value: string): string {
  * sees an item re-dated. Headlines and explainers may still refresh in place
  * as a story develops, matching the site.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  // counts CDN misses only (the cache header below stays); the per-reader
+  // subscriber gauges in the metrics blob are the real audience number
+  after(() => recordFeedHit(req.headers.get("user-agent")));
   const state = await loadState();
   const base = siteUrl();
   const site = siteIdentity();

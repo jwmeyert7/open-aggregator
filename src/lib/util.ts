@@ -8,6 +8,59 @@ export function newId(): string {
   return crypto.randomBytes(5).toString("hex");
 }
 
+/**
+ * A pasted link finds the story that carries it. Exact after normalization
+ * (tracking params, www, hash ignored), or the query as a fragment of the
+ * link with scheme and www stripped, so a bare host or a partial path works
+ * too. Needs a dot in the query so ordinary words never match link paths.
+ */
+export function urlMatches(candidate: string, query: string): boolean {
+  const bare = (s: string) => s.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+  const q = bare(query);
+  if (!q.includes(".")) return false;
+  try {
+    if (normalizeUrl(candidate) === normalizeUrl(/^https?:\/\//i.test(query.trim()) ? query.trim() : `https://${q}`)) return true;
+  } catch {}
+  return bare(candidate).includes(q);
+}
+
+/**
+ * A feed's author field, made fit to show as a byline. Feeds put all sorts in
+ * there: "By Jane Doe", an email, a URL, "Staff", the outlet's own name. Only
+ * a plausible person's name (or names) survives; everything else is dropped
+ * rather than shown wrong. Returns undefined when nothing usable remains.
+ */
+export function cleanByline(raw: string | undefined, sourceName?: string): string | undefined {
+  if (!raw) return undefined;
+  let s = stripHtml(raw).replace(/\s+/g, " ").trim();
+  s = s.replace(/^by[:\s]+/i, "").replace(/[.,;\s]+$/g, "").trim();
+  if (!s || s.length > 80) return undefined;
+  if (/[@/]|https?:|\bwww\./i.test(s)) return undefined;
+  if (/^(staff|admin|administrator|editor|editors|editorial|team|newsroom|guest|contributor|anonymous|unknown|press release|pr newswire|reuters|bloomberg|ap)$/i.test(s)) return undefined;
+  if (/\b(staff|team|desk|newsroom|editors?|news|media|research|labs?|foundation|dao|protocol)\b/i.test(s) && !/\s/.test(s.replace(/\b(staff|team|desk|newsroom|editors?|news|media|research|labs?|foundation|dao|protocol)\b/i, "").trim())) return undefined;
+  if (sourceName && s.toLowerCase() === sourceName.toLowerCase()) return undefined;
+  if (!/[a-z]/i.test(s)) return undefined;
+  return s;
+}
+
+/** The people in a byline: "A, B and C" becomes ["A", "B", "C"]. */
+export function bylineNames(byline: string): string[] {
+  return byline
+    .split(/\s*(?:,|;|&|\band\b|\+)\s*/i)
+    .map((n) => n.trim())
+    .filter((n) => n.length > 1);
+}
+
+/** URL segment for a writer's on-site page, derived from the display name. */
+export function nameSlug(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export function normalizeUrl(raw: string): string {
   try {
     const u = new URL(raw);

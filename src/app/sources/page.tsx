@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { sourceSlug } from "./shared";
 import { SourcesTable, type SourceRow, type SourceType } from "./SourcesTable";
 import { effectiveFeeds } from "@/lib/config";
@@ -68,7 +69,8 @@ export default async function SourcesPage() {
         <h1>Sources</h1>
         <p>
           {siteIdentity().siteName} reads a hand-picked whitelist of sources: team blogs, release feeds, forums,
-          podcast shows, primary sources, and news outlets.
+          podcast shows, primary sources, and news outlets. The people behind the articles have pages of their own on{" "}
+          <Link href="/by">Writers</Link>.
         </p>
         <SourcesTable rows={tableRows} />
         <p className="sources-foot">

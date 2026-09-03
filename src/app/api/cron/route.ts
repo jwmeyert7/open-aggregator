@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { compactMetrics } from "@/lib/metrics";
 import { runPipeline } from "@/lib/pipeline";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ async function handle(req: NextRequest): Promise<NextResponse> {
   }
   try {
     const report = await runPipeline();
+    // fold distribution metric deltas into their day rollups; the cron being
+    // the only rollup writer is what keeps that overwrite-in-place safe
+    await compactMetrics();
     return NextResponse.json({ ok: true, report });
   } catch (err) {
     return NextResponse.json(

@@ -145,6 +145,8 @@ export interface CoverageLink {
   addedAt: string;
   /** the page declared no publish date, so publishedAt is just the moment it was added; such a link never counts toward velocity */
   undated?: boolean;
+  /** the writer(s) as the feed named them, when the feed named anyone at all (captured from 2026-09-01) */
+  byline?: string;
 }
 
 export interface Cluster {
@@ -197,6 +199,7 @@ export interface RiverItem {
   ingestedAt: string;
   excerpt?: string;
   clusterId?: string;
+  byline?: string;
 }
 
 /**
@@ -355,7 +358,22 @@ export interface SiteState {
    * (set when an admin action changes a story a line cites, or a cited story
    * dies); still-accurate lines survive that pass verbatim.
    */
-  frontSummary?: { text: string; at: string; stale?: boolean };
+  frontSummary?: {
+    text: string;
+    at: string;
+    stale?: boolean;
+    /** why the box was flagged stale, echoed into the next rewrite's history line */
+    staleReason?: string;
+    /** newest first, last 10 times the text actually changed and why */
+    history?: Array<{
+      at: string;
+      reason: string;
+      changed: number;
+      total: number;
+      /** the lines that moved: before and after paired by story where possible */
+      diff?: Array<{ section: string; before?: string; after?: string }>;
+    }>;
+  };
   /** Paid posts injected into the story lists, clearly marked as ads. */
   sponsoredPosts?: SponsoredPost[];
   /** Admin-managed source changes layered over config/feeds.json. */
@@ -455,6 +473,7 @@ export interface Submission {
   id: string;
   url: string;
   note?: string;
+  /** required by the API for new submissions since 2026-09; older stored ones may lack it */
   email?: string;
   /** Story permalink slug when suggested from a story page. */
   storySlug?: string;
@@ -602,6 +621,8 @@ export interface CandidateItem {
   sectionHint?: SectionId;
   /** manual adds only: the page declared no publish date, so the link must not rank as breaking */
   undated?: boolean;
+  /** writer(s) named by the feed or page, already cleaned */
+  byline?: string;
   /**
    * Release-feed items only: the stripped release notes, carried from ingest
    * to the release-summary step and dropped before the item persists.

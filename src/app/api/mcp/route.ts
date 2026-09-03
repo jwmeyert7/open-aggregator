@@ -1,10 +1,13 @@
 import { createMcpHandler } from "mcp-handler";
+import { after } from "next/server";
 import { z } from "zod";
 import { loadSiteConfig, navSections, siteUrl } from "@/lib/config";
+import { recordMcpBody, recordMcpHtmlView } from "@/lib/metrics";
 import { adaptiveRanking, byPublished, episodeStories, itemDisplayTitle, leadLink, liveClusters, rankClusters, rankMedia, sectionStories, topStories, weekInReview } from "@/lib/rank";
 import { siteIdentity } from "@/lib/site";
 import { loadDailyDigest, loadState } from "@/lib/state";
 import type { Cluster } from "@/lib/types";
+import { urlMatches } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,7 @@ function serializeCluster(c: Cluster, rank: number, base: string) {
     leadUrl: lead?.url,
     sources: c.links.slice(0, MAX_SOURCES_PER_STORY).map((l) => ({
       source: l.sourceName,
+      ...(l.byline ? { byline: l.byline } : {}),
       title: l.title,
       url: l.url,
       publishedAt: l.publishedAt,
@@ -91,7 +95,7 @@ const handler = createMcpHandler(
       {
         title: "Search stories",
         description:
-          `Search the live ${id.siteName} stories by keyword. Matches headlines, explainers, editor keywords, and the titles of the underlying source links. Results come back in current rank order. When presenting a story to the user, link its permalink.`,
+          `Search the live ${id.siteName} stories by keyword, writer, or link. Matches headlines, explainers, editor keywords, and the titles, bylines, and URLs of the underlying source links, so pasting an article URL finds the story that covers it. Results come back in current rank order. When presenting a story to the user, link its permalink.`,
         annotations: { readOnlyHint: true },
         inputSchema: z.object({
           query: z.string().min(2).max(200),
@@ -108,7 +112,7 @@ const handler = createMcpHandler(
             c.headline.toLowerCase().includes(q) ||
             c.explainer.toLowerCase().includes(q) ||
             c.keywords.some((k) => k.toLowerCase().includes(q)) ||
-            c.links.some((l) => l.title.toLowerCase().includes(q))
+            c.links.some((l) => l.title.toLowerCase().includes(q) || Boolean(l.byline?.toLowerCase().includes(q)) || urlMatches(l.url, query))
         );
         const base = siteUrl();
         return asText({
@@ -316,9 +320,23 @@ podcasts, all ranked exactly as the live site ranks them.</p>
 
 async function GET(req: Request) {
   const accept = req.headers.get("accept") ?? "";
-  if (accept.includes("text/html") && !accept.includes("text/event-stream")) return browserExplainer();
+  if (accept.includes("text/html") && !accept.includes("text/event-stream")) {
+    after(() => recordMcpHtmlView());
+    return browserExplainer();
+  }
   return handler(req);
 }
 
-export { GET };
-export { handler as POST };
+// the clone is taken before handler(req) consumes the body; parsing happens
+// post-response inside after(), so counting costs the caller nothing
+async function POST(req: Request) {
+  const clone = req.clone();
+  after(async () => {
+    try {
+      await recordMcpBody(await clone.json());
+    } catch {}
+  });
+  return handler(req);
+}
+
+export { GET, POST };

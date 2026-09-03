@@ -18,6 +18,12 @@ import { bestMatchIndex, echoesHeadline, formatViews, hoursAgo, mediaThumb, pars
 
 export const dynamic = "force-dynamic";
 
+/** "3h 12m ago" for the X-ray log; minutes only under an hour. */
+function ago(iso: string): string {
+  const m = Math.max(0, Math.round(hoursAgo(iso) * 60));
+  return m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ${m % 60}m ago`;
+}
+
 export default async function HomePage() {
   const state = await loadState();
   const cfg = loadSiteConfig();
@@ -197,10 +203,32 @@ export default async function HomePage() {
       <ColumnHeads sections={cfg.sections} active="top" />
       {admin && state.frontSummary ? (
         <AdminXray>
-          <div className="org rank-debug" style={{ gridColumn: "1 / -1" }}>
-            summary rewritten {Math.round(hoursAgo(state.frontSummary.at) * 60)}m ago
-            {state.frontSummary.stale ? " · marked stale" : ""}
+          <div className="org rank-debug summary-log" style={{ gridColumn: "1 / -1" }}>
+            Latest in box: last confirmed by the editor {ago(state.frontSummary.at)}
+            {state.frontSummary.stale ? ` · marked stale (${state.frontSummary.staleReason ?? "reason not recorded"})` : ""}
             {summary ? "" : " · hidden from visitors (over the freshness window)"}
+            {(state.frontSummary.history ?? []).length > 0 ? (
+              <ul>
+                {(state.frontSummary.history ?? []).map((h) => (
+                  <li key={h.at}>
+                    {h.at.slice(11, 16)} UTC, {ago(h.at)}: {h.reason}
+                    {h.diff && h.diff.length > 0 ? (
+                      <ul className="summary-diff">
+                        {h.diff.map((d, i) => (
+                          <li key={i}>
+                            <span className="sub">{d.section}</span>
+                            {d.before ? <div className="diff-before">− {d.before}</div> : null}
+                            {d.after ? <div className="diff-after">+ {d.after}</div> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div>No rewrites logged yet (the log starts with the next change).</div>
+            )}
           </div>
         </AdminXray>
       ) : null}
@@ -215,7 +243,7 @@ export default async function HomePage() {
                   <li key={c.id} id={`s-${c.id}`}>
                     {/* same Techmeme-style kicker as every story card: the
                         vouching source reads first, on its own line */}
-                    <SourceKicker name={lead.sourceName} />
+                    <SourceKicker name={lead.sourceName} byline={lead.byline} />
                     <a href={lead.url} rel="noopener">
                       {c.headline}
                     </a>{" "}

@@ -62,7 +62,8 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
         ))}
         {digest.episodes && digest.episodes.length > 0 ? (
           <>
-            <h2 className="list-label">Top podcasts this month</h2>
+            {/* the id anchors the digest email's Podcasts heading link */}
+            <h2 className="list-label" id="podcasts">Top podcasts this month</h2>
             <DigestEpisodes episodes={digest.episodes} idPrefix="month" />
           </>
         ) : null}

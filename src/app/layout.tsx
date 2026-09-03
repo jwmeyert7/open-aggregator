@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminLink } from "@/components/AdminLink";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
+import { ClickBeacons } from "@/components/ClickBeacons";
 import { loadSiteConfig, siteUrl } from "@/lib/config";
 import { siteIdentity } from "@/lib/site";
 import { loadState } from "@/lib/state";
@@ -134,6 +135,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </footer>
         {process.env.NEXT_PUBLIC_GA_ID ? <AnalyticsConsent gaId={process.env.NEXT_PUBLIC_GA_ID} /> : null}
+        {/* hand-rolled outbound click counter (see ClickBeacons); admin browsers excluded */}
+        <ClickBeacons />
       </body>
     </html>
   );

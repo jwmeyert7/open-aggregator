@@ -88,15 +88,15 @@ export function SubmitForm({ story, sections }: { story?: string; sections: stri
         />
       </label>
       <label>
-        Your email <span className="org">(optional, never shown. Used once to email you the decision.)</span>
-        <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        Your email * <span className="org">(used only to follow up about your submission, never shown publicly)</span>
+        <input type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
       {/* honeypot: hidden from people, filled by bots */}
       <label className="hp-field" aria-hidden="true">
         Website
         <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </label>
-      <button type="submit" disabled={busy || !url.trim()}>
+      <button type="submit" disabled={busy || !url.trim() || !email.trim()}>
         {busy ? "Sending…" : "Suggest it"}
       </button>
       {status ? <p className={status.ok ? "form-ok" : "form-err"}>{status.message}</p> : null}

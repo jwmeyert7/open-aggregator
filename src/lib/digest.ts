@@ -4,6 +4,7 @@ import { siteIdentity } from "./site";
 import { leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
 import { loadDailyDigest, loadMonthlyDigest } from "./state";
 import type { Cluster, DigestSubscriber, MediaItem, SiteConfig, SiteState } from "./types";
+import { withUtm } from "./utm";
 import { formatDuration, parseSummaryLines, utcDay } from "./util";
 
 /**
@@ -46,13 +47,24 @@ function toMailStories(clusters: Cluster[]): MailStory[] {
  * few stories first under "Top", then the rest grouped by section. Input
  * order is already the edition's ranking, so slicing keeps it.
  */
-function groupStories(clusters: Cluster[]): Array<{ title: string; stories: MailStory[] }> {
-  const groups = [{ title: "Top", stories: toMailStories(clusters.slice(0, 3)) }];
+function groupStories(clusters: Cluster[]): Array<{ title: string; anchor?: string; stories: MailStory[] }> {
+  // each group's anchor is its first story's card id on the archive page
+  // (#s-<clusterId>, the anchor ClusterCard already renders), so an email
+  // heading jumps straight to where that group starts in the day's ranking
+  const groups: Array<{ title: string; anchor?: string; stories: MailStory[] }> = [
+    {
+      title: "Top",
+      ...(clusters[0] ? { anchor: `s-${clusters[0].id}` } : {}),
+      stories: toMailStories(clusters.slice(0, 3)),
+    },
+  ];
   const rest = clusters.slice(3);
   const sections = [...loadSiteConfig().sections.map((s) => ({ id: s.id, title: s.title })), { id: "general", title: "General" }];
   for (const s of sections) {
     const inSection = rest.filter((c) => c.section === s.id);
-    if (inSection.length > 0) groups.push({ title: s.title, stories: toMailStories(inSection) });
+    if (inSection.length > 0) {
+      groups.push({ title: s.title, anchor: `s-${inSection[0].id}`, stories: toMailStories(inSection) });
+    }
   }
   return groups;
 }
@@ -61,7 +73,11 @@ function groupStories(clusters: Cluster[]): Array<{ title: string; stories: Mail
 export interface MailEpisode {
   show: string;
   title: string;
+  /** the episode on our own podcasts page */
   url: string;
+  /** the episode where it actually lives (YouTube, the show's own page) */
+  sourceUrl: string;
+  kind: "video" | "podcast";
   length?: string;
 }
 
@@ -79,7 +95,15 @@ export function recentEpisodes(state: SiteState, windowHours: number, limit: num
     .slice(0, limit)
     .map((m) => {
       const length = formatDuration(m.durationSec);
-      return { show: m.sourceName, title: m.displayTitle ?? m.title, url: `${siteUrl()}/podcasts?play=${m.id}#m-${m.id}`, ...(length ? { length } : {}) };
+      return {
+        show: m.sourceName,
+        title: m.displayTitle ?? m.title,
+        url: `${siteUrl()}/podcasts?play=${m.id}#m-${m.id}`,
+        // same preference the site's episode shelf uses for its outbound link
+        sourceUrl: m.videoUrl ?? m.url,
+        kind: m.kind,
+        ...(length ? { length } : {}),
+      };
     });
 }
 
@@ -91,12 +115,17 @@ function digestEmail(opts: {
   heading: string;
   archiveUrl: string;
   archiveLabel: string;
+  /** utm_campaign for every site link in this edition (daily-2026-09-01 etc.) */
+  campaign: string;
   summary: string[];
-  groups: Array<{ title: string; stories: MailStory[] }>;
+  groups: Array<{ title: string; anchor?: string; stories: MailStory[] }>;
   episodes?: MailEpisode[];
 }): { text: string; html: string } {
-  const { heading, archiveUrl, archiveLabel, summary, groups } = opts;
+  const { heading, archiveUrl, archiveLabel, campaign, summary, groups } = opts;
   const episodes = opts.episodes ?? [];
+  // every link to our own site is tagged, so email traffic shows up attributed in
+  // analytics; publisher links and the unsubscribe link are left alone
+  const track = (u: string) => withUtm(u, "email", campaign);
   const text = [
     heading,
     "",
@@ -105,12 +134,21 @@ function digestEmail(opts: {
     ...groups.flatMap((g) => [
       `== ${g.title} ==`,
       "",
-      ...g.stories.flatMap((s) => [`${s.source}: ${s.headline}`, s.explainer || null, s.permalink, ""]),
+      ...g.stories.flatMap((s) => [`${s.source}: ${s.headline}`, s.explainer || null, track(s.permalink), ""]),
     ]),
     ...(episodes.length > 0
-      ? ["== Podcasts ==", "", ...episodes.flatMap((e) => [`${e.show}: ${e.title}${e.length ? ` (${e.length})` : ""}`, e.url, ""])]
+      ? [
+          "== Podcasts ==",
+          "",
+          ...episodes.flatMap((e) => [
+            `${e.show}: ${e.title}${e.length ? ` (${e.length})` : ""}`,
+            track(e.url),
+            `${e.kind === "podcast" ? "Listen" : "Watch"} at ${e.show}: ${e.sourceUrl}`,
+            "",
+          ]),
+        ]
       : []),
-    `${archiveLabel}: ${archiveUrl}`,
+    `${archiveLabel}: ${track(archiveUrl)}`,
     "",
     "Unsubscribe: %%UNSUB%%",
   ]
@@ -119,34 +157,41 @@ function digestEmail(opts: {
 
   const html = [
     `<div style="font-family: Georgia, serif; max-width: 640px; margin: 0 auto; color: #222; line-height: 1.5;">`,
-    `<h1 style="font-size: 20px;">${escapeHtml(heading)}</h1>`,
+    // the heading quietly links the archived edition; the explicit CTA at the
+    // bottom stays, so the link is styled like the plain text it replaces
+    `<h1 style="font-size: 20px;"><a href="${escapeHtml(track(archiveUrl))}" style="color: #222; text-decoration: none;">${escapeHtml(heading)}</a></h1>`,
     summary.length > 0
       ? `<ul style="padding-left: 20px;">${summary.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`
       : "",
     ...groups.flatMap((g) => [
-      `<h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; margin: 22px 0 4px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">${escapeHtml(g.title)}</h2>`,
+      `<h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; margin: 22px 0 4px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">` +
+        (g.anchor
+          ? `<a href="${escapeHtml(track(`${archiveUrl}#${g.anchor}`))}" style="color: #777; text-decoration: none;">${escapeHtml(g.title)}</a>`
+          : escapeHtml(g.title)) +
+        `</h2>`,
       ...g.stories.map(
         (s) =>
           `<p style="margin: 16px 0;"><span style="color: #777; font-size: 13px;">${escapeHtml(s.source)}:</span><br/>` +
-          `<a href="${escapeHtml(s.permalink)}" style="font-size: 16px; font-weight: bold; color: #1a4b8f;">${escapeHtml(s.headline)}</a>` +
+          `<a href="${escapeHtml(track(s.permalink))}" style="font-size: 16px; font-weight: bold; color: #1a4b8f;">${escapeHtml(s.headline)}</a>` +
           (s.explainer ? `<br/><span style="font-size: 14px;">${escapeHtml(s.explainer)}</span>` : "") +
           `<br/><a href="${escapeHtml(s.url)}" style="font-size: 12px; color: #777;">read at ${escapeHtml(s.source)}</a></p>`
       ),
     ]),
     ...(episodes.length > 0
       ? [
-          `<h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; margin: 22px 0 4px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">Podcasts</h2>`,
+          `<h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; margin: 22px 0 4px; border-bottom: 1px solid #ddd; padding-bottom: 4px;"><a href="${escapeHtml(track(`${archiveUrl}#podcasts`))}" style="color: #777; text-decoration: none;">Podcasts</a></h2>`,
           ...episodes.map(
             (e) =>
               `<p style="margin: 12px 0;"><span style="color: #777; font-size: 13px;">${escapeHtml(e.show)}:</span><br/>` +
-              `<a href="${escapeHtml(e.url)}" style="font-size: 15px; font-weight: bold; color: #1a4b8f;">${escapeHtml(e.title)}</a>` +
+              `<a href="${escapeHtml(track(e.url))}" style="font-size: 15px; font-weight: bold; color: #1a4b8f;">${escapeHtml(e.title)}</a>` +
               (e.length ? `<span style="font-size: 12px; color: #777;"> · ${escapeHtml(e.length)}</span>` : "") +
+              `<br/><a href="${escapeHtml(e.sourceUrl)}" style="font-size: 12px; color: #777;">${e.kind === "podcast" ? "listen" : "watch"} at ${escapeHtml(e.show)}</a>` +
               `</p>`
           ),
-          `<p style="font-size: 12px; color: #777; margin-top: 4px;"><a href="${escapeHtml(siteUrl())}/podcasts" style="color: #777;">All podcasts on the site</a></p>`,
+          `<p style="font-size: 12px; color: #777; margin-top: 4px;"><a href="${escapeHtml(track(`${siteUrl()}/podcasts`))}" style="color: #777;">All podcasts on the site</a></p>`,
         ]
       : []),
-    `<p style="margin-top: 24px;"><a href="${escapeHtml(archiveUrl)}">${escapeHtml(archiveLabel)}</a></p>`,
+    `<p style="margin-top: 24px;"><a href="${escapeHtml(track(archiveUrl))}">${escapeHtml(archiveLabel)}</a></p>`,
     `<p style="font-size: 12px; color: #777;">You asked for this email at ${escapeHtml(siteUrl())}. ` +
       `<a href="%%UNSUB%%" style="color: #777;">Unsubscribe</a>.</p>`,
     `</div>`,
@@ -261,6 +306,7 @@ export function buildDailyEdition(
       heading,
       archiveUrl: `${siteUrl()}/day/${digest.date}`,
       archiveLabel: "Read this day on the site",
+      campaign: `daily-${digest.date}`,
       summary: digest.summary ? parseSummaryLines(digest.summary).map((l) => l.text) : [],
       groups: groupStories(digest.clusters),
       episodes,
@@ -394,6 +440,7 @@ export async function buildMonthlyEdition(state: SiteState, cfg: SiteConfig, mon
       heading: `${siteIdentity().siteName} monthly, ${monthLabel(month)}`,
       archiveUrl: `${siteUrl()}/month/${month}`,
       archiveLabel: "Read this month on the site",
+      campaign: `monthly-${month}`,
       summary: [],
       groups: groupStories(m.top),
       episodes: recentEpisodes(state, 31 * 24, 6),
@@ -451,6 +498,7 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig, epis
       // freezes the week first, then mails)
       archiveUrl: `${siteUrl()}/week/${end.toISOString().slice(0, 10)}`,
       archiveLabel: "Read this week on the site",
+      campaign: `weekly-${end.toISOString().slice(0, 10)}`,
       summary: [],
       groups: groupStories(top),
       episodes: episodes ?? recentEpisodes(state, 7 * 24, 5),
