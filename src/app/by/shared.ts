@@ -1,6 +1,6 @@
 import { liveClusters } from "@/lib/rank";
 import type { SiteState } from "@/lib/types";
-import { bylineNames, nameSlug } from "@/lib/util";
+import { bylineNames, nameSlug, showableByline } from "@/lib/util";
 
 export interface WriterArticle {
   title: string;
@@ -29,8 +29,9 @@ export function writers(state: SiteState): Map<string, Writer> {
   for (const c of liveClusters(state)) {
     if (c.mergedInto) continue;
     for (const l of c.links) {
-      if (!l.byline) continue;
-      for (const n of bylineNames(l.byline)) {
+      const byline = showableByline(l.byline, l.sourceName);
+      if (!byline) continue;
+      for (const n of bylineNames(byline)) {
         const slug = nameSlug(n);
         if (!slug) continue;
         const w: Draft = out.get(slug) ?? { slug, name: n, outlets: [], articles: [], spellings: new Map<string, number>() };

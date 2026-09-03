@@ -10,6 +10,7 @@ import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
 import { castRaw, postToFarcaster, farcasterPostedToday } from "./social/farcaster";
 import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from "./social/x";
+import { buildDailyComment, postDailyComment, redditPostFor } from "./social/reddit";
 import { loadDailyDigest, loadMonthlyDigest, loadState, loadWeeklyDigest, saveDailyDigest, saveMonthlyDigest, saveSnapshot, saveState, saveWeeklyDigest, saveYearlyDigest } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
@@ -782,6 +783,41 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
     report.notes.push(`day thread posted (${r.tweetId})${r.notes.length > 0 ? `, ${r.notes.join(", ")}` : ""}`);
   } else if (r.notes.length > 0) {
     report.notes.push(`day thread: ${r.notes.join(", ")}`);
+  }
+}
+
+/**
+ * Yesterday's edition as a comment in the subreddit's daily thread. Its own
+ * step like the X thread: it waits for the configured hour (the new daily
+ * thread has to exist first), retries on later runs until a record is
+ * written, half an hour apart when it fails, and gives up once the edition
+ * is over 36h old. Dry runs (no credentials) only leave a note.
+ */
+async function maybePostRedditDaily(state: SiteState, cfg: SiteConfig, report: RunReport): Promise<void> {
+  const rc = cfg.bots.reddit;
+  if (!rc?.dailyComment || !rc.subreddit) return;
+  const now = Date.now();
+  if (new Date(now).getUTCHours() < (rc.postHourUtc ?? 10)) return;
+  const yesterday = utcDay(new Date(now - 24 * 60 * 60000).toISOString());
+  if (redditPostFor(state, yesterday)) return;
+  if (state.redditLastAttemptAt && now - new Date(state.redditLastAttemptAt).getTime() < 30 * 60000) return;
+  const digest = await loadDailyDigest(yesterday);
+  if (!digest || digest.inProgress || hoursAgo(digest.takenAt) > 36 || digest.clusters.length === 0) return;
+  state.redditLastAttemptAt = new Date(now).toISOString();
+  try {
+    const r = await postDailyComment(buildDailyComment(digest, cfg.bots, rc.topN ?? 6), cfg.bots);
+    if (r.dryRun) {
+      report.notes.push("reddit daily comment skipped (dry-run or no Reddit credentials)");
+      return;
+    }
+    state.redditPosts = [
+      { date: yesterday, postedAt: state.redditLastAttemptAt, threadId: r.threadId!, threadUrl: r.threadUrl, commentId: r.commentId, commentUrl: r.commentUrl },
+      ...(state.redditPosts ?? []),
+    ].slice(0, 60);
+    report.posted.push(`reddit daily comment for ${yesterday}`);
+    report.notes.push(`reddit daily comment posted${r.commentUrl ? ` (${r.commentUrl})` : ""}`);
+  } catch (err) {
+    report.notes.push(`reddit daily comment failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
   }
 }
 
@@ -2152,6 +2188,7 @@ export async function runPipeline(): Promise<RunReport> {
   // the day thread on X, retried until it lands (see maybePostDayThread)
   try {
     await maybePostDayThread(state, cfg, report);
+    await maybePostRedditDaily(state, cfg, report);
   } catch (err) {
     report.notes.push(`day thread failed: ${err instanceof Error ? err.message : err}`);
   }

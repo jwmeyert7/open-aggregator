@@ -5,9 +5,9 @@ import { MentionLink } from "@/components/MentionLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import type { Cluster, SponsoredPost } from "@/lib/types";
 import { leadLink } from "@/lib/rank";
-import { siteIdentity } from "@/lib/site";
+import { siteIdentity, writersPublic } from "@/lib/site";
 import { sourceSlug } from "@/app/sources/shared";
-import { bylineNames, nameSlug } from "@/lib/util";
+import { bylineNames, nameSlug, showableByline } from "@/lib/util";
 
 /**
  * The Techmeme-style kicker masthead: the vouching source's name reads first,
@@ -15,22 +15,27 @@ import { bylineNames, nameSlug } from "@/lib/util";
  * The headline below stays the loud click.
  */
 export function SourceKicker({ name, byline }: { name: string; byline?: string }) {
+  const shown = showableByline(byline, name);
   return (
     <div className="kicker">
       <Link href={`/sources/${sourceSlug(name)}`} title={`${name} on ${siteIdentity().siteName}`}>
         {name}
       </Link>
       {/* Techmeme-style byline: the outlet vouches, the writer gets the credit
-          and a page of their own; multiple names each link separately */}
-      {byline ? (
+          and (once writer pages are public) a page of their own */}
+      {shown ? (
         <span className="byline">
           {" / "}
-          {bylineNames(byline).map((n, i) => (
+          {bylineNames(shown).map((n, i) => (
             <span key={n}>
               {i > 0 ? ", " : ""}
-              <Link href={`/by/${nameSlug(n)}`} title={`${n} on ${siteIdentity().siteName}`}>
-                {n}
-              </Link>
+              {writersPublic() ? (
+                <Link href={`/by/${nameSlug(n)}`} title={`${n} on ${siteIdentity().siteName}`}>
+                  {n}
+                </Link>
+              ) : (
+                n
+              )}
             </span>
           ))}
         </span>
@@ -132,7 +137,7 @@ export function ClusterCard({
           {others.map((l, i) => (
             <span key={l.url}>
               {i > 0 ? " · " : "More: "}
-              <a href={l.url} rel="noopener" title={l.byline ? `${l.title} (by ${l.byline})` : l.title} data-oa-story={cluster.id}>
+              <a href={l.url} rel="noopener" title={showableByline(l.byline, l.sourceName) ? `${l.title} (by ${showableByline(l.byline, l.sourceName)})` : l.title} data-oa-story={cluster.id}>
                 <span className="src">{l.sourceName}</span>
               </a>
             </span>

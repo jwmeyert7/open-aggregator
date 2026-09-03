@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AgeStamp } from "@/components/AgeStamp";
 import { sourceSlug } from "@/app/sources/shared";
-import { siteIdentity } from "@/lib/site";
+import { isAdmin } from "@/lib/auth";
+import { siteIdentity, writersPublic } from "@/lib/site";
 import { loadState } from "@/lib/state";
 import { writers } from "../shared";
 
@@ -13,12 +14,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const w = writers(await loadState()).get(slug);
   if (!w) return {};
-  return { title: w.name, description: `Articles by ${w.name} that ${siteIdentity().siteName} published.` };
+  return {
+    title: w.name,
+    description: `Articles by ${w.name} that ${siteIdentity().siteName} published.`,
+    ...(writersPublic() ? {} : { robots: { index: false } }),
+  };
 }
 
 /** House style for this copy: no em dashes, no semicolons. */
 export default async function WriterPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (!writersPublic() && !(await isAdmin())) notFound();
   const w = writers(await loadState()).get(slug);
   if (!w) notFound();
   const rows = w.articles.slice(0, 100);

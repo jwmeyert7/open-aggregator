@@ -169,7 +169,8 @@ async function fetchRss(feed: FeedConfig, timeoutMs: number): Promise<CandidateI
         i.title!,
         i.isoDate || (i.pubDate ? new Date(i.pubDate).toISOString() : new Date().toISOString()),
         i.contentSnippet || i.content,
-        feedAuthor(i)
+        // a release feed's author is whoever pressed publish (or a bot), not a writer
+        isReleaseFeed(feed) ? undefined : feedAuthor(i)
       );
       // release-feed entries carry their full notes so the release-summary
       // step can distill themes; the 500-char excerpt is too little for that

@@ -8,11 +8,12 @@ import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable, summarizeRelease } from "@/lib/llm";
 import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
+import { buildDailyComment, postDailyComment, redditPostFor } from "@/lib/social/reddit";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
 import { sponsoredPlacements } from "@/lib/types";
 import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
-import { cleanByline, isPrivateHost, newId, normalizeUrl, sha256, slugify, socialSourceName, stripHtml, truncate } from "@/lib/util";
+import { cleanByline, isPrivateHost, newId, normalizeUrl, sha256, slugify, socialSourceName, stripHtml, truncate, utcDay } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -549,6 +550,30 @@ async function handle(req: NextRequest) {
     return ok(r.note);
   }
 
+  if (body.action === "previewReddit" || body.action === "postReddit") {
+    // the edition to post: a given date, else yesterday's frozen digest
+    const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
+      ? body.date
+      : utcDay(new Date(Date.now() - 24 * 60 * 60000).toISOString());
+    const digest = await loadDailyDigest(date);
+    if (!digest || digest.inProgress) return fail(`No frozen edition for ${date} yet.`);
+    const text = buildDailyComment(digest, cfg.bots, cfg.bots.reddit?.topN ?? 6);
+    if (body.action === "previewReddit") return ok(`Preview of the Reddit comment for ${date}.`, { text });
+    if (redditPostFor(state, date) && !body.again) return fail(`Already posted for ${date}. Send again=true to post a second time.`);
+    state.redditLastAttemptAt = new Date().toISOString();
+    const r = await postDailyComment(text, cfg.bots);
+    if (r.dryRun) {
+      await saveState(state);
+      return ok("Dry-run: no Reddit credentials configured, nothing posted.", { text });
+    }
+    state.redditPosts = [
+      { date, postedAt: state.redditLastAttemptAt, threadId: r.threadId!, threadUrl: r.threadUrl, commentId: r.commentId, commentUrl: r.commentUrl, manual: true },
+      ...(state.redditPosts ?? []),
+    ].slice(0, 60);
+    await saveState(state);
+    return ok(`Posted to Reddit${r.commentUrl ? `: ${r.commentUrl}` : "."}`, { text, url: r.commentUrl });
+  }
+
   if (body.action === "testDigestEmail") {
     // sends the real edition exactly as a subscriber would receive it: to a
     // named subscriber (with their own working unsubscribe link) or, with no
@@ -814,6 +839,7 @@ async function handle(req: NextRequest) {
   if (body.action === "addSubmissionSource") {
     const sub = (state.submissions ?? []).find((s) => s.id === String(body.id ?? ""));
     if (!sub) return fail("Unknown submission.");
+    if (sub.status !== "pending") return fail("Already handled.");
     const host = new URL(sub.url).hostname.replace(/^www\./, "");
     const o = (state.feedOverrides ??= { custom: [], disabled: [] });
     const found = await discoverFeed(host, cfg.ingest.feedTimeoutMs);
@@ -844,9 +870,13 @@ async function handle(req: NextRequest) {
     // covered now: the same domain must not resurface as a Farcaster candidate
     const cand = ownEntry(state.sourceCandidates, host);
     if (cand) cand.dismissed = true;
+    // adding the source IS the decision on this submission: the reader asked
+    // for a source, they got one, and the email says so in those words
+    sub.status = "approved";
     await saveState(state);
+    const mailed = await notifySubmitter(sub, "source", String(body.note ?? "").trim());
     return ok(
-      `Source \u201c${name}\u201d added from ${host} (${found.type} feed ${found.url}, tier 2, weight 1). It's polled starting next pipeline run; tune tier, weight, and category in Sources. The submission itself still needs Approve or Dismiss.`
+      `Source \u201c${name}\u201d added from ${host} (${found.type} feed ${found.url}, tier 2, weight 1). It's polled starting next pipeline run; tune tier, weight, and category in Sources.${mailed}`
     );
   }
 

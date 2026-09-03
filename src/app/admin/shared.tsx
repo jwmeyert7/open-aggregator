@@ -81,7 +81,7 @@ export interface AdminChromeData {
   xMonthly: { used: number; cap: number };
   subscribers: { daily: number; weekly: number };
   updatedAt: string;
-  unhealthyFeeds: Array<{ id: string; name: string; state: string; action: string }>;
+  unhealthyFeeds: Array<{ id: string; name: string; kind: "errors" | "silent" | "empty"; state: string; action: string }>;
   /** pending reader submissions, badged on the Stories link */
   submissions: number;
   /** undecided source candidates, badged on the Sources link */
@@ -160,19 +160,47 @@ export function AdminChrome({ chrome }: { chrome: AdminChromeData }) {
       ) : null}
       <Toast status={status} onClear={() => setStatus("")} />
       {pathname === "/admin" && chrome.unhealthyFeeds.length > 0 ? (
-        <div className="notice feed-health">
-          <strong>Feed health</strong>
-          <ul>
-            {chrome.unhealthyFeeds.map((f) => (
-              <li key={f.id}>
-                <Link href={`/admin/sources#feed-${f.id}`} className="health-bad">
-                  {f.name}
-                </Link>{" "}
-                {f.state} <span className="sub">{f.action}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <details className="notice feed-health">
+          <summary>
+            <strong>Feed health:</strong>{" "}
+            {(
+              [
+                ["errors", "failing"],
+                ["silent", "quiet"],
+                ["empty", "never produced an item"],
+              ] as const
+            )
+              .map(([kind, label]) => [chrome.unhealthyFeeds.filter((f) => f.kind === kind).length, label] as const)
+              .filter(([n]) => n > 0)
+              .map(([n, label]) => `${n} ${label}`)
+              .join(", ")}
+          </summary>
+          {(
+            [
+              ["errors", "Failing"],
+              ["silent", "Quiet"],
+              ["empty", "Reachable but empty"],
+            ] as const
+          ).map(([kind, heading]) => {
+            const group = chrome.unhealthyFeeds.filter((f) => f.kind === kind);
+            if (group.length === 0) return null;
+            return (
+              <div key={kind} className="feed-health-group">
+                <div className="feed-health-heading">{heading}</div>
+                <ul>
+                  {group.map((f) => (
+                    <li key={f.id}>
+                      <Link href={`/admin/sources#feed-${f.id}`} className="health-bad">
+                        {f.name}
+                      </Link>{" "}
+                      {f.state} <span className="sub">{f.action}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </details>
       ) : null}
     </>
   );

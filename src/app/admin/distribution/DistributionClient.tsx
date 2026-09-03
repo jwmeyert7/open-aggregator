@@ -1,13 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import type { DayMetrics } from "@/lib/metrics";
-import { AdminChrome, type AdminChromeData } from "../shared";
+import type { RedditPostRecord } from "@/lib/types";
+import { AdminChrome, call, Toast, useAdminAct, type AdminChromeData } from "../shared";
 
 export interface DistributionData {
   /** newest first, up to 14 days */
   days: DayMetrics[];
   /** clicked cluster ids resolved to headlines (aged-out ids resolve to themselves) */
   stories: Record<string, { headline: string; slug?: string }>;
+  reddit: {
+    configured: boolean;
+    enabled: boolean;
+    subreddit: string;
+    postHourUtc: number;
+    posts: RedditPostRecord[];
+    lastAttemptAt: string | null;
+  };
 }
 
 function sumMaps(days: DayMetrics[], pick: (d: DayMetrics) => Record<string, number>): Array<[string, number]> {
@@ -20,6 +30,8 @@ function sumMaps(days: DayMetrics[], pick: (d: DayMetrics) => Record<string, num
 
 export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; data: DistributionData }) {
   const { days } = data;
+  const { busy, status, setStatus, act } = useAdminAct();
+  const [preview, setPreview] = useState("");
 
   // per-reader rollup: max subs today and across the window, last seen
   const readers: Record<string, { today: number; window: number; hits: number; lastSeen: string }> = {};
@@ -39,12 +51,76 @@ export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; 
   const storyTotals = sumMaps(days, (d) => d.clicks.stories).slice(0, 20);
   const domainTotals = sumMaps(days, (d) => d.clicks.domains).slice(0, 20);
   const sponsoredTotal = days.reduce((n, d) => n + d.clicks.sponsored, 0);
+  const searchTotal = days.reduce((n, d) => n + (d.searches?.total ?? 0), 0);
+  const queryTotals = sumMaps(days, (d) => d.searches?.queries ?? {}).slice(0, 40);
+  const missTotals = sumMaps(days, (d) => d.searches?.misses ?? {}).slice(0, 20);
   const mcpHtmlTotal = days.reduce((n, d) => n + d.mcp.htmlViews, 0);
   const mcpInitTotal = days.reduce((n, d) => n + d.mcp.initializes, 0);
 
   return (
     <div>
       <AdminChrome chrome={chrome} />
+      <Toast status={status} onClear={() => setStatus("")} />
+
+      <h2 id="reddit">Reddit daily comment</h2>
+      <div className="admin-card">
+        <div className="headline">
+          r/{data.reddit.subreddit} daily thread ·{" "}
+          {!data.reddit.enabled || !data.reddit.subreddit
+            ? "off in config"
+            : data.reddit.configured
+              ? `posting automatically after ${String(data.reddit.postHourUtc).padStart(2, "0")}:00 UTC`
+              : "no credentials yet, runs dry"}
+        </div>
+        <div className="sub">
+          Yesterday&apos;s frozen edition goes in as one comment, top stories with site and source links, where the
+          thread&apos;s regulars and any mod roundup can pick it up. Credentials live in Vercel env (REDDIT_CLIENT_ID,
+          REDDIT_CLIENT_SECRET, REDDIT_REFRESH_TOKEN). Mint the refresh token once at{" "}
+          <a href="/api/admin/reddit-auth">/api/admin/reddit-auth</a>.
+          {data.reddit.lastAttemptAt ? ` Last attempt ${data.reddit.lastAttemptAt.slice(0, 16).replace("T", " ")} UTC.` : ""}
+        </div>
+        <div className="form-row">
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={async () => {
+              const r = (await call("previewReddit")) as { ok: boolean; message?: string; text?: string };
+              setStatus(r.message ?? (r.ok ? "Done." : "Failed."));
+              setPreview(r.text ?? "");
+            }}
+          >
+            Preview comment
+          </button>
+          <button
+            className="btn primary"
+            disabled={busy}
+            onClick={() => act("postReddit", {}, "Post yesterday's edition into the daily thread now?")}
+          >
+            Post now
+          </button>
+        </div>
+        {preview ? <pre className="reddit-preview">{preview}</pre> : null}
+        {data.reddit.posts.length > 0 ? (
+          <ul className="search-items">
+            {data.reddit.posts.map((p) => (
+              <li key={p.postedAt} className="newest-item">
+                {p.commentUrl ? <a href={p.commentUrl}>edition {p.date}</a> : <span>edition {p.date}</span>}
+                <div className="org">
+                  posted {p.postedAt.slice(0, 16).replace("T", " ")} UTC{p.manual ? " · by hand" : ""}
+                  {p.threadUrl ? (
+                    <>
+                      {" · "}
+                      <a href={p.threadUrl}>thread</a>
+                    </>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="sub">No comments made yet.</div>
+        )}
+      </div>
 
       {days.length === 0 ? (
         <p className="empty-state">No distribution metrics recorded yet. Counters start filling in as the feed, the MCP server, and story links get traffic.</p>
@@ -139,9 +215,45 @@ export function DistributionClient({ chrome, data }: { chrome: AdminChromeData; 
         </div>
       ) : null}
 
+      <h2 id="search">Site search</h2>
+      <div className="admin-card">
+        <div className="headline">
+          {searchTotal} search{searchTotal === 1 ? "" : "es"} in the window
+        </div>
+        <div className="sub">
+          What readers typed into the search box, your own searches excluded. Misses are queries that found no story
+          and no stream item, the clearest signal of a source or a story the site is missing.
+        </div>
+        {days.map((d) => (
+          <div key={d.date} className="sub" style={{ margin: "4px 0" }}>
+            {d.date} · {d.searches?.total ?? 0}
+          </div>
+        ))}
+      </div>
+      {queryTotals.length > 0 ? (
+        <div className="admin-card">
+          <div className="headline">Most searched</div>
+          {queryTotals.map(([q, n]) => (
+            <div key={q} className="sub" style={{ margin: "4px 0" }}>
+              <a href={`/search?q=${encodeURIComponent(q)}`}>{q}</a> · {n}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {missTotals.length > 0 ? (
+        <div className="admin-card">
+          <div className="headline">Searches that found nothing</div>
+          {missTotals.map(([q, n]) => (
+            <div key={q} className="sub" style={{ margin: "4px 0" }}>
+              <a href={`/search?q=${encodeURIComponent(q)}`}>{q}</a> · {n}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <p className="status-line">
-        This page covers the consumption side (feed, MCP, outbound clicks). Inbound attribution per channel lives in
-        Vercel Analytics and Google Analytics under utm_source x, farcaster, and email.
+        This page covers the consumption side (feed, MCP, outbound clicks, site search). Inbound attribution per channel lives in
+        Vercel Analytics and Google Analytics under utm_source x, farcaster, reddit, and email.
       </p>
     </div>
   );

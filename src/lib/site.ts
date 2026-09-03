@@ -20,6 +20,12 @@ export interface SiteIdentity {
   contactEmail: string;
   /** Optional public account handles; empty strings hide the footer icons. */
   social?: { xHandle?: string; farcasterHandle?: string };
+  /**
+   * Writer pages (/by) and byline links are admin-only until this is true.
+   * Bylines themselves still show in the kicker as plain text. Flip it once
+   * the bylines coming out of your feeds look right.
+   */
+  writersPublic?: boolean;
 }
 
 const configDir = path.join(process.cwd(), "config");
@@ -43,6 +49,11 @@ export function siteIdentity(): SiteIdentity {
     contactEmail: "you@example.com",
   };
   return cached;
+}
+
+/** Whether /by and the byline links are public (config writersPublic, default false). */
+export function writersPublic(): boolean {
+  return siteIdentity().writersPublic === true;
 }
 
 /** Outbound From: header. MAIL_FROM env wins, then the configured contact address. */

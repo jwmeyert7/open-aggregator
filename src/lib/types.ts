@@ -131,6 +131,14 @@ export interface SiteConfig {
     farcaster: { maxPerDay: number; minScore: number; topN: number; digestChannel?: string };
     /** dailyThread/weeklyThread/monthlyThread: the two-tweet digest threads on X (tweet 1 the snapshot lines, tweet 2 the archive link). Like the old single digest tweet they ride outside the story caps. */
     x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number; dailyThread?: boolean; weeklyThread?: boolean; monthlyThread?: boolean };
+    /**
+     * One comment a day in the subreddit's daily discussion thread carrying
+     * yesterday's frozen edition. dailyTitlePrefix identifies the thread among
+     * the subreddit's stickies. postHourUtc waits for the new daily thread to
+     * exist (many appear in the small hours UTC) and for a busy time of day.
+     * An empty subreddit or dailyComment false turns the feature off.
+     */
+    reddit?: { subreddit: string; dailyComment: boolean; dailyTitlePrefix?: string; postHourUtc?: number; topN?: number };
   };
 }
 
@@ -327,6 +335,17 @@ export interface XPostRecord {
   dryRun?: boolean;
 }
 
+export interface RedditPostRecord {
+  /** the edition's date (YYYY-MM-DD), not the posting day */
+  date: string;
+  postedAt: string;
+  threadId: string;
+  threadUrl?: string;
+  commentId?: string;
+  commentUrl?: string;
+  manual?: boolean;
+}
+
 export interface FarcasterPostRecord {
   clusterId: string;
   postedAt: string;
@@ -347,6 +366,10 @@ export interface SiteState {
   llmAlertedAt?: string;
   xPosts: XPostRecord[];
   farcasterPosts: FarcasterPostRecord[];
+  /** the daily Reddit comments actually made, newest first (dry runs are not recorded) */
+  redditPosts?: RedditPostRecord[];
+  /** last try at the Reddit comment, so a failing post retries every half hour instead of every run */
+  redditLastAttemptAt?: string;
   jobs: Listing[];
   events: Listing[];
   podcasts?: Listing[];

@@ -1609,6 +1609,15 @@ select.select {
 .kicker .byline {
   font-weight: 400;
 }
+.reddit-preview {
+  white-space: pre-wrap;
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
 .summary-log ul {
   margin: 4px 0 0;
   padding-left: 18px;
@@ -1625,8 +1634,23 @@ select.select {
 .summary-log .diff-after {
   color: var(--good);
 }
+.filter-label {
+  display: inline-block;
+  min-width: 56px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.feed-health summary {
+  cursor: pointer;
+}
+.feed-health-group {
+  margin-top: 8px;
+}
+.feed-health-heading {
+  font-weight: 600;
+}
 .feed-health ul {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   padding-left: 18px;
 }
 .feed-health li {
@@ -2976,8 +3000,13 @@ body:has(.player-page) {
 /* type chips above the sources table; the active one fills in */
 .source-filters {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
-  margin: 14px 0 10px;
+  margin: 8px 0;
+}
+.source-filters:first-of-type {
+  margin-top: 14px;
 }
 .filter-chip {
   padding: 2px 10px;

@@ -3,6 +3,7 @@ import { buildChrome, NotLoggedIn } from "../server";
 import { isAdmin } from "@/lib/auth";
 import { loadSiteConfig } from "@/lib/config";
 import { loadRecentMetrics } from "@/lib/metrics";
+import { redditConfigured } from "@/lib/social/reddit";
 import { loadState } from "@/lib/state";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,18 @@ export default async function AdminDistributionPage() {
     }
   }
 
-  const data: DistributionData = { days, stories };
+  const data: DistributionData = {
+    days,
+    stories,
+    reddit: {
+      configured: redditConfigured(),
+      enabled: Boolean(cfg.bots.reddit?.dailyComment),
+      subreddit: cfg.bots.reddit?.subreddit ?? "",
+      postHourUtc: cfg.bots.reddit?.postHourUtc ?? 10,
+      posts: (state.redditPosts ?? []).slice(0, 14),
+      lastAttemptAt: state.redditLastAttemptAt ?? null,
+    },
+  };
   return (
     <main className="wrap page single admin">
       <DistributionClient chrome={buildChrome(state, cfg)} data={data} />

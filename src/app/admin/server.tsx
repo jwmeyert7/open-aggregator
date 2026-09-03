@@ -36,6 +36,7 @@ export function buildChrome(state: SiteState, cfg: SiteConfig): AdminChromeData 
     unhealthyFeeds: unhealthyFeeds(state, effectiveFeeds(state), cfg.ingest).map((u) => ({
       id: u.feed.id,
       name: u.feed.name,
+      kind: u.kind,
       ...describeUnhealthyFeed(u),
     })),
     submissions: (state.submissions ?? []).filter((s) => s.status === "pending").length,

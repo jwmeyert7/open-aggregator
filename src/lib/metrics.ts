@@ -59,6 +59,13 @@ export interface DayMetrics {
     domains: Record<string, number>;
     sponsored: number;
   };
+  /** site search: what readers typed (lowercased, trimmed) and how often nothing came back; absent on days before 2026-09-02 */
+  searches?: {
+    total: number;
+    queries: Record<string, number>;
+    /** queries that returned no story and no stream item */
+    misses: Record<string, number>;
+  };
 }
 
 type MetricEvent =
@@ -66,7 +73,8 @@ type MetricEvent =
   | { date: string; kind: "mcpTool"; tool: string }
   | { date: string; kind: "mcpInit"; client?: string }
   | { date: string; kind: "mcpHtml" }
-  | { date: string; kind: "click"; clusterId?: string; domain?: string; sponsored?: boolean };
+  | { date: string; kind: "click"; clusterId?: string; domain?: string; sponsored?: boolean }
+  | { date: string; kind: "search"; query: string; hits: number };
 
 function emptyDay(date: string): DayMetrics {
   return {
@@ -74,6 +82,7 @@ function emptyDay(date: string): DayMetrics {
     feed: { hits: 0, readers: {} },
     mcp: { tools: {}, clients: {}, initializes: 0, htmlViews: 0 },
     clicks: { total: 0, stories: {}, domains: {}, sponsored: 0 },
+    searches: { total: 0, queries: {}, misses: {} },
   };
 }
 
@@ -116,6 +125,11 @@ function applyEvent(day: DayMetrics, ev: MetricEvent): void {
     bump(day.mcp.clients, ev.client ?? "unknown", 50);
   } else if (ev.kind === "mcpHtml") {
     day.mcp.htmlViews += 1;
+  } else if (ev.kind === "search") {
+    const s = (day.searches ??= { total: 0, queries: {}, misses: {} });
+    s.total += 1;
+    bump(s.queries, ev.query, 300);
+    if (ev.hits === 0) bump(s.misses, ev.query, 100);
   } else if (ev.kind === "click") {
     day.clicks.total += 1;
     if (ev.sponsored) day.clicks.sponsored += 1;
@@ -144,6 +158,12 @@ function mergeDay(target: DayMetrics, src: DayMetrics): void {
   target.clicks.sponsored += src.clicks.sponsored;
   for (const [k, v] of Object.entries(src.clicks.stories)) bump(target.clicks.stories, k, 400, v);
   for (const [k, v] of Object.entries(src.clicks.domains)) bump(target.clicks.domains, k, 200, v);
+  if (src.searches) {
+    const s = (target.searches ??= { total: 0, queries: {}, misses: {} });
+    s.total += src.searches.total;
+    for (const [k, v] of Object.entries(src.searches.queries)) bump(s.queries, k, 300, v);
+    for (const [k, v] of Object.entries(src.searches.misses)) bump(s.misses, k, 100, v);
+  }
 }
 
 // ---------- storage: immutable deltas + per-day rollups, blob or .data ----------
@@ -369,6 +389,16 @@ export async function recordMcpBody(body: unknown): Promise<void> {
         await record({ kind: "mcpInit", ...(typeof client === "string" && client ? { client } : {}) });
       }
     }
+  } catch {}
+}
+
+/** One site search: the query as typed (normalized) and whether it found anything. Admin searches are not counted. */
+export async function recordSearch(query: string, hits: number, isAdmin: boolean): Promise<void> {
+  try {
+    if (isAdmin) return;
+    const q = query.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 60);
+    if (!q) return;
+    await record({ kind: "search", query: q, hits });
   } catch {}
 }
 

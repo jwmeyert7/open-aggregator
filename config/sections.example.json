@@ -48,9 +48,10 @@
     "candidateRetentionDays": 45
   },
   "bots": {
-    "$comment": "Social posting, off by default: with no credentials configured every post is a logged dry-run. siteUrl is the canonical base for links in posts (SITE_URL env overrides it). digestChannel is a Farcaster channel id for the nightly digest cast, empty for none. X posting is capped in code: at most maxAutoPerDay automated posts per day and maxPerMonth posts per calendar month. dailyThread, weeklyThread, and monthlyThread turn the two-tweet digest threads on X on or off (they ride outside the story caps).",
+    "$comment": "Social posting, off by default: with no credentials configured every post is a logged dry-run. siteUrl is the canonical base for links in posts (SITE_URL env overrides it). digestChannel is a Farcaster channel id for the nightly digest cast, empty for none. X posting is capped in code: at most maxAutoPerDay automated posts per day and maxPerMonth posts per calendar month. dailyThread, weeklyThread, and monthlyThread turn the two-tweet digest threads on X on or off (they ride outside the story caps). reddit posts yesterday's edition as one comment into a subreddit's daily discussion thread (the sticky whose title starts with dailyTitlePrefix) after postHourUtc, with the top topN stories; it needs REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, and a REDDIT_REFRESH_TOKEN minted at /api/admin/reddit-auth, and stays off while subreddit is empty or dailyComment is false.",
     "siteUrl": "http://localhost:3000",
     "farcaster": { "maxPerDay": 8, "minScore": 0.8, "topN": 3, "digestChannel": "" },
-    "x": { "maxAutoPerDay": 0, "maxPerMonth": 30, "minScore": 1.0, "dailyThread": true, "weeklyThread": true, "monthlyThread": true }
+    "x": { "maxAutoPerDay": 0, "maxPerMonth": 30, "minScore": 1.0, "dailyThread": true, "weeklyThread": true, "monthlyThread": true },
+    "reddit": { "subreddit": "", "dailyComment": false, "dailyTitlePrefix": "Daily General Discussion", "postHourUtc": 10, "topN": 6 }
   }
 }

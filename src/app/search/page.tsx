@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { ClusterCard } from "@/components/ClusterCard";
+import { isAdmin } from "@/lib/auth";
+import { recordSearch } from "@/lib/metrics";
 import { byPublished, itemDisplayTitle, liveClusters, rankClusters, score } from "@/lib/rank";
 import { loadSiteConfig } from "@/lib/config";
 import { loadState } from "@/lib/state";
-import { timeAgo, urlMatches } from "@/lib/util";
+import { looseIncludes, timeAgo, urlMatches } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +19,13 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const cfg = loadSiteConfig();
 
   const needle = query.toLowerCase();
-  const match = (...fields: Array<string | undefined>) =>
-    needle.length > 0 && fields.some((f) => f?.toLowerCase().includes(needle));
+  const match = (...fields: Array<string | undefined>) => needle.length > 0 && fields.some((f) => looseIncludes(f, needle));
 
   const stories = query
     ? rankClusters(
         liveClusters(state).filter(
           (c) =>
-            match(c.headline, c.explainer, ...(c.keywords ?? []), ...c.links.map((l) => l.byline)) ||
+            match(c.headline, c.explainer, ...(c.keywords ?? []), ...c.links.flatMap((l) => [l.byline, l.sourceName, l.title])) ||
             // a pasted link lands on the story that carries it
             c.links.some((l) => urlMatches(l.url, query))
         ),
@@ -36,6 +38,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         .filter((i) => (match(i.title, i.sourceName, i.byline) || urlMatches(i.url, query)) && !(i.clusterId && storyIds.has(i.clusterId)))
         .slice(0, 30)
     : [];
+  if (query) {
+    // counted after the page is served so a slow metrics store never delays a search
+    const admin = await isAdmin();
+    after(() => recordSearch(query, stories.length + items.length, admin));
+  }
 
   return (
     <main className="wrap page single">

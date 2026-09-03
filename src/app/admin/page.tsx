@@ -4,6 +4,7 @@ import { buildChrome } from "./server";
 import { AdminChrome, LoginForm } from "./shared";
 import { isAdmin } from "@/lib/auth";
 import { effectiveFeeds, loadSiteConfig } from "@/lib/config";
+import { loadRecentMetrics } from "@/lib/metrics";
 import { liveClusters, weekendMode } from "@/lib/rank";
 import { loadState } from "@/lib/state";
 import { timeAgo } from "@/lib/util";
@@ -29,6 +30,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const cfg = loadSiteConfig();
   const chrome = buildChrome(state, cfg);
   const now = new Date();
+  // today's consumption numbers for the Distribution card; the page has the window
+  const today = (await loadRecentMetrics(1))[0];
+  const feedSubs = today ? Object.values(today.feed.readers).reduce((n, r) => n + r.subs, 0) : 0;
+  const distribution = today
+    ? `today: ${feedSubs} feed subs · ${today.mcp.initializes} MCP session${today.mcp.initializes === 1 ? "" : "s"} · ${today.clicks.total} click${today.clicks.total === 1 ? "" : "s"} · ${today.searches?.total ?? 0} search${(today.searches?.total ?? 0) === 1 ? "" : "es"}`
+    : "no metrics recorded yet today";
 
   const stories = liveClusters(state).length;
   const sources = effectiveFeeds(state).length;
@@ -76,6 +83,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     { href: "/admin/leaderboard", name: "Leaderboard", sub: "which sources earn their keep" },
     { href: "/admin/wordmap", name: "Word maps", sub: "preview clouds for the frozen editions" },
     { href: "/admin/farcaster", name: "Farcaster", sub: "the bot's activity and channel reads" },
+    { href: "/admin/distribution", name: "Distribution", sub: distribution },
   ];
 
   return (

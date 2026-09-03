@@ -61,7 +61,7 @@ export async function sendAdminEmail(subject: string, text: string): Promise<boo
  */
 export async function notifySubmitter(
   sub: { url: string; email?: string },
-  outcome: "approved" | "dismissed",
+  outcome: "approved" | "dismissed" | "source",
   note?: string,
   storySlug?: string
 ): Promise<string> {
@@ -75,15 +75,27 @@ export async function notifySubmitter(
           sub.url,
           ...(storySlug ? ["", `It joined this story: https://${site.domain}/story/${storySlug}`] : []),
         ]
-      : [
-          `Thanks for your suggestion to ${site.siteName}. An editor reviewed it and decided not to use it this time.`,
-          "",
-          sub.url,
-        ];
+      : outcome === "source"
+        ? [
+            `Good news. The site you suggested to ${site.siteName} is now on the source list, so its new posts are read every run and go in front of the editor like any other source.`,
+            "",
+            sub.url,
+            "",
+            `The full list is at https://${site.domain}/sources.`,
+          ]
+        : [
+            `Thanks for your suggestion to ${site.siteName}. An editor reviewed it and decided not to use it this time.`,
+            "",
+            sub.url,
+          ];
   if (note) lines.push("", `A note from the editor: ${note}`);
   lines.push("", "Thanks for reading and for pitching in.", site.siteName);
   const subject =
-    outcome === "approved" ? `Your ${site.siteName} suggestion made it on` : `About your ${site.siteName} suggestion`;
+    outcome === "approved"
+      ? `Your ${site.siteName} suggestion made it on`
+      : outcome === "source"
+        ? `Your suggested source is on ${site.siteName}`
+        : `About your ${site.siteName} suggestion`;
   const err = await sendMail(sub.email, subject, lines.join("\n"));
   if (err) console.error(`[mail] submitter email failed: ${err}`);
   return err ? ` (email to submitter failed: ${err})` : " Submitter emailed.";

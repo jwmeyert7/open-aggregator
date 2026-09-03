@@ -159,8 +159,25 @@ export function StoriesClient({
       <AdminChrome chrome={chrome} />
       <Toast status={status} onClear={() => setStatus("")} />
 
-      {/* reader suggestions sit first: they are the one thing on this page
-          waiting on a decision, and the story list below runs long */}
+      <h2 id="add-url">Add story by URL</h2>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const url = new FormData(e.currentTarget).get("url") as string;
+          if (url) act("addUrl", { url });
+          e.currentTarget.reset();
+        }}
+      >
+        <div className="form-row">
+          <input className="text" name="url" placeholder="Paste any link: article, tweet, forum post…" />
+          <button className="btn primary" type="submit" disabled={busy}>
+            Add
+          </button>
+        </div>
+      </form>
+
+      {/* reader suggestions next: they are the one thing on this page waiting
+          on a decision, and the story list below runs long */}
       <h2 id="submissions">Submissions</h2>
       {data.submissions.length === 0 ? (
         <p className="status-line">
@@ -176,7 +193,7 @@ export function StoriesClient({
       <div className="form-row">
         <input
           className="text"
-          placeholder="Filter stories by headline, section, or source…"
+          placeholder="Filter stories by headline, section, source, or link URL…"
           value={storyQuery}
           onChange={(e) => {
             setStoryQuery(e.target.value);
@@ -191,7 +208,7 @@ export function StoriesClient({
               (c) =>
                 c.headline.toLowerCase().includes(q) ||
                 c.section === q ||
-                c.linkList.some((l) => l.sourceName.toLowerCase().includes(q))
+                c.linkList.some((l) => l.sourceName.toLowerCase().includes(q) || l.url.toLowerCase().includes(q))
             )
           : data.clusters;
         const pinned = !q && pinnedId ? data.clusters.filter((c) => c.id === pinnedId) : null;
@@ -537,23 +554,6 @@ export function StoriesClient({
       })()}
       {data.clusters.length === 0 ? <p className="empty-state">No stories yet. Run the pipeline.</p> : null}
 
-      <h2 id="add-url">Add story by URL</h2>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const url = new FormData(e.currentTarget).get("url") as string;
-          if (url) act("addUrl", { url });
-          e.currentTarget.reset();
-        }}
-      >
-        <div className="form-row">
-          <input className="text" name="url" placeholder="Paste any link: article, tweet, forum post…" />
-          <button className="btn primary" type="submit" disabled={busy}>
-            Add
-          </button>
-        </div>
-      </form>
-
     </div>
   );
 }
@@ -638,8 +638,8 @@ function SubmissionCard({
           <button
             className="btn"
             disabled={busy}
-            title="Find this domain's feed and add it as a tier 2 source (separate from approving the story)"
-            onClick={() => act("addSubmissionSource", { id: s.id, ...confirmed })}
+            title="Find this domain's feed and add it as a tier 2 source. This settles the submission and emails the submitter that their source is on."
+            onClick={() => act("addSubmissionSource", { id: s.id, ...confirmed, ...(note.trim() ? { note: note.trim() } : {}) })}
           >
             Add as source
           </button>

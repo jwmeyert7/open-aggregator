@@ -7,7 +7,7 @@ import { adaptiveRanking, byPublished, episodeStories, itemDisplayTitle, leadLin
 import { siteIdentity } from "@/lib/site";
 import { loadDailyDigest, loadState } from "@/lib/state";
 import type { Cluster } from "@/lib/types";
-import { urlMatches } from "@/lib/util";
+import { looseIncludes, urlMatches } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 
@@ -109,10 +109,10 @@ const handler = createMcpHandler(
         const q = query.toLowerCase();
         const matches = liveClusters(state).filter(
           (c) =>
-            c.headline.toLowerCase().includes(q) ||
-            c.explainer.toLowerCase().includes(q) ||
-            c.keywords.some((k) => k.toLowerCase().includes(q)) ||
-            c.links.some((l) => l.title.toLowerCase().includes(q) || Boolean(l.byline?.toLowerCase().includes(q)) || urlMatches(l.url, query))
+            looseIncludes(c.headline, q) ||
+            looseIncludes(c.explainer, q) ||
+            c.keywords.some((k) => looseIncludes(k, q)) ||
+            c.links.some((l) => looseIncludes(l.title, q) || looseIncludes(l.sourceName, q) || looseIncludes(l.byline, q) || urlMatches(l.url, query))
         );
         const base = siteUrl();
         return asText({

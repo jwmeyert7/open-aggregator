@@ -7,7 +7,7 @@ import { siteUrl } from "./config";
  * a deliberate call for a privacy-conscious audience).
  */
 
-export type UtmSource = "x" | "farcaster" | "email";
+export type UtmSource = "x" | "farcaster" | "email" | "reddit";
 
 /**
  * Append utm params to one of our own URLs. Anything that is not our own

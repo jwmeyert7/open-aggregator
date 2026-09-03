@@ -9,6 +9,19 @@ export function newId(): string {
 }
 
 /**
+ * Loose text match for search: case-insensitive substring, tried again with
+ * whitespace removed on both sides so "devtools" finds "Dev Tools Guild" and
+ * "ethresearch" finds "ethresear.ch" written as "eth resear ch".
+ */
+export function looseIncludes(haystack: string | undefined, needle: string): boolean {
+  if (!haystack) return false;
+  const h = haystack.toLowerCase();
+  const n = needle.toLowerCase();
+  if (!n) return false;
+  return h.includes(n) || h.replace(/\s+/g, "").includes(n.replace(/\s+/g, ""));
+}
+
+/**
  * A pasted link finds the story that carries it. Exact after normalization
  * (tracking params, www, hash ignored), or the query as a fragment of the
  * link with scheme and www stripped, so a bare host or a partial path works
@@ -17,7 +30,9 @@ export function newId(): string {
 export function urlMatches(candidate: string, query: string): boolean {
   const bare = (s: string) => s.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
   const q = bare(query);
-  if (!q.includes(".")) return false;
+  // without a dot the query is a word: it still finds links whose host or
+  // path contains it once it is long enough not to hit everything
+  if (!q.includes(".")) return q.length >= 5 && bare(candidate).includes(q);
   try {
     if (normalizeUrl(candidate) === normalizeUrl(/^https?:\/\//i.test(query.trim()) ? query.trim() : `https://${q}`)) return true;
   } catch {}
@@ -35,12 +50,26 @@ export function cleanByline(raw: string | undefined, sourceName?: string): strin
   let s = stripHtml(raw).replace(/\s+/g, " ").trim();
   s = s.replace(/^by[:\s]+/i, "").replace(/[.,;\s]+$/g, "").trim();
   if (!s || s.length > 80) return undefined;
-  if (/[@/]|https?:|\bwww\./i.test(s)) return undefined;
+  if (/[@/]|https?:|\bwww\.|\[bot\]|\bbot\b/i.test(s)) return undefined;
+  // "The Defiant Team", "CoinDesk Staff", "News Desk": a group, not a writer
+  if (/\b(team|staff|desk|editors?|editorial|newsroom|contributors?|communications?|comms|pr)$/i.test(s)) return undefined;
+  // a lowercase handle (github login, forum username) is not a byline
+  if (!/[A-Z]/.test(s) && !/\s/.test(s)) return undefined;
   if (/^(staff|admin|administrator|editor|editors|editorial|team|newsroom|guest|contributor|anonymous|unknown|press release|pr newswire|reuters|bloomberg|ap)$/i.test(s)) return undefined;
   if (/\b(staff|team|desk|newsroom|editors?|news|media|research|labs?|foundation|dao|protocol)\b/i.test(s) && !/\s/.test(s.replace(/\b(staff|team|desk|newsroom|editors?|news|media|research|labs?|foundation|dao|protocol)\b/i, "").trim())) return undefined;
   if (sourceName && s.toLowerCase() === sourceName.toLowerCase()) return undefined;
   if (!/[a-z]/i.test(s)) return undefined;
   return s;
+}
+
+/**
+ * The byline to show for a stored link, if any. Re-cleans at read time so
+ * links stored before a rule tightened stop showing what it now rejects,
+ * and hides release feeds, whose author is whoever clicked publish.
+ */
+export function showableByline(byline: string | undefined, sourceName: string): string | undefined {
+  if (/\breleases?\b/i.test(sourceName)) return undefined;
+  return cleanByline(byline, sourceName);
 }
 
 /** The people in a byline: "A, B and C" becomes ["A", "B", "C"]. */
