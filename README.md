@@ -28,7 +28,7 @@ If the LLM is unreachable, tier 1 items become single-link stories flagged "need
 - **`CRON_SECRET`**, required. The cron route fails closed: without it nothing can trigger the pipeline, so an unconfigured fork can't run anything.
 - **SMTP credentials, only if you want email digests.** The worked example is a Gmail app password sending as a forwarding alias from ImprovMX (free): ImprovMX forwards `hello@yourdomain` to your Gmail, and Gmail's "send mail as" plus an app password lets the site send from that address. Any SMTP server works via `SMTP_HOST` and `SMTP_PORT`.
 - **`YOUTUBE_API_KEY`, optional.** Fills in episode lengths and view counts on the podcasts shelf from the YouTube Data API (one quota unit per video, ten thousand a day free). Without it the pipeline falls back to a best-effort scrape of each watch page, which datacenter egress often cannot do, so lengths and view counts may stay unknown.
-- **Social credentials, only if you want posting.** The built-in modules are Farcaster (`NEYNAR_API_KEY` plus `FARCASTER_SIGNER_UUID`) and X (its four API keys), and the same small-module shape extends to any network. Until credentials exist every post is a logged dry-run.
+- **Social credentials, only if you want posting.** The built-in modules are Farcaster (`NEYNAR_API_KEY` plus `FARCASTER_SIGNER_UUID`), X (its four API keys), and Reddit (`REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, and a `REDDIT_REFRESH_TOKEN` minted once at `/api/admin/reddit-auth`, for one comment a day in a subreddit's daily thread), and the same small-module shape extends to any network. Until credentials exist every post is a logged dry-run, and the admin Posting page switches each channel on or off without a config change.
 
 ## Quickstart (local)
 
