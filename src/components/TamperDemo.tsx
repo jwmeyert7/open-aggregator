@@ -93,7 +93,7 @@ export function TamperDemo({ date, uid }: { date: string; uid: string }) {
         <p className="verify-ok">✓ Verified. Exactly what was sealed on {sealedAt}.</p>
       ) : null}
       {state === "bad" ? (
-        <p className="verify-bad">✗ This content does not match the sealed record. That is what tampering looks like: it cannot hide.</p>
+        <p className="verify-bad">✗ This content does not match the sealed record.</p>
       ) : null}
       {state === "error" ? <p className="verify-err">Could not reach the public record just now. The steps above work without it.</p> : null}
     </div>

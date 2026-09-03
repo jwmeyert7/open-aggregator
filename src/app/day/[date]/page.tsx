@@ -101,22 +101,26 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
           </p>
           {digest.contentHash ? (
             <p className="day-colophon">
-              {digest.attestationUid ? "attested via EAS: " : "edition hash: "}
               {digest.attestationUid ? (
-                <a
-                  className="edition-hash"
-                  href={`https://base.easscan.org/attestation/view/${digest.attestationUid}`}
-                  rel="noopener"
-                  title="This edition's content hash, attested onchain the day it froze. Opens the attestation."
-                >
-                  {digest.contentHash}
-                </a>
-              ) : (
-                <span className="edition-hash">{digest.contentHash}</span>
-              )}
+                <>
+                  Attested onchain:{" "}
+                  <a
+                    href={`https://base.easscan.org/attestation/view/${digest.attestationUid}`}
+                    rel="noopener"
+                    title={`The attestation, written the day this edition froze. UID ${digest.attestationUid}`}
+                  >
+                    EAS on Base
+                  </a>
+                  <br />
+                </>
+              ) : null}
+              sha256 hash of json file contents: <span className="edition-hash">{digest.contentHash}</span>
               <br />
-              <a href={`/day/${date}/edition.json`} title="The sealed edition file: sha256 of this exact download equals the hash">
-                download the hashed json
+              <a
+                href={`/day/${date}/edition.json`}
+                title="To verify: the hash of this file must equal the content hash of the EAS onchain attestation on Base"
+              >
+                Download this day&apos;s .json file
               </a>
               {digest.attestationUid ? (
                 <>

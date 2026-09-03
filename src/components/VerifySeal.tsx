@@ -39,6 +39,14 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
   const [detail, setDetail] = useState("");
   const [work, setWork] = useState<string[]>([]);
   const [showWork, setShowWork] = useState(false);
+  // back to the untouched state, work log and all, so someone can be shown
+  // the check from the start without reloading the page
+  const reset = () => {
+    setState("idle");
+    setDetail("");
+    setWork([]);
+    setShowWork(false);
+  };
 
   const run = async () => {
     setState("working");
@@ -112,7 +120,7 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
           {seal} <span className="verify-word">{state === "working" ? "checking…" : "Verify this edition"}</span>
         </button>
       )}{" "}
-      <a href="/verify" className="verify-help" title="How verification works">
+      <a href="/verify" className="verify-help" title="How verification works (opens in a new tab)" target="_blank" rel="noopener">
         ?
       </a>
       {state === "bad" ? <span className="verify-bad"> ✗ {detail}</span> : null}
@@ -127,6 +135,14 @@ export function VerifySeal({ date, uid }: { date: string; uid: string }) {
             title="The steps each verify run took, newest last"
           >
             <span className="verify-word">{showWork ? "hide" : "show"}</span> {showWork ? "▴" : "▾"}
+          </button>
+        </>
+      ) : null}
+      {state !== "idle" && state !== "working" ? (
+        <>
+          {" "}
+          <button type="button" className="linklike verify-reset" onClick={reset} title="Back to the unverified state">
+            <span className="verify-word">reset</span>
           </button>
         </>
       ) : null}
