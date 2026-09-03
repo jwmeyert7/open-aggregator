@@ -51,6 +51,12 @@ function summaryBulletSchema(navIds: string[]) {
       .describe(
         "the id of the ONE story this line leans on most (an activeClusters/frontPageTop id, or the new:N ref of a cluster in this reply), so the site can link the line to it; omit when no single story anchors the line"
       ),
+    why: z
+      .string()
+      .optional()
+      .describe(
+        "ONLY when this line is new or differs from the currentSummary line for its section: one short reason under 90 characters naming the item or story that changed it; omit when the line is carried over verbatim"
+      ),
     moreRefs: z
       .array(
         z.object({
@@ -69,6 +75,8 @@ export interface SummaryBullet {
   text: string;
   section: string;
   ref?: string;
+  /** the editor's short reason when the line is new or changed from the current box */
+  why?: string;
   moreRefs?: Array<{ phrase: string; ref: string }>;
 }
 
@@ -173,7 +181,13 @@ export async function classifyAndCluster(
    * real page. In weekend mode the page leads with the week, so the summary is
    * written about weekTop instead.
    */
-  ctx: { frontPageTop?: Cluster[]; weekTop?: Cluster[]; weekendMode?: boolean } = {}
+  ctx: {
+    frontPageTop?: Cluster[];
+    weekTop?: Cluster[];
+    weekendMode?: boolean;
+    /** the Latest in box as it shows now, so the editor carries lines over verbatim and explains what it changes */
+    currentSummary?: Array<{ section: string; ref?: string; text: string }>;
+  } = {}
 ): Promise<EditorOutput> {
   const sections = navSections();
   const headlines = (list?: Cluster[]) => (list ?? []).map((c) => ({ id: c.id, headline: c.headline, section: c.section }));
@@ -207,6 +221,7 @@ export async function classifyAndCluster(
           weekendMode: Boolean(ctx.weekendMode),
           frontPageTop: headlines(ctx.frontPageTop),
           weekTop: headlines(ctx.weekTop),
+          currentSummary: ctx.currentSummary ?? [],
           activeClusters: clusterDigest(activeClusters),
           newItems: itemPayload(newItems),
         }),

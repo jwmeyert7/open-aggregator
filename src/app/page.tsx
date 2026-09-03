@@ -179,11 +179,13 @@ export default async function HomePage() {
         // a refless bullet fuzzy-matches to the story it is plainly about,
         // among stories active this week only (an old story with a similar
         // headline once won and sent a "Latest in" line 43 days back);
-        // its section page is the last resort when nothing matches
+        // and stays plain text when nothing matches
         fallbackHref={(section, text) => {
           const cands = liveClusters(state).filter((c) => c.section === section && summaryLinkable(c));
           const i = bestMatchIndex(text, cands.map((c) => `${c.headline} ${(c.keywords ?? []).join(" ")}`));
-          return i >= 0 ? storyHref.get(cands[i].id) : `/${section}`;
+          // no story to point at means no link: the section title above the
+          // bullet already links the section page
+          return i >= 0 ? storyHref.get(cands[i].id) : undefined;
         }}
       />
     ) : null;
@@ -220,6 +222,7 @@ export default async function HomePage() {
                             <span className="sub">{d.section}</span>
                             {d.before ? <div className="diff-before">− {d.before}</div> : null}
                             {d.after ? <div className="diff-after">+ {d.after}</div> : null}
+                            {d.why ? <div className="diff-why">why: {d.why}</div> : null}
                           </li>
                         ))}
                       </ul>

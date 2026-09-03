@@ -40,11 +40,35 @@ export function useAdminAct() {
   return { busy, status, setStatus, act };
 }
 
+/**
+ * The action result. It stays until closed, the text can be selected, and
+ * Copy puts it on the clipboard: an error message you cannot copy is an
+ * error message you cannot ask about.
+ */
 export function Toast({ status, onClear }: { status: string; onClear: () => void }) {
+  const [copied, setCopied] = useState(false);
   if (!status) return null;
   return (
-    <div className="notice toast" onClick={onClear} title="Dismiss">
-      {status}
+    <div className="notice toast" role="status">
+      <span className="toast-text">{status}</span>
+      <span className="toast-actions">
+        <button
+          type="button"
+          className="linklike"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(status);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            } catch {}
+          }}
+        >
+          {copied ? "copied" : "copy"}
+        </button>
+        <button type="button" className="linklike" onClick={onClear} title="Dismiss">
+          ×
+        </button>
+      </span>
     </div>
   );
 }

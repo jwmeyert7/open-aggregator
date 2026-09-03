@@ -15,6 +15,9 @@ export default async function AdminRunsPage() {
   const cfg = loadSiteConfig();
   const data: RunsData = {
     runs: state.runLog ?? [],
+    frontSummary: state.frontSummary?.text ?? "",
+    frontSummaryAt: state.frontSummary?.at ?? null,
+    exampleSection: cfg.sections[0]?.id ?? "general",
     digests: await Promise.all(
       (state.dailyDigestDates ?? []).slice(0, 7).map(async (d) => {
         const dg = await loadDailyDigest(d);

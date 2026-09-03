@@ -309,10 +309,16 @@ export function parseSummaryLines(
       // semicolon here means the editor packed two stories into one line:
       // split them into separate bullets. Only the first keeps the story ref;
       // the rest link like any refless bullet (fuzzy match on the front page).
-      return body
-        .split(/;\s*/)
-        .map((t) => t.trim())
-        .filter(Boolean)
+      // a semicolon tail only stands as its own bullet when it names a story
+      // (a phrase ref); a plain clause ("users warned to withdraw") is the
+      // same story's second half and rejoins with a comma
+      const parts = body.split(/;\s*/).map((t) => t.trim()).filter(Boolean);
+      const pieces: string[] = [];
+      for (const part of parts) {
+        if (pieces.length === 0 || /\{[^{}\n]+@[a-z0-9]+\}/.test(part)) pieces.push(part);
+        else pieces[pieces.length - 1] += `, ${part.charAt(0).toLowerCase()}${part.slice(1)}`;
+      }
+      return pieces
         .map((raw, i) => {
           const segments: Array<{ text: string; ref: string | null }> = [];
           const re = /\{([^{}\n]+)@([a-z0-9]+)\}/g;

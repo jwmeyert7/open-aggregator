@@ -413,8 +413,8 @@ export interface SiteState {
       reason: string;
       changed: number;
       total: number;
-      /** the lines that moved: before and after paired by story where possible */
-      diff?: Array<{ section: string; before?: string; after?: string }>;
+      /** the lines that moved: before and after paired by story where possible, with the editor's stated reason when it gave one */
+      diff?: Array<{ section: string; before?: string; after?: string; why?: string }>;
     }>;
   };
   /** Paid posts injected into the story lists, clearly marked as ads. */

@@ -253,7 +253,14 @@ function carryForwardSummary(
     const newRefs = new Set(newSec.map((l) => l.ref).filter(Boolean));
     const dropped = keep ? prevSec.filter((l) => l.ref && !newRefs.has(l.ref)) : [];
     for (const l of newSec) {
-      const same = keep && l.ref ? prevSec.find((p) => p.ref === l.ref) : undefined;
+      // the old line about the same story: by id, or by wording when the
+      // editor sent the line without an id or under a fresh id (the Sky
+      // vote-tally line was re-phrased three times in an hour that way)
+      let same = keep && l.ref ? prevSec.find((p) => p.ref === l.ref) : undefined;
+      if (keep && !same) {
+        const j = bestMatchIndex(l.text, prevSec.map((p) => p.text), l.ref ? 4 : 3);
+        if (j >= 0) same = prevSec[j];
+      }
       if (same) {
         out.push(asRaw(same));
         continue;
@@ -265,6 +272,13 @@ function carryForwardSummary(
         continue;
       }
       out.push(asRaw(l));
+    }
+    // a line only leaves when a newcomer took its slot: an editor pass that
+    // simply did not repeat a story is not a reason to lose it (up to the
+    // box's usual two lines per section)
+    const newcomers = newSec.filter((l) => l.ref && !prevSec.some((p) => p.ref === l.ref)).length;
+    if (keep && newcomers === 0) {
+      for (const d of dropped) if (out.filter((r) => r.startsWith(`[${sec}`)).length < 2) out.push(asRaw(d));
     }
   }
   // sections the new summary skipped keep their old lines alive, as before
@@ -1829,7 +1843,7 @@ export async function reeditCluster(state: SiteState, cluster: Cluster): Promise
  * makes a history line; an editor pass that confirms the same text just
  * refreshes the timestamp (the freshness window keys off it).
  */
-function writeFrontSummary(state: SiteState, text: string, why: string): void {
+function writeFrontSummary(state: SiteState, text: string, why: string, whys?: Map<string, string>): void {
   const prev = state.frontSummary;
   const at = new Date().toISOString();
   if (prev && prev.text === text) {
@@ -1852,7 +1866,13 @@ function writeFrontSummary(state: SiteState, text: string, why: string): void {
   for (const l of changedLines) {
     const i = spare.findIndex((p) => p.section === l.section && (l.ref ? p.ref === l.ref : !p.ref));
     const pair = i >= 0 ? spare.splice(i, 1)[0] : undefined;
-    diff.push({ section: l.section ?? "general", ...(pair ? { before: truncate(pair.text, 200) } : {}), after: truncate(l.text, 200) });
+    const stated = whys?.get(l.text.slice(0, 60));
+    diff.push({
+      section: l.section ?? "general",
+      ...(pair ? { before: truncate(pair.text, 200) } : {}),
+      after: truncate(l.text, 200),
+      ...(stated ? { why: stated } : {}),
+    });
   }
   for (const p of spare) diff.push({ section: p.section ?? "general", before: truncate(p.text, 200) });
   state.frontSummary = {
@@ -2108,6 +2128,9 @@ export async function runPipeline(): Promise<RunReport> {
           frontPageTop: topStories(state, cfg.ranking).slice(0, 6),
           weekTop: weekend ? weekInReview(state, cfg.ranking, new Set()) : [],
           weekendMode: weekend,
+          currentSummary: parseSummaryLines(state.frontSummary?.text ?? "")
+            .filter((l) => l.section)
+            .map((l) => ({ section: l.section!, ...(l.ref ? { ref: l.ref } : {}), text: l.text })),
         });
         report.usedLlm = true;
         // an outage that alerted gets a recovery note, then the streak resets
@@ -2178,10 +2201,17 @@ export async function runPipeline(): Promise<RunReport> {
         state,
         cfg
       );
+      // the editor's stated reason per changed line, keyed by the line's opening words
+      const whys = new Map(
+        (out.frontSummary ?? [])
+          .filter((b) => b.why)
+          .map((b) => [stripEmDashes(b.text.trim().replace(/^[-•*]\s*/, "")).slice(0, 60), truncate(b.why!, 120)] as const)
+      );
       writeFrontSummary(
         state,
         merged,
-        `Editor pass on ${newItems.length} new item${newItems.length === 1 ? "" : "s"}${applied.clustersCreated ? `, ${applied.clustersCreated} new stor${applied.clustersCreated === 1 ? "y" : "ies"}` : ""}`
+        `Editor pass on ${newItems.length} new item${newItems.length === 1 ? "" : "s"}${applied.clustersCreated ? `, ${applied.clustersCreated} new stor${applied.clustersCreated === 1 ? "y" : "ies"}` : ""}`,
+        whys
       );
     }
     }

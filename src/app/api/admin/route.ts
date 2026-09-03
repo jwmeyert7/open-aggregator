@@ -13,7 +13,7 @@ import { postTextToX, postToX, XCapError } from "@/lib/social/x";
 import { loadDailyDigest, loadState, saveDailyDigest, saveState } from "@/lib/state";
 import { sponsoredPlacements } from "@/lib/types";
 import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState, SponsoredPost } from "@/lib/types";
-import { cleanByline, isPrivateHost, newId, normalizeUrl, sha256, slugify, socialSourceName, stripHtml, truncate, utcDay } from "@/lib/util";
+import { cleanByline, isPrivateHost, newId, normalizeUrl, parseSummaryLines, sha256, slugify, socialSourceName, stripHtml, truncate, utcDay } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -569,6 +569,36 @@ async function handle(req: NextRequest) {
     if (snapshot && body.action !== "pin") await takeSnapshot(state);
     await saveState(state);
     return ok(message);
+  }
+
+  if (body.action === "setFrontSummary") {
+    // the editor's box, written by hand: the same marked-up lines the editor
+    // writes ([section@storyId] text), one per line; empty clears the box
+    const text = String(body.text ?? "").replace(/\r/g, "").trim();
+    if (!text) {
+      delete state.frontSummary;
+      await saveState(state);
+      return ok("Latest in box cleared. The next editor pass writes a fresh one.");
+    }
+    const lines = parseSummaryLines(text);
+    const first = cfg.sections[0]?.id ?? "general";
+    if (lines.length === 0) return fail(`No usable lines. Each line should look like [${first}@storyid] Text of the line.`);
+    const marker = new RegExp(`^\\[(${cfg.sections.map((s) => s.id).join("|")})(@[a-z0-9]+)?\\]\\s+\\S`);
+    const bad = text.split("\n").map((l) => l.trim()).filter((l) => l && !marker.test(l));
+    if (bad.length > 0) return fail(`Every line needs a section marker first, like [${first}] or [${first}@storyid]. Fix: ${truncate(bad[0], 80)}`);
+    const prev = state.frontSummary;
+    const at = new Date().toISOString();
+    state.frontSummary = {
+      text,
+      at,
+      history: [
+        { at, reason: "Edited by hand in the admin", changed: lines.length, total: lines.length },
+        ...(prev?.history ?? []),
+      ].slice(0, 10),
+    };
+    await takeSnapshot(state);
+    await saveState(state);
+    return ok(`Latest in box saved with ${lines.length} line${lines.length === 1 ? "" : "s"}.`);
   }
 
   if (body.action === "refreshSummary") {

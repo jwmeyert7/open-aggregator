@@ -6,11 +6,17 @@ import { AdminChrome, type AdminChromeData, Toast, useAdminAct } from "../shared
 
 export interface RunsData {
   runs: RunLogEntry[];
+  /** the Latest in box as stored: [section@storyId] lines */
+  frontSummary: string;
+  frontSummaryAt: string | null;
+  /** the first configured section id, for the example marker in the help text */
+  exampleSection: string;
   digests: Array<{ date: string; stories: number; cast: boolean; tweetId: string | null }>;
 }
 
 export function RunsClient({ chrome, data }: { chrome: AdminChromeData; data: RunsData }) {
   const { busy, status, setStatus, act } = useAdminAct();
+  const [summaryDraft, setSummaryDraft] = useState(data.frontSummary);
   const [showAllRuns, setShowAllRuns] = useState(false);
 
   return (
@@ -26,6 +32,31 @@ export function RunsClient({ chrome, data }: { chrome: AdminChromeData; data: Ru
         <button className="btn" disabled={busy} onClick={() => act("refreshSummary")}>
           Refresh summary
         </button>
+      </div>
+
+      <div className="admin-card">
+        <div className="headline">Latest in box</div>
+        <div className="sub">
+          The editor&apos;s lines as stored, one per line, each starting with its section and story id, like{" "}
+          <code>[{data.exampleSection}@1a2b3c4d5e] Text</code>. Edit or delete lines and save. Refresh summary asks the
+          editor to reconsider them against the page instead. Empty and save to clear the box until the next editor pass.
+          {data.frontSummaryAt ? ` Last written ${data.frontSummaryAt.slice(0, 16).replace("T", " ")} UTC.` : ""}
+        </div>
+        <textarea
+          className="text"
+          rows={6}
+          value={summaryDraft}
+          onChange={(e) => setSummaryDraft(e.target.value)}
+          style={{ width: "100%", fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: "0.8rem", marginTop: 8 }}
+        />
+        <div className="btn-row">
+          <button className="btn primary" disabled={busy || summaryDraft === data.frontSummary} onClick={() => act("setFrontSummary", { text: summaryDraft })}>
+            Save box
+          </button>
+          <button className="btn" disabled={busy} onClick={() => setSummaryDraft(data.frontSummary)}>
+            Revert
+          </button>
+        </div>
       </div>
       {data.digests.length > 0 ? (
         <div className="admin-card">
