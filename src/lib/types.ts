@@ -128,9 +128,23 @@ export interface SiteConfig {
   bots: {
     siteUrl: string;
     /** digestChannel: channel id for the nightly digest cast; empty = no channel (requires channel membership to stick). */
-    farcaster: { maxPerDay: number; minScore: number; topN: number; digestChannel?: string };
+    farcaster: {
+      maxPerDay: number;
+      minScore: number;
+      topN: number;
+      digestChannel?: string;
+      /** story casts wait for this UTC hour (absent means any hour) */
+      storyHourUtc?: number;
+      /** the digest casts and the story casts, each off with false; absent means on */
+      dailyDigest?: boolean;
+      weeklyDigest?: boolean;
+      monthlyDigest?: boolean;
+      stories?: boolean;
+    };
     /** dailyThread/weeklyThread/monthlyThread: the two-tweet digest threads on X (tweet 1 the snapshot lines, tweet 2 the archive link). Like the old single digest tweet they ride outside the story caps. */
-    x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number; dailyThread?: boolean; weeklyThread?: boolean; monthlyThread?: boolean };
+    /** storyHourUtc: the automated story post waits for this UTC hour so it goes to the day's real top story */
+    /** topN: how deep in the ranked top list the story post may draw from (absent means the whole list) */
+    x: { maxAutoPerDay: number; maxPerMonth: number; minScore: number; topN?: number; storyHourUtc?: number; dailyThread?: boolean; weeklyThread?: boolean; monthlyThread?: boolean };
     /**
      * One comment a day in the subreddit's daily discussion thread carrying
      * yesterday's frozen edition. dailyTitlePrefix identifies the thread among
@@ -140,6 +154,12 @@ export interface SiteConfig {
      */
     reddit?: { subreddit: string; dailyComment: boolean; dailyTitlePrefix?: string; postHourUtc?: number; topN?: number };
   };
+}
+
+export interface BotOverrides {
+  x?: Partial<Pick<SiteConfig["bots"]["x"], "maxAutoPerDay" | "topN" | "storyHourUtc" | "dailyThread" | "weeklyThread" | "monthlyThread">>;
+  farcaster?: Partial<Pick<SiteConfig["bots"]["farcaster"], "maxPerDay" | "topN" | "storyHourUtc" | "dailyDigest" | "weeklyDigest" | "monthlyDigest" | "stories">>;
+  reddit?: { dailyComment?: boolean; postHourUtc?: number };
 }
 
 export interface CoverageLink {
@@ -418,6 +438,8 @@ export interface SiteState {
     >;
   };
   /** Admin-managed Polymarket market changes layered over config/sections.json. */
+  /** Admin switches from the Posting page, layered over config bots settings by applyBotOverrides. */
+  botOverrides?: BotOverrides;
   marketOverrides?: {
     custom: Array<{ slug: string; label: string; section?: SectionId }>;
     disabled: string[];

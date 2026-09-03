@@ -43,6 +43,23 @@ export function loadSiteConfig(): SiteConfig {
   return readJson<SiteConfig>("sections.json", "sections.example.json");
 }
 
+/** The config's bot settings with the admin's Posting page switches laid over them. */
+export function applyBotOverrides(cfg: SiteConfig, state: SiteState): SiteConfig {
+  const o = state.botOverrides;
+  if (!o) return cfg;
+  return {
+    ...cfg,
+    bots: {
+      ...cfg.bots,
+      x: { ...cfg.bots.x, ...(o.x ?? {}) },
+      farcaster: { ...cfg.bots.farcaster, ...(o.farcaster ?? {}) },
+      ...(cfg.bots.reddit || o.reddit
+        ? { reddit: { subreddit: "", dailyComment: false, ...(cfg.bots.reddit ?? {}), ...(o.reddit ?? {}) } }
+        : {}),
+    },
+  };
+}
+
 /** The configured nav sections (never includes the built-in "general"). */
 export function navSections(): SectionConfig[] {
   return loadSiteConfig().sections;

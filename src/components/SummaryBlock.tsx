@@ -16,6 +16,7 @@ export function SummaryBlock({
   storyHrefs,
   fallbackHref,
   footer,
+  askEmail = false,
 }: {
   text: string;
   /** The configured nav sections, in display order. */
@@ -42,6 +43,8 @@ export function SummaryBlock({
   fallbackHref?: (section: SummarySection, text: string) => string | undefined;
   /** Extra content at the bottom of the box (the mobile top-podcast row). */
   footer?: React.ReactNode;
+  /** Front page only: one quiet line offering the same box by email. */
+  askEmail?: boolean;
 }) {
   const lines = parseSummaryLines(text);
   if (lines.length === 0) return null;
@@ -113,6 +116,11 @@ export function SummaryBlock({
         </div>
       ) : null}
       {footer}
+      {askEmail ? (
+        <p className="front-summary-ask">
+          <a href="/subscribe">Get the latest by email</a>
+        </p>
+      ) : null}
       </div>
     </>
   );

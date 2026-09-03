@@ -104,6 +104,7 @@ const TOOL_ROWS: Array<{ label: string; tools: Array<{ href: string; label: stri
     label: "Audience",
     tools: [
       { href: "/admin/distribution", label: "Distribution" },
+      { href: "/admin/posting", label: "Posting" },
       { href: "/admin/email", label: "Email" },
       { href: "/admin/farcaster", label: "Farcaster" },
     ],

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, checkPassword, cookieValue, isAdmin, LAYOUT_PREVIEW_COOKIE } from "@/lib/auth";
-import { effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
+import { applyBotOverrides, effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
 import { buildDailyEdition, buildMonthlyEdition, buildWeeklyEdition, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
 import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAgent } from "@/lib/feeds";
 import { notifySubmitter } from "@/lib/mail";
@@ -400,7 +400,35 @@ async function handle(req: NextRequest) {
 
   // fresh: admin actions save state, and saving a stale fallback would roll the site back
   const state = await loadState({ fresh: true });
-  const cfg = loadSiteConfig();
+  const cfg = applyBotOverrides(loadSiteConfig(), state);
+
+  if (body.action === "setPosting") {
+    if (body.reset) {
+      delete state.botOverrides;
+      await saveState(state);
+      return ok("Posting switches cleared. The config file's settings apply again from the next run.");
+    }
+    const channel = String(body.channel ?? "");
+    const o = (state.botOverrides ??= {});
+    const bool = (v: unknown) => (typeof v === "boolean" ? v : undefined);
+    const int = (v: unknown, min: number, max: number) => {
+      if (v === undefined || v === null || v === "") return undefined;
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : undefined;
+    };
+    const strip = <T extends object>(obj: T): T => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+    if (channel === "x") {
+      o.x = { ...(o.x ?? {}), ...strip({ dailyThread: bool(body.dailyThread), weeklyThread: bool(body.weeklyThread), monthlyThread: bool(body.monthlyThread), maxAutoPerDay: int(body.maxAutoPerDay, 0, 5), topN: int(body.topN, 1, 10), storyHourUtc: int(body.storyHourUtc, 0, 23) }) };
+    } else if (channel === "farcaster") {
+      o.farcaster = { ...(o.farcaster ?? {}), ...strip({ dailyDigest: bool(body.dailyDigest), weeklyDigest: bool(body.weeklyDigest), monthlyDigest: bool(body.monthlyDigest), stories: bool(body.stories), maxPerDay: int(body.maxPerDay, 0, 20), topN: int(body.topN, 1, 10), storyHourUtc: int(body.storyHourUtc, 0, 23) }) };
+    } else if (channel === "reddit") {
+      o.reddit = { ...(o.reddit ?? {}), ...strip({ dailyComment: bool(body.dailyComment), postHourUtc: int(body.postHourUtc, 0, 23) }) };
+    } else {
+      return fail("Unknown channel.");
+    }
+    await saveState(state);
+    return ok("Posting updated. Applies from the next pipeline run.");
+  }
 
   const clusterActions = ["pin", "kill", "merge", "resection", "edit", "postX", "reedit", "split", "attachLink", "setLead"];
   if (clusterActions.includes(body.action)) {

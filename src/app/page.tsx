@@ -172,6 +172,7 @@ export default async function HomePage() {
         quietText={leadWithWeek ? "A quiet week here." : undefined}
         text={gistLines.join("\n")}
         footer={aboveNav ? episodeRow : undefined}
+        askEmail
         // a bullet's story jumps in page when its card is below, and falls
         // back to the story permalink when it ranks off the front page
         storyHrefs={storyHref}

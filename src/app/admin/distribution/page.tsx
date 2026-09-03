@@ -1,7 +1,7 @@
 import { DistributionClient, type DistributionData } from "./DistributionClient";
 import { buildChrome, NotLoggedIn } from "../server";
 import { isAdmin } from "@/lib/auth";
-import { loadSiteConfig } from "@/lib/config";
+import { applyBotOverrides, loadSiteConfig } from "@/lib/config";
 import { bucketMetrics, emptyMetrics, loadMetricsRange } from "@/lib/metrics";
 import { siteIdentity } from "@/lib/site";
 import { redditConfigured } from "@/lib/social/reddit";
@@ -21,7 +21,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   const windowDays = RANGES[rangeKey];
 
   const state = await loadState();
-  const cfg = loadSiteConfig();
+  const cfg = applyBotOverrides(loadSiteConfig(), state);
   const recorded = bucketMetrics(await loadMetricsRange(windowDays), by);
 
   // resolve clicked cluster ids to headlines while the clusters still exist;

@@ -1676,6 +1676,30 @@ select.select {
   margin: 8px 0;
   overflow-x: auto;
 }
+.front-summary-ask {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.front-summary-ask a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+}
+.front-summary-ask a:hover {
+  color: var(--fg-soft);
+}
+.posting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.posting-label {
+  min-width: 200px;
+  font-size: 0.88rem;
+}
 .summary-log ul {
   margin: 4px 0 0;
   padding-left: 18px;

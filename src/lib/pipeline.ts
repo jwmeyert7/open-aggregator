@@ -1,4 +1,4 @@
-import { effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
+import { applyBotOverrides, effectiveFeeds, effectiveMarkets, loadSiteConfig, siteUrl } from "./config";
 import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sendDailyEmail, sendMonthlyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC, yearlyTop } from "./digest";
 import { attestAvailable, attestEdition } from "./attest";
 import { sendAdminEmail } from "./mail";
@@ -637,9 +637,13 @@ async function makeDailyDigest(
     // Channel casting usually requires channel membership to stick.
     // the page embed is the cast's "full day in review" link, so the cast
     // only appends the email ask beneath the snapshot
-    const r = await castRaw(`${text}\n\n${subscribeLines(cfg, "farcaster")}`, url, cfg.bots.farcaster.digestChannel || undefined);
+    const r =
+      cfg.bots.farcaster.dailyDigest === false
+        ? { dryRun: true, hash: undefined }
+        : await castRaw(`${text}\n\n${subscribeLines(cfg, "farcaster")}`, url, cfg.bots.farcaster.digestChannel || undefined);
     cast = !r.dryRun;
-    if (r.dryRun) notes.push("cast skipped (dry-run or no credentials)");
+    if (cfg.bots.farcaster.dailyDigest === false) notes.push("daily cast off (Posting page)");
+    else if (r.dryRun) notes.push("cast skipped (dry-run or no credentials)");
     if (r.hash) digest.castHash = r.hash;
   } catch (err) {
     notes.push(`cast failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
@@ -661,16 +665,27 @@ async function makeDailyDigest(
   return { date: yesterday, count: top.length, cast, tweeted: Boolean(digest.tweetId), notes };
 }
 
-/** The email ask shared by tweet 2 and the digest casts. */
+/**
+ * The email ask shared by tweet 2 and the digest casts. On X the link is the
+ * short /join redirect, which carries the tags server-side: a visible
+ * "?utm_source=..." in a tweet reads as spam. Casts hide URLs in embeds, so
+ * they keep the tagged link.
+ */
 const subscribeLines = (cfg: SiteConfig, source: UtmSource): string =>
-  `Get regular summary emails:\n${withUtm(`${cfg.bots.siteUrl}/subscribe`, source, "subscribe-ask")}`;
+  `Get regular summary emails:\n${source === "x" ? `${cfg.bots.siteUrl}/join` : withUtm(`${cfg.bots.siteUrl}/subscribe`, source, "subscribe-ask")}`;
+
+/** The short redirect for an archive page (/d/2026-09-02, /w/..., /m/...), tags added by the redirect. */
+function shortArchiveUrl(pageUrl: string): string {
+  return pageUrl.replace(/\/day\//, "/d/").replace(/\/week\//, "/w/").replace(/\/month\//, "/m/");
+}
 
 /**
  * Tweet 2 of a digest thread: the archive link, then the email ask. No
  * follow line by decision: not asking is part of the digests' voice.
  */
 function threadSecondTweet(period: "day" | "week" | "month", pageUrl: string, cfg: SiteConfig, campaign: string): string {
-  return `Full ${period} in review:\n${withUtm(pageUrl, "x", campaign)}\n\n${subscribeLines(cfg, "x")}`;
+  void campaign; // the /d, /w, /m redirects attach the campaign from the date
+  return `Full ${period} in review:\n${shortArchiveUrl(pageUrl)}\n\n${subscribeLines(cfg, "x")}`;
 }
 
 /** "August 26, 2026" for the daily tweet heading. */
@@ -726,25 +741,41 @@ async function threadFirstTweet(
     blocks.push({ label: "Podcasts", text: ep.displayTitle ?? ep.title, suffix, max: Math.max(30, 52 - suffix.length) });
   }
 
-  // the editor model rewrites each line as a complete phrase inside its
-  // budget; any bad output (missing, empty, way over) falls back to a plain
-  // word-boundary trim of the original
-  let texts = blocks.map((b) => (b.text.length <= b.max ? b.text : ogTruncate(b.text, b.max)));
-  if (llmAvailable() && blocks.some((b) => b.text.length > b.max)) {
+  // the editor model rewrites each long line as a complete phrase inside
+  // its budget. A line it could not fit gets one more try at a tighter
+  // budget, then the podcast line is dropped and the headlines get the room
+  // back, and only then is a line cut, at a clause boundary and never with
+  // an ellipsis: a trailing "..." on every line read as a broken post
+  const texts = blocks.map((b) => b.text);
+  const over = () => blocks.map((b, i) => texts[i].length > b.max);
+  for (let attempt = 0; attempt < 2 && llmAvailable() && over().some(Boolean); attempt++) {
     try {
-      const out = await compressTweetLines(blocks.map((b) => ({ text: b.text, max: b.max })));
-      texts = blocks.map((b, i) => {
-        const line = (out[i] ?? "").trim();
-        return line.length > 0 && line.length <= b.max + 10 && !line.includes("…") ? line : texts[i];
+      const idx = over().map((o, i) => (o ? i : -1)).filter((i) => i >= 0);
+      const out = await compressTweetLines(idx.map((i) => ({ text: texts[i], max: blocks[i].max - attempt * 6 })));
+      idx.forEach((i, k) => {
+        const line = (out[k] ?? "").trim();
+        if (line.length > 0 && line.length <= blocks[i].max && !/…|\.\.\.$/.test(line)) texts[i] = line;
       });
     } catch {
-      // the word-boundary trims stand
+      break;
     }
   }
-
+  if (over().some(Boolean) && blocks.length > 3) {
+    blocks.pop();
+    texts.pop();
+    for (const b of blocks) b.max = 72;
+  }
+  const clauseCut = (s: string, max: number): string => {
+    if (s.length <= max) return s;
+    const head = s.slice(0, max + 1);
+    const at = Math.max(...[", ", ": ", " as ", " after ", " with ", " while ", " to "].map((sep) => head.lastIndexOf(sep)));
+    if (at > max * 0.5) return s.slice(0, at).trim();
+    const space = head.lastIndexOf(" ");
+    return s.slice(0, space > max * 0.6 ? space : max).trim();
+  };
   for (let squeeze = 0; squeeze <= 4; squeeze++) {
     const body = blocks
-      .map((b, i) => `${b.label}\n- ${squeeze === 0 ? texts[i] : ogTruncate(texts[i], Math.max(24, blocks[i].max - squeeze * 6))}${b.suffix}`)
+      .map((b, i) => `${b.label}\n- ${clauseCut(texts[i], Math.max(24, b.max - squeeze * 6))}${b.suffix}`)
       .join("\n\n");
     const text = `${heading}\n\n${body}`;
     if (text.length <= 279) return text;
@@ -1895,13 +1926,17 @@ export async function takeSnapshot(state: SiteState): Promise<string> {
 }
 
 async function maybePostBots(state: SiteState, report: RunReport): Promise<boolean> {
-  const cfg = loadSiteConfig();
+  const cfg = applyBotOverrides(loadSiteConfig(), state);
   const now = new Date();
   let changed = false;
 
   // Farcaster: the automated channel. New top-ranked stories, bounded per day.
   const top = topStories(state, cfg.ranking, now);
-  for (const cluster of top.slice(0, cfg.bots.farcaster.topN)) {
+  const storyCasts =
+    cfg.bots.farcaster.stories === false || now.getUTCHours() < (cfg.bots.farcaster.storyHourUtc ?? 0)
+      ? []
+      : top.slice(0, cfg.bots.farcaster.topN);
+  for (const cluster of storyCasts) {
     if (cluster.posted?.farcaster) continue;
     if (score(cluster, cfg.ranking, now) < cfg.bots.farcaster.minScore) continue;
     if (farcasterPostedToday(state) >= cfg.bots.farcaster.maxPerDay) {
@@ -1918,10 +1953,16 @@ async function maybePostBots(state: SiteState, report: RunReport): Promise<boole
     }
   }
 
-  // X: strictly max one automated post per day, monthly hard cap inside postToX.
-  const candidate = top.find((c) => !c.posted?.x && !state.xPosts.some((p) => p.clusterId === c.id));
+  // X: strictly max one automated post per day, monthly hard cap inside
+  // postToX. It waits for storyHourUtc so the morning's news has ranked and
+  // the day's one post goes to the day's actual top story, not the first
+  // thing that crossed the bar at 3am.
+  const candidate = top
+    .slice(0, cfg.bots.x.topN ?? top.length)
+    .find((c) => !c.posted?.x && !state.xPosts.some((p) => p.clusterId === c.id));
   if (
     cfg.bots.x.maxAutoPerDay > 0 &&
+    now.getUTCHours() >= (cfg.bots.x.storyHourUtc ?? 0) &&
     candidate &&
     !xAutoPostedToday(state) &&
     score(candidate, cfg.ranking, now) >= cfg.bots.x.minScore
@@ -1947,9 +1988,10 @@ async function maybePostBots(state: SiteState, report: RunReport): Promise<boole
  */
 export async function runPipeline(): Promise<RunReport> {
   const startedAt = Date.now();
-  const cfg = loadSiteConfig();
   // fresh: mutating and saving a stale fallback copy would roll the site back
   const state = await loadState({ fresh: true });
+  // the admin's Posting page switches lay over the config's bot settings
+  const cfg = applyBotOverrides(loadSiteConfig(), state);
   const allFeeds = effectiveFeeds(state);
   // media feeds fill the shelf beside the news flow; they never enter the
   // gate/cluster path, so the news fetch only sees the rest
@@ -2322,7 +2364,9 @@ export async function runPipeline(): Promise<RunReport> {
       }
     }
     try {
-      if (weekly && weeklyFirst) {
+      if (cfg.bots.farcaster.weeklyDigest === false) {
+        report.notes.push("Weekly cast off (Posting page).");
+      } else if (weekly && weeklyFirst) {
         const r = await castRaw(`${weeklyFirst}\n\n${subscribeLines(cfg, "farcaster")}`, withUtm(`${cfg.bots.siteUrl}/week/${weekly.end}`, "farcaster", `weekly-${weekly.end}`), cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Weekly cast skipped (dry-run or no credentials)." : "Weekly cast posted.");
       } else {
@@ -2412,7 +2456,9 @@ export async function runPipeline(): Promise<RunReport> {
       }
     }
     try {
-      if (monthly && monthlyFirst) {
+      if (cfg.bots.farcaster.monthlyDigest === false) {
+        report.notes.push("Monthly cast off (Posting page).");
+      } else if (monthly && monthlyFirst) {
         const r = await castRaw(`${monthlyFirst}\n\n${subscribeLines(cfg, "farcaster")}`, withUtm(`${cfg.bots.siteUrl}/month/${prevMonth}`, "farcaster", `monthly-${prevMonth}`), cfg.bots.farcaster.digestChannel || undefined);
         report.notes.push(r.dryRun ? "Monthly cast skipped (dry-run or no credentials)." : "Monthly cast posted.");
       }
