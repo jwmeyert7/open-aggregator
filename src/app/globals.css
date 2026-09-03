@@ -1609,6 +1609,24 @@ select.select {
 .kicker .byline {
   font-weight: 400;
 }
+.subscriber-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.subscriber-controls .sub-sep {
+  margin-left: 8px;
+  color: var(--muted);
+}
+.subscriber-controls .linklike {
+  font-size: 0.82rem;
+}
+.subscriber-controls .danger-text {
+  color: var(--bad);
+  margin-left: 8px;
+}
 .reddit-preview {
   white-space: pre-wrap;
   font-size: 0.78rem;

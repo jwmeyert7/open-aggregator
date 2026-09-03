@@ -339,6 +339,32 @@ export async function dayInReview(date: string, clusters: Cluster[]): Promise<Su
   return object.summary as SummaryBullet[];
 }
 
+/** Week- or month-in-review bullets for a frozen rollup edition: one small call, best-effort at the call site. */
+export async function periodInReview(period: string, clusters: Cluster[]): Promise<SummaryBullet[]> {
+  const sections = navSections();
+  const { object } = await generateObject({
+    model: qualityModel(),
+    schema: z.object({
+      summary: z
+        .array(summaryBulletSchema(sections.map((s) => s.id)))
+        .max(5)
+        .describe("one or two bullets per section reviewing the period, 5 at the most, each ONE short past-tense plain-language line under 120 characters"),
+    }),
+    system: loadPrompt("period-summary"),
+    prompt: JSON.stringify({
+      period,
+      sections: sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+      stories: clusters.map((c) => ({
+        headline: c.headline,
+        explainer: c.explainer,
+        section: c.section,
+        importance: c.importance,
+      })),
+    }),
+  });
+  return object.summary as SummaryBullet[];
+}
+
 /**
  * The media gate: one batched yes/no read over new tier-2 episodes. Cheaper
  * and blunter than the news gate on purpose: an episode is either

@@ -567,6 +567,8 @@ export interface MonthlyDigest {
   clusters: Cluster[]; // the month's top stories, importance first then magnitude
   /** The month's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];
+  /** Editor-model month-in-review bullets, section-tagged lines, written once at freeze (absent on months frozen before 2026-09-02). */
+  summary?: string;
   /** Id of the month's X thread (its first tweet), when it really posted. */
   tweetId?: string;
   /** Still the CURRENT month: refreshed every run, replaced by the freeze. */
@@ -606,6 +608,8 @@ export interface WeeklyDigest {
   clusters: Cluster[]; // the week's top stories, importance first then magnitude
   /** The week's top podcast episodes, frozen playable (full items, ranked). */
   episodes?: MediaItem[];
+  /** Editor-model week-in-review bullets, section-tagged lines, written once at freeze (absent on weeks frozen before 2026-09-02). */
+  summary?: string;
   /** Id of the week's X thread (its first tweet), when it really posted. */
   tweetId?: string;
   /** Still the CURRENT week: refreshed every run, replaced by the freeze. */

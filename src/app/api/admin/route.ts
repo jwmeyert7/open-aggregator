@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, checkPassword, cookieValue, isAdmin, LAYOUT_PREVIEW_COOKIE } from "@/lib/auth";
 import { effectiveFeeds, loadFeeds, loadSiteConfig, siteUrl } from "@/lib/config";
-import { buildDailyEdition, buildMonthlyEdition, buildWeeklyEdition, confirmationEmail, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
+import { buildDailyEdition, buildMonthlyEdition, buildWeeklyEdition, recentEpisodes, sendEditionTo, type Edition } from "@/lib/digest";
 import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAgent } from "@/lib/feeds";
-import { notifySubmitter, sendMail } from "@/lib/mail";
+import { notifySubmitter } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable, summarizeRelease } from "@/lib/llm";
 import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
@@ -645,13 +645,23 @@ async function handle(req: NextRequest) {
     return ok(`Pruned ${gone} unconfirmed signup${gone === 1 ? "" : "s"} older than 30 days.`);
   }
 
-  if (body.action === "resendConfirmation") {
+  if (body.action === "setSubscriberFlags") {
+    // one frequency at a time from the row chips; taking away the last one
+    // is what Remove is for, so the row never sits subscribed to nothing
     const sub = (state.digestSubscribers ?? []).find((s) => s.email === String(body.email ?? ""));
     if (!sub) return fail("Unknown subscriber.");
-    if (sub.confirmed !== false) return fail("Already confirmed, nothing to resend.");
-    const c = confirmationEmail(sub.token);
-    const err = await sendMail(sub.email, c.subject, c.text, c.html);
-    return err ? fail(`Send failed: ${err}`) : ok(`Confirmation email resent to ${sub.email}.`);
+    const next = {
+      daily: typeof body.daily === "boolean" ? body.daily : sub.daily,
+      weekly: typeof body.weekly === "boolean" ? body.weekly : sub.weekly,
+      monthly: typeof body.monthly === "boolean" ? body.monthly : Boolean(sub.monthly),
+    };
+    if (!next.daily && !next.weekly && !next.monthly) return fail("That would leave them on no list. Use remove instead.");
+    sub.daily = next.daily;
+    sub.weekly = next.weekly;
+    sub.monthly = next.monthly;
+    await saveState(state);
+    const on = (["daily", "weekly", "monthly"] as const).filter((k) => next[k]).join(" + ");
+    return ok(`${sub.email} now gets ${on}.`);
   }
 
   if (body.action === "removeSubscriber") {

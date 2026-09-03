@@ -3,7 +3,7 @@ import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sen
 import { attestAvailable, attestEdition } from "./attest";
 import { sendAdminEmail } from "./mail";
 import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
-import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
+import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, periodInReview, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
 import { clusterActivityAt, liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, summaryLinkable, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
@@ -819,6 +819,24 @@ async function maybePostRedditDaily(state: SiteState, cfg: SiteConfig, report: R
   } catch (err) {
     report.notes.push(`reddit daily comment failed: ${truncate(err instanceof Error ? err.message : String(err), 200)}`);
   }
+}
+
+/**
+ * The in-review lines for a frozen week or month: the editor's bullets, and
+ * any section it skipped filled with that section's biggest story so no
+ * section reads as empty. Best effort: a model failure leaves the edition
+ * with the fallback lines only.
+ */
+async function periodSummary(period: string, top: Cluster[]): Promise<string | undefined> {
+  let bullets: SummaryBullet[] = [];
+  if (llmAvailable()) bullets = await periodInReview(period, top).catch(() => []);
+  const covered = new Set(bullets.map((b) => b.section));
+  for (const sec of loadSiteConfig().sections.map((s) => s.id)) {
+    if (covered.has(sec)) continue;
+    const biggest = top.find((c) => c.section === sec || c.alsoIn === sec);
+    if (biggest) bullets.push({ section: sec, ref: biggest.id, text: biggest.headline });
+  }
+  return joinSummaryLines(bullets) || undefined;
 }
 
 /**
@@ -2252,6 +2270,8 @@ export async function runPipeline(): Promise<RunReport> {
           cfg.ranking
         ).slice(0, 5);
         if (weekEps.length > 0) weekly.episodes = JSON.parse(JSON.stringify(weekEps)) as MediaItem[];
+        // the review lines are edition content, so they go in before the hash
+        weekly.summary = await periodSummary(`the week of ${weekly.start} to ${weekly.end}`, weekly.clusters);
         weekly.contentHash = digestContentHash(weekly);
         await attestFrozenEdition(weekly, `week:${weekly.end}`, report.notes);
         await saveWeeklyDigest(weekly);
@@ -2342,6 +2362,7 @@ export async function runPipeline(): Promise<RunReport> {
           cfg.ranking
         ).slice(0, 6);
         if (monthEps.length > 0) monthly.episodes = JSON.parse(JSON.stringify(monthEps)) as MediaItem[];
+        monthly.summary = await periodSummary(`the month ${monthly.month}`, monthly.clusters);
         monthly.contentHash = digestContentHash(monthly);
         await attestFrozenEdition(monthly, `month:${monthly.month}`, report.notes);
         await saveMonthlyDigest(monthly);

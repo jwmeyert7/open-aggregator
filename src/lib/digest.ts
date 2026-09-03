@@ -2,7 +2,8 @@ import { loadSiteConfig, siteUrl } from "./config";
 import { sendMail } from "./mail";
 import { siteIdentity } from "./site";
 import { leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
-import { loadDailyDigest, loadMonthlyDigest } from "./state";
+import { llmAvailable, periodInReview } from "./llm";
+import { loadDailyDigest, loadMonthlyDigest, loadWeeklyDigest } from "./state";
 import type { Cluster, DigestSubscriber, MediaItem, SiteConfig, SiteState } from "./types";
 import { withUtm } from "./utm";
 import { formatDuration, parseSummaryLines, utcDay } from "./util";
@@ -27,6 +28,44 @@ interface MailStory {
   url: string;
   source: string;
   permalink: string;
+  /** the section title from config, shown in the Top group, where stories mix */
+  section?: string;
+}
+
+/** Section id to its display title, from config/sections.json, for the email's labels. */
+function sectionLabel(id: string | null | undefined): string | undefined {
+  if (!id) return undefined;
+  return loadSiteConfig().sections.find((s) => s.id === id)?.title;
+}
+
+/** The stored summary text as labeled lines for the email. */
+function labeledSummary(text: string | undefined): Array<{ label?: string; text: string }> {
+  return text
+    ? parseSummaryLines(text).map((l) => ({ ...(sectionLabel(l.section) ? { label: sectionLabel(l.section) } : {}), text: l.text }))
+    : [];
+}
+
+/**
+ * Review lines for a rollup edition. Frozen editions carry them; one frozen
+ * before the field existed gets them written on the fly for this email and
+ * not stored, since its content hash is sealed.
+ */
+async function rollupSummary(frozen: string | undefined, period: string, top: Cluster[]): Promise<Array<{ label?: string; text: string }>> {
+  if (frozen) return labeledSummary(frozen);
+  if (!llmAvailable()) return [];
+  const bullets = await periodInReview(period, top).catch(() => []);
+  return labeledSummary(bullets.map((b) => `[${b.section}] ${b.text}`).join("\n"));
+}
+
+/** Summary lines gathered under their section, in first-seen order, so a section heads its bullets once. */
+function summaryGroups(summary: Array<{ label?: string; text: string }>): Array<{ label?: string; lines: string[] }> {
+  const groups: Array<{ label?: string; lines: string[] }> = [];
+  for (const s of summary) {
+    const g = groups.find((x) => x.label === s.label);
+    if (g) g.lines.push(s.text);
+    else groups.push({ label: s.label, lines: [s.text] });
+  }
+  return groups;
 }
 
 function toMailStories(clusters: Cluster[]): MailStory[] {
@@ -38,6 +77,7 @@ function toMailStories(clusters: Cluster[]): MailStory[] {
       url: lead.url,
       source: lead.sourceName,
       permalink: `${siteUrl()}/story/${c.slug}`,
+      ...(sectionLabel(c.section) ? { section: sectionLabel(c.section) } : {}),
     };
   });
 }
@@ -117,7 +157,8 @@ function digestEmail(opts: {
   archiveLabel: string;
   /** utm_campaign for every site link in this edition (daily-2026-09-01 etc.) */
   campaign: string;
-  summary: string[];
+  /** the Latest in lines, each with its section label */
+  summary: Array<{ label?: string; text: string }>;
   groups: Array<{ title: string; anchor?: string; stories: MailStory[] }>;
   episodes?: MailEpisode[];
 }): { text: string; html: string } {
@@ -129,12 +170,16 @@ function digestEmail(opts: {
   const text = [
     heading,
     "",
-    ...summary.map((s) => `- ${s}`),
-    summary.length > 0 ? "" : null,
+    ...summaryGroups(summary).flatMap((g) => [g.label ?? null, ...g.lines.map((t) => `- ${t}`), ""]),
     ...groups.flatMap((g) => [
       `== ${g.title} ==`,
       "",
-      ...g.stories.flatMap((s) => [`${s.source}: ${s.headline}`, s.explainer || null, track(s.permalink), ""]),
+      ...g.stories.flatMap((s) => [
+        `${s.source}${g.title === "Top" && s.section ? ` (${s.section})` : ""}: ${s.headline}`,
+        s.explainer || null,
+        track(s.permalink),
+        "",
+      ]),
     ]),
     ...(episodes.length > 0
       ? [
@@ -161,7 +206,15 @@ function digestEmail(opts: {
     // bottom stays, so the link is styled like the plain text it replaces
     `<h1 style="font-size: 20px;"><a href="${escapeHtml(track(archiveUrl))}" style="color: #222; text-decoration: none;">${escapeHtml(heading)}</a></h1>`,
     summary.length > 0
-      ? `<ul style="padding-left: 20px;">${summary.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`
+      ? summaryGroups(summary)
+          .map(
+            (g) =>
+              (g.label
+                ? `<div style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; color: #777; margin-top: 10px;">${escapeHtml(g.label)}</div>`
+                : "") +
+              `<ul style="padding-left: 20px; margin: 4px 0;">${g.lines.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
+          )
+          .join("")
       : "",
     ...groups.flatMap((g) => [
       `<h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; margin: 22px 0 4px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">` +
@@ -171,7 +224,11 @@ function digestEmail(opts: {
         `</h2>`,
       ...g.stories.map(
         (s) =>
-          `<p style="margin: 16px 0;"><span style="color: #777; font-size: 13px;">${escapeHtml(s.source)}:</span><br/>` +
+          `<p style="margin: 16px 0;"><span style="color: #777; font-size: 13px;">${escapeHtml(s.source)}:</span>` +
+          (g.title === "Top" && s.section
+            ? `<span style="color: #777; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;"> · ${escapeHtml(s.section)}</span>`
+            : "") +
+          `<br/>` +
           `<a href="${escapeHtml(track(s.permalink))}" style="font-size: 16px; font-weight: bold; color: #1a4b8f;">${escapeHtml(s.headline)}</a>` +
           (s.explainer ? `<br/><span style="font-size: 14px;">${escapeHtml(s.explainer)}</span>` : "") +
           `<br/><a href="${escapeHtml(s.url)}" style="font-size: 12px; color: #777;">read at ${escapeHtml(s.source)}</a></p>`
@@ -307,7 +364,7 @@ export function buildDailyEdition(
       archiveUrl: `${siteUrl()}/day/${digest.date}`,
       archiveLabel: "Read this day on the site",
       campaign: `daily-${digest.date}`,
-      summary: digest.summary ? parseSummaryLines(digest.summary).map((l) => l.text) : [],
+      summary: labeledSummary(digest.summary),
       groups: groupStories(digest.clusters),
       episodes,
     }),
@@ -434,6 +491,7 @@ export async function yearlyTop(
 export async function buildMonthlyEdition(state: SiteState, cfg: SiteConfig, month: string): Promise<Edition | null> {
   const m = await monthlyTop(state, cfg, month);
   if (!m) return null;
+  const frozen = await loadMonthlyDigest(month);
   return {
     subject: `${siteIdentity().siteName} Monthly Digest: ${monthLabel(month)}`,
     ...digestEmail({
@@ -441,7 +499,7 @@ export async function buildMonthlyEdition(state: SiteState, cfg: SiteConfig, mon
       archiveUrl: `${siteUrl()}/month/${month}`,
       archiveLabel: "Read this month on the site",
       campaign: `monthly-${month}`,
-      summary: [],
+      summary: await rollupSummary(frozen && !frozen.inProgress ? frozen.summary : undefined, `the month ${month}`, m.top),
       groups: groupStories(m.top),
       episodes: recentEpisodes(state, 31 * 24, 6),
     }),
@@ -490,16 +548,18 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig, epis
   const { top, start, end } = week;
   const label = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
   const heading = `${siteIdentity().siteName} weekly, ${label(start)} to ${label(end)}`;
+  const endDay = end.toISOString().slice(0, 10);
+  const frozen = await loadWeeklyDigest(endDay);
   return {
     subject: `${siteIdentity().siteName} Weekly Digest: ${subjectRangeLabel(start, end)}`,
     ...digestEmail({
       heading,
       // the frozen weekly page exists by the time this sends (the pipeline
       // freezes the week first, then mails)
-      archiveUrl: `${siteUrl()}/week/${end.toISOString().slice(0, 10)}`,
+      archiveUrl: `${siteUrl()}/week/${endDay}`,
       archiveLabel: "Read this week on the site",
-      campaign: `weekly-${end.toISOString().slice(0, 10)}`,
-      summary: [],
+      campaign: `weekly-${endDay}`,
+      summary: await rollupSummary(frozen && !frozen.inProgress ? frozen.summary : undefined, `the week of ${utcDay(start.toISOString())} to ${endDay}`, top),
       groups: groupStories(top),
       episodes: episodes ?? recentEpisodes(state, 7 * 24, 5),
     }),

@@ -167,33 +167,42 @@ export function EmailClient({ chrome, data }: { chrome: AdminChromeData; data: E
       {subs.map((s) => (
         <div key={s.email} className="admin-card">
           <div className="sub">
-            <strong>{s.email}</strong> · {[s.daily ? "daily" : null, s.weekly ? "weekly" : null, s.monthly ? "monthly" : null].filter(Boolean).join(" + ")} ·{" "}
-            {s.confirmed ? "confirmed" : <span className="health-bad">unconfirmed</span>} · joined {timeAgo(s.addedAt)}{" "}
-            <button
-              className="btn"
-              disabled={busy}
-              onClick={() => act("testDigestEmail", { kind: "daily", email: s.email }, `Send the latest daily edition to ${s.email}?`)}
-            >
-              Send daily
-            </button>{" "}
-            <button
-              className="btn"
-              disabled={busy}
-              onClick={() => act("testDigestEmail", { kind: "weekly", email: s.email }, `Send the weekly edition to ${s.email}?`)}
-            >
-              Send weekly
-            </button>{" "}
-            {!s.confirmed ? (
-              <button className="btn" disabled={busy} onClick={() => act("resendConfirmation", { email: s.email })}>
-                Resend confirmation
+            <strong>{s.email}</strong> · {s.confirmed ? "confirmed" : <span className="health-bad">unconfirmed</span>} · joined{" "}
+            {timeAgo(s.addedAt)}
+          </div>
+          <div className="sub subscriber-controls">
+            {/* each frequency is a chip that flips on click: selective removal
+                without another button per frequency */}
+            {(["daily", "weekly", "monthly"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={`filter-chip${s[k] ? " on" : ""}`}
+                disabled={busy}
+                title={s[k] ? `Click to stop the ${k} for ${s.email}` : `Click to add the ${k} for ${s.email}`}
+                onClick={() => act("setSubscriberFlags", { email: s.email, [k]: !s[k] })}
+              >
+                {k}
               </button>
-            ) : null}{" "}
+            ))}
+            <span className="sub-sep">send now:</span>
+            {(["daily", "weekly", "monthly"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                className="linklike"
+                disabled={busy}
+                onClick={() => act("testDigestEmail", { kind: k, email: s.email }, `Send the ${k} edition to ${s.email}?`)}
+              >
+                {k}
+              </button>
+            ))}
             <button
-              className="btn danger"
+              className="linklike danger-text"
               disabled={busy}
-              onClick={() => act("removeSubscriber", { email: s.email }, `Remove ${s.email} from the list?`)}
+              onClick={() => act("removeSubscriber", { email: s.email }, `Remove ${s.email} from every list?`)}
             >
-              Remove
+              remove
             </button>
           </div>
         </div>

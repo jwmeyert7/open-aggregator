@@ -56,6 +56,7 @@ cp config/sections.example.json config/sections.json
 cp config/prompts/cluster.example.md config/prompts/cluster.md
 cp config/prompts/add-by-url.example.md config/prompts/add-by-url.md
 cp config/prompts/day-summary.example.md config/prompts/day-summary.md
+cp config/prompts/period-summary.example.md config/prompts/period-summary.md
 cp config/prompts/source-candidate.example.md config/prompts/source-candidate.md
 cp config/prompts/summary-refresh.example.md config/prompts/summary-refresh.md
 cp config/prompts/media-gate.example.md config/prompts/media-gate.md
