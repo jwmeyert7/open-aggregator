@@ -386,6 +386,8 @@ export interface SiteState {
   llmAlertedAt?: string;
   xPosts: XPostRecord[];
   farcasterPosts: FarcasterPostRecord[];
+  /** premieres and streams the media feeds have announced but that have not aired; they shelve on their own once they do */
+  scheduledEpisodes?: Array<{ url: string; title: string; sourceName: string; scheduledAt?: string; seenAt: string }>;
   /** the daily Reddit comments actually made, newest first (dry runs are not recorded) */
   redditPosts?: RedditPostRecord[];
   /** last try at the Reddit comment, so a failing post retries every half hour instead of every run */

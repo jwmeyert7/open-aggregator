@@ -1198,7 +1198,7 @@ export const MAX_MEDIA_ITEMS = 200;
  * Best effort: an episode without a length just shows none.
  */
 async function fillVideoDetails(
-  items: Array<{ url: string; kind: string; durationSec?: number; views?: number; likes?: number; statsAt?: string; publishedAt: string; upcoming?: boolean }>,
+  items: Array<{ url: string; kind: string; durationSec?: number; views?: number; likes?: number; statsAt?: string; publishedAt: string; upcoming?: boolean; scheduledAt?: string }>,
   timeoutMs: number,
   refreshStats = false
 ): Promise<number> {
@@ -1232,8 +1232,10 @@ async function fillVideoDetails(
       }
       // a scheduled premiere is not an episode yet; one that aired gets its
       // honest publish time (the air time, not the listing's creation time)
-      if (d.upcoming) i.upcoming = true;
-      else {
+      if (d.upcoming) {
+        i.upcoming = true;
+        if (d.scheduledAt) i.scheduledAt = d.scheduledAt;
+      } else {
         i.upcoming = undefined;
         if (d.airedAt) i.publishedAt = d.airedAt;
       }
@@ -1386,6 +1388,102 @@ export async function addMediaByUrl(state: SiteState, rawUrl: string, cfg: SiteC
   return `Added \u201c${item.title}\u201d to the shelf${mentions > 0 ? ` with ${mentions} story mention(s) from its notes` : ""}. It ranks like any episode.`;
 }
 
+/**
+ * The cheap, local part of a re-judge for one episode: title cleaned and
+ * rewritten per the show's rule, section hint, roundup flag, tile style,
+ * tier, and a Shorts clip hidden. No network, no model.
+ */
+function relabelEpisode(m: MediaItem, feed: ReturnType<typeof effectiveFeeds>[number] | undefined): { clip: boolean } {
+  m.title = cleanMediaTitle(rewriteTitle(feed, m.title, m.publishedAt));
+  const hint = feed?.sectionHint;
+  if (feed?.roundup) {
+    m.roundup = true;
+    delete m.section;
+  } else {
+    delete m.roundup;
+    if (!m.section && hint) m.section = hint;
+  }
+  const ts = feed?.thumbStyle;
+  if (ts && ts !== "episode") m.thumbStyle = ts;
+  else delete m.thumbStyle;
+  if (!m.tier && feed?.tier) m.tier = feed.tier;
+  // clips shelved before ingest learned to skip them
+  if (!m.hidden && isYoutubeShort(m.url)) {
+    m.hidden = true;
+    return { clip: true };
+  }
+  return { clip: false };
+}
+
+/** Relabel every episode on the shelf: seconds, no network. The full re-judge does this and then much more. */
+export function relabelMedia(state: SiteState, mediaFeeds: ReturnType<typeof effectiveFeeds>): { note: string } {
+  const items = state.mediaItems ?? [];
+  const feedById = new Map(mediaFeeds.map((f) => [f.id, f]));
+  let clips = 0;
+  for (const m of items) if (relabelEpisode(m, feedById.get(m.sourceId)).clip) clips += 1;
+  return { note: `Relabeled ${items.length} episode${items.length === 1 ? "" : "s"}: titles, sections, tiles, tiers.${clips > 0 ? ` ${clips} Shorts clip(s) hidden.` : ""}` };
+}
+
+/**
+ * The full re-judge for ONE episode: relabel, refresh its video details and
+ * show notes, rebuild its story mentions, and run the media gate on it when
+ * its show is tier 2. Seconds, against minutes for the whole shelf.
+ */
+export async function rejudgeEpisode(
+  state: SiteState,
+  mediaFeeds: ReturnType<typeof effectiveFeeds>,
+  id: string,
+  timeoutMs: number = loadSiteConfig().ingest.feedTimeoutMs
+): Promise<{ note: string }> {
+  const m = (state.mediaItems ?? []).find((x) => x.id === id);
+  if (!m) return { note: "Unknown episode." };
+  const feed = mediaFeeds.find((f) => f.id === m.sourceId);
+  const { clip } = relabelEpisode(m, feed);
+  const parts: string[] = ["relabeled"];
+  if (clip) parts.push("hidden as a Shorts clip");
+  await fillVideoDetails([m], timeoutMs, true);
+  if (m.upcoming) {
+    state.mediaItems = (state.mediaItems ?? []).filter((x) => x.id !== id);
+    delete state.seen[dedupeKeyUrl(m.url)];
+    delete state.seen[dedupeKeyContent(m.title, m.sourceId)];
+    return { note: "That is a scheduled premiere that has not aired: removed from the shelf until it does." };
+  }
+  if (m.kind === "video") {
+    const vid = youtubeVideoId(m.url);
+    if (vid) {
+      const found = await fetchYoutubeDetails([vid], timeoutMs, 0, true);
+      const d = found.get(vid);
+      if (d?.description) {
+        const links = extractDescriptionLinks(d.description);
+        const chapters = extractChapters(d.description);
+        if (links.length > 0) m.links = links;
+        if (chapters.length > 0) m.chapters = chapters;
+        parts.push(`${links.length} link(s) and ${chapters.length} chapter(s) read from the notes`);
+      }
+    }
+  }
+  // this episode's mentions rebuild from scratch under the current rules
+  for (const c of Object.values(state.clusters)) {
+    if (c.mentions) c.mentions = c.mentions.filter((x) => x.mediaId !== m.id);
+    if (c.mentions && c.mentions.length === 0) delete c.mentions;
+  }
+  delete m.notesLinkedAt;
+  const mentions = await linkEpisodesToStories(state, [m]);
+  if (mentions > 0) parts.push(`${mentions} story mention(s)`);
+  if ((feed?.tier ?? m.tier ?? 1) !== 1 && !m.hidden && llmAvailable()) {
+    const verdicts = await gateMediaItems([{ id: m.id, show: m.sourceName, title: m.title, excerpt: m.excerpt }]);
+    const v = verdicts[m.id];
+    if (!v?.onTopic) {
+      m.hidden = true;
+      parts.push("hidden by the media gate");
+    } else {
+      if (v.section && !m.roundup) m.section = v.section;
+      parts.push(`kept by the gate${v.section ? ` as ${v.section}` : ""}`);
+    }
+  }
+  return { note: `Re-judged one episode: ${parts.join(", ")}.` };
+}
+
 export async function rejudgeMedia(
   state: SiteState,
   mediaFeeds: ReturnType<typeof effectiveFeeds>,
@@ -1395,27 +1493,7 @@ export async function rejudgeMedia(
   if (items.length === 0) return { note: "Nothing on the shelf to re-judge." };
   const feedById = new Map(mediaFeeds.map((f) => [f.id, f]));
   let clips = 0;
-  for (const m of items) {
-    m.title = cleanMediaTitle(rewriteTitle(feedById.get(m.sourceId), m.title, m.publishedAt));
-    const hint = feedById.get(m.sourceId)?.sectionHint;
-    if (feedById.get(m.sourceId)?.roundup) {
-      m.roundup = true;
-      delete m.section;
-    } else {
-      delete m.roundup;
-      if (!m.section && hint) m.section = hint;
-    }
-    const ts = feedById.get(m.sourceId)?.thumbStyle;
-    if (ts && ts !== "episode") m.thumbStyle = ts;
-    else delete m.thumbStyle;
-    const tier = feedById.get(m.sourceId)?.tier;
-    if (!m.tier && tier) m.tier = tier;
-    // clips shelved before ingest learned to skip them
-    if (!m.hidden && isYoutubeShort(m.url)) {
-      m.hidden = true;
-      clips += 1;
-    }
-  }
+  for (const m of items) if (relabelEpisode(m, feedById.get(m.sourceId)).clip) clips += 1;
   // hidden ones too: a hidden video may be the twin of a podcast episode, and pairing needs both lengths
   const filled = await fillVideoDetails(items, timeoutMs, true);
   // scheduled premieres that slipped onto the shelf leave it and are
@@ -1647,6 +1725,22 @@ export async function ingestMedia(
   // with its publish time set to the air time by the details fill
   const ready = kept.filter((i) => !i.upcoming);
   const scheduled = kept.length - ready.length;
+  // the announced premieres, for the admin: upserted by url, gone once they
+  // air (they shelve as episodes then) or a fortnight after their slot
+  {
+    const nowIso = new Date().toISOString();
+    const list = state.scheduledEpisodes ?? [];
+    for (const i of kept.filter((x) => x.upcoming)) {
+      const entry = { url: i.url, title: i.title, sourceName: i.sourceName, ...(i.scheduledAt ? { scheduledAt: i.scheduledAt } : {}), seenAt: nowIso };
+      const at = list.findIndex((e) => e.url === i.url);
+      if (at >= 0) list[at] = { ...list[at], ...entry };
+      else list.push(entry);
+    }
+    const shelvedUrls = new Set((state.mediaItems ?? []).map((m) => m.url).concat(ready.map((r) => r.url)));
+    state.scheduledEpisodes = list.filter(
+      (e) => !shelvedUrls.has(e.url) && hoursAgo(e.scheduledAt ?? e.seenAt) < 14 * 24
+    );
+  }
   for (const item of judged) {
     if (!(item as MediaCandidate).upcoming) markSeen(state, item);
   }

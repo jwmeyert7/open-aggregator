@@ -6,7 +6,7 @@ import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAge
 import { notifySubmitter } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable, summarizeRelease } from "@/lib/llm";
-import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeEpisode, rejudgeMedia, relabelMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
 import { buildDailyComment, postDailyComment, redditPostFor } from "@/lib/social/reddit";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
@@ -16,7 +16,7 @@ import type { CandidateItem, Cluster, FeedConfig, Listing, SectionId, SiteState,
 import { cleanByline, isPrivateHost, newId, normalizeUrl, parseSummaryLines, sha256, slugify, socialSourceName, stripHtml, truncate, utcDay } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 type Body = { action: string } & Record<string, unknown>;
 
@@ -1020,6 +1020,18 @@ async function handle(req: NextRequest) {
     await saveState(state);
     const errs = res.errors.length > 0 ? ` Feed errors: ${res.errors.map((e) => e.feedId).join(", ")}.` : "";
     return ok(`${res.note ?? "Media shelf refreshed, nothing new."}${errs}`);
+  }
+
+  if (body.action === "relabelMedia") {
+    const r = relabelMedia(state, effectiveFeeds(state).filter(isMediaFeed));
+    await saveState(state);
+    return ok(r.note);
+  }
+
+  if (body.action === "rejudgeEpisode") {
+    const r = await rejudgeEpisode(state, effectiveFeeds(state).filter(isMediaFeed), String(body.id ?? ""), cfg.ingest.feedTimeoutMs);
+    await saveState(state);
+    return ok(r.note);
   }
 
   if (body.action === "rejudgeMedia") {

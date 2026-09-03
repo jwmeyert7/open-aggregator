@@ -24,6 +24,7 @@ export default async function AdminPodcastsPage({ searchParams }: { searchParams
   const data: PodcastsData = {
     sections: cfg.sections.map((s) => s.id),
     mediaItems: sliced,
+    scheduled: [...(state.scheduledEpisodes ?? [])].sort((a, b) => (a.scheduledAt ?? a.seenAt).localeCompare(b.scheduledAt ?? b.seenAt)),
   };
 
   return (

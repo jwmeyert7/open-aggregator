@@ -8,6 +8,8 @@ import { useState } from "react";
 export interface PodcastsData {
   sections: string[];
   mediaItems: MediaItem[];
+  /** announced premieres and streams that have not aired, soonest first */
+  scheduled: Array<{ url: string; title: string; sourceName: string; scheduledAt?: string; seenAt: string }>;
 }
 
 export function PodcastsClient({
@@ -62,14 +64,51 @@ export function PodcastsClient({
           </button>
         </div>
       </form>
-      <div className="btn-row">
-        <button className="btn" disabled={busy} onClick={() => act("refreshMedia")}>
-          Refresh shelf now
-        </button>
-        <button className="btn" disabled={busy} onClick={() => act("rejudgeMedia")}>
-          Re-judge shelf
-        </button>
+      <div className="admin-card">
+        <div className="posting-row">
+          <button className="btn" disabled={busy} onClick={() => act("refreshMedia")}>
+            Refresh shelf now
+          </button>
+          <span className="sub">Polls every show feed for new episodes, without waiting for the hourly run.</span>
+        </div>
+        <div className="posting-row">
+          <button className="btn" disabled={busy} onClick={() => act("relabelMedia")}>
+            Refresh labels
+          </button>
+          <span className="sub">Reapplies titles, sections, tiles, and tiers to every episode. Seconds, no network.</span>
+        </div>
+        <div className="posting-row">
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={() => act("rejudgeMedia", {}, "Re-judge the whole shelf? This refetches every episode and can take a few minutes.")}
+          >
+            Re-judge shelf
+          </button>
+          <span className="sub">
+            Everything at once: details, show notes, story mentions, and the media gate for tier 2 shows. Minutes. For one
+            episode, use Re-judge on its row.
+          </span>
+        </div>
       </div>
+
+      {data.scheduled.length > 0 ? (
+        <div className="admin-card">
+          <div className="headline">Scheduled</div>
+          <div className="sub">
+            Premieres and streams the feeds have announced. They are not on the site, and they shelve on their own once they
+            air.
+          </div>
+          {data.scheduled.map((s) => (
+            <div key={s.url} className="sub" style={{ margin: "4px 0" }}>
+              {s.scheduledAt ? `${s.scheduledAt.slice(0, 16).replace("T", " ")} UTC` : "time unknown"} · {s.sourceName} ·{" "}
+              <a href={s.url} rel="noopener">
+                {s.title}
+              </a>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {pinnedId ? (
         <p className="status-line">
           Showing one episode, straight from its edit link.{" "}
@@ -120,6 +159,15 @@ export function PodcastsClient({
                 Set title
               </button>
             </form>
+            <button
+              className="btn"
+              type="button"
+              disabled={busy}
+              title="This episode only: relabel, refresh details and show notes, rebuild its story mentions, and run the media gate if its show is tier 2"
+              onClick={() => act("rejudgeEpisode", { id: m.id })}
+            >
+              Re-judge
+            </button>
           </div>
         </div>
       ))}

@@ -28,6 +28,8 @@ export interface MediaCandidate extends CandidateItem {
   videoUrl?: string;
   /** a scheduled premiere or live stream that has not aired */
   upcoming?: boolean;
+  /** when it is scheduled to start, when the details call said */
+  scheduledAt?: string;
   /** show notes read from the full description */
   descriptionLinks?: string[];
   chapters?: Array<{ at: number; label: string; links?: string[] }>;
@@ -676,6 +678,8 @@ export interface YoutubeDetails {
   publishedAt?: string;
   /** a scheduled premiere or live stream that has not aired: not an episode yet */
   upcoming?: boolean;
+  /** when the premiere or stream is scheduled to start, for the admin's Scheduled card */
+  scheduledAt?: string;
   /** when a live stream or premiere actually happened, which is its honest publish time */
   airedAt?: string;
 }
@@ -727,7 +731,7 @@ export async function fetchYoutubeDetails(
             ...((): Partial<YoutubeDetails> => {
               const live = v.liveStreamingDetails;
               if (!live) return {};
-              if (!live.actualStartTime && live.scheduledStartTime) return { upcoming: true };
+              if (!live.actualStartTime && live.scheduledStartTime) return { upcoming: true, scheduledAt: live.scheduledStartTime };
               const airedAt = live.actualEndTime ?? live.actualStartTime;
               return airedAt ? { airedAt } : {};
             })(),
