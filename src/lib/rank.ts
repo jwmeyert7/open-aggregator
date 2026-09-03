@@ -1,5 +1,5 @@
 import { loadFeeds } from "./config";
-import type { Cluster, MediaItem, RiverItem, SiteConfig, SiteState, SectionId, WeekendSchedule } from "./types";
+import type { CoverageLink, Cluster, MediaItem, RiverItem, SiteConfig, SiteState, SectionId, WeekendSchedule } from "./types";
 import { hoursAgo } from "./util";
 import { mediaThumb } from "@/lib/util";
 
@@ -50,6 +50,31 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+/** A release-feed link that is a preview of a release: rc, alpha, beta, pre-release, by its title. */
+export function isPrereleaseLink(l: Pick<CoverageLink, "title" | "sourceName">): boolean {
+  return /\breleases?$/i.test(l.sourceName) && /-rc\.?\d*\b|\brc\b|release candidate|\balpha\b|\bbeta\b|pre-?release/i.test(l.title);
+}
+
+/**
+ * The links that date a story. A release candidate is a preview of the
+ * release, so once the final release from the same source lands, the
+ * prerelease no longer counts as the story's start: the final is the event
+ * and the rc becomes its run-up. Every other link stays.
+ */
+export function eventLinks(cluster: Cluster): Cluster["links"] {
+  const finals = cluster.links.filter((l) => /\breleases?$/i.test(l.sourceName) && !isPrereleaseLink(l));
+  if (finals.length === 0) return cluster.links;
+  return cluster.links.filter(
+    (l) => !isPrereleaseLink(l) || !finals.some((f) => f.sourceId === l.sourceId && f.publishedAt > l.publishedAt)
+  );
+}
+
+/** When a story broke: its earliest dating link, or its creation when it has none. */
+export function brokeAt(cluster: Cluster): string {
+  const links = eventLinks(cluster);
+  return links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), links[0]?.publishedAt ?? cluster.createdAt);
+}
+
 export function scoreBreakdown(cluster: Cluster, cfg: SiteConfig["ranking"], now: Date = new Date()): ScoreBreakdown {
   // Each link's weight decays from its OWN publish time. A late follow-up
   // contributes its own fresh weight but cannot resurrect the old links'
@@ -61,7 +86,7 @@ export function scoreBreakdown(cluster: Cluster, cfg: SiteConfig["ranking"], now
   // then a late link's contribution halves per lateness half-life. Day-two
   // corroboration still lifts a story; a burst of coverage about two-day-old
   // news no longer sends it back to the top as if the event just happened.
-  const eventStartMs = cluster.links.reduce((min, l) => {
+  const eventStartMs = eventLinks(cluster).reduce((min, l) => {
     if (l.undated) return min;
     const t = new Date(l.publishedAt).getTime();
     return t < min ? t : min;
@@ -195,8 +220,7 @@ export function weekInReview(
   now: Date = new Date(),
   window?: { start: Date; end: Date }
 ): Cluster[] {
-  const broke = (c: Cluster) =>
-    c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
+  const broke = brokeAt;
   const inWindow = window
     ? (c: Cluster) => broke(c) >= window.start.toISOString() && broke(c) < window.end.toISOString()
     : (c: Cluster) => hoursAgo(broke(c), now) <= 7 * 24;
@@ -310,7 +334,11 @@ export function leadLink(cluster: Cluster) {
   return [...cluster.links].sort((a, b) => {
     if (a.tier !== b.tier) return a.tier - b.tier;
     if (a.weight !== b.weight) return b.weight - a.weight;
-    return new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime();
+    // across sources the one that broke the story leads; within one source
+    // the newest link is the update (a final release over its rc, a
+    // follow-up post over the first) and leads instead
+    const dt = new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime();
+    return a.sourceId === b.sourceId ? -dt : dt;
   })[0];
 }
 

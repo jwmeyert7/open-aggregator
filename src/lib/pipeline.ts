@@ -2,9 +2,9 @@ import { applyBotOverrides, effectiveFeeds, effectiveMarkets, loadSiteConfig, si
 import { buildWeeklyCast, monthLabel, monthlyTop, poolFromDailies, rankPool, sendDailyEmail, sendMonthlyEmail, sendWeeklyEmail, subjectRangeLabel, weeklyTop, WEEKLY_SEND_HOUR_UTC, yearlyTop } from "./digest";
 import { attestAvailable, attestEdition } from "./attest";
 import { sendAdminEmail } from "./mail";
-import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
+import { enrichNewItems, extractChapters, extractDescriptionLinks, fetchAllFeeds, fetchMediaFeeds, fetchVideoManifest, fetchYoutubeDetails, isMediaFeed, isReleaseFeed, isYoutubeShort, normalizeHost, updateFeedHealth, youtubeVideoId, type CastLink, type FeedFetchResult, type MediaCandidate } from "./feeds";
 import { assessSourceCandidates, classifyAndCluster, compressTweetLines, dayInReview, gateMediaItems, heuristicFallback, llmAvailable, periodInReview, refreshFrontSummary, summarizeRelease, type EditorOutput, type SummaryBullet, matchChaptersToStories } from "./llm";
-import { clusterActivityAt, liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, summaryLinkable, topStories, weekInReview, weekendMode } from "./rank";
+import { brokeAt, clusterActivityAt, liveClusters, magnitude, rankClusters, rankMedia, score, scoreBreakdown, sectionStories, summaryLinkable, topStories, weekInReview, weekendMode } from "./rank";
 import type { SectionId, SiteConfig } from "./types";
 import { polymarketQuote } from "./polymarket";
 import { siteIdentity } from "./site";
@@ -568,8 +568,7 @@ function rememberDate(list: string[] | undefined, v: string): string[] {
  * bullets and the also-in-the-news list.
  */
 function dayTopClusters(state: SiteState, cfg: SiteConfig, date: string): { top: Cluster[]; reviewPool: Cluster[] } {
-  const broke = (c: Cluster) =>
-    c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
+  const broke = brokeAt;
   const mag = (c: Cluster) => magnitude(c, cfg.ranking);
   const dayClusters = liveClusters(state).filter((c) => utcDay(broke(c)) === date);
   const eligible = dayClusters.filter((c) => {
@@ -1311,12 +1310,18 @@ function rewriteTitle(
   }
 }
 
-/** Feed titles arrive with stray trailing separators ("Conference 2026 Recap Video |"); drop them. */
+/**
+ * Feed titles arrive with stray trailing separators ("Conference 2026 Recap
+ * Video |") and, for streams, a leading "LIVE:" with a colored dot, which is
+ * a leftover of the broadcast and not the episode's name. Both go.
+ */
 function cleanMediaTitle(title: string): string {
-  return title
+  const cleaned = title
+    .replace(/^\s*(?:[\u{1F7E2}\u{1F534}\u{26AA}\u{1F535}]\ufe0f?\s*)?(?:LIVE|Live)\s*[:\-\u2013|]\s*/u, "")
     .replace(/[\s|:\-\u2013\u2014\u00b7]+$/u, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+  return cleaned || title.trim();
 }
 
 /**
@@ -2094,6 +2099,20 @@ export async function runPipeline(): Promise<RunReport> {
     for (const i of baselined) markSeen(state, i);
     if (baselined.length > 0) report.notes.push(`Baselined ${baselined.length} existing posts from new listing feeds.`);
     newItems = newItems.filter((i) => !firstCrawlListings.has(i.sourceId));
+  }
+
+  // A release that has no notes yet waits. GitHub Actions publishes the
+  // release first and the maintainer writes the body afterward, and a poll
+  // that lands in that gap summarizes a real change as "a routine update".
+  // Left unseen, the item returns next poll with the notes; after six hours
+  // it goes in as it is.
+  const releaseFeedIds = new Set(feeds.filter((f) => isReleaseFeed(f)).map((f) => f.id));
+  const waiting = newItems.filter(
+    (i) => releaseFeedIds.has(i.sourceId) && (i.releaseNotes ?? "").trim().length < 200 && hoursAgo(i.publishedAt) < 6
+  );
+  if (waiting.length > 0) {
+    report.notes.push(`Holding ${waiting.length} release${waiting.length === 1 ? "" : "s"} with no notes yet (${waiting.map((i) => i.sourceName).join(", ")}).`);
+    newItems = newItems.filter((i) => !waiting.includes(i));
   }
 
   // One editor call handles a bounded batch. Normal runs see a handful of

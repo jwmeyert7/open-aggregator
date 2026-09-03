@@ -1700,6 +1700,9 @@ select.select {
   min-width: 200px;
   font-size: 0.88rem;
 }
+.updated-stamp {
+  color: var(--muted);
+}
 .summary-log ul {
   margin: 4px 0 0;
   padding-left: 18px;

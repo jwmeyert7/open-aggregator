@@ -835,9 +835,15 @@ async function handle(req: NextRequest) {
     if (!cluster) return fail("Unknown story.");
     if (!llmAvailable()) return fail("No LLM credentials configured.");
     const feedsById = new Map(effectiveFeeds(state).map((f) => [f.id, f]));
-    const target = cluster.links
+    // the lead link when it is a release, else the newest release link: a
+    // story holding an rc and the final release summarizes the final one
+    const releaseLinks = cluster.links
       .map((l) => ({ link: l, feed: feedsById.get(l.sourceId) }))
-      .find((x) => x.feed && isReleaseFeed(x.feed));
+      .filter((x) => x.feed && isReleaseFeed(x.feed));
+    const lead = leadLink(cluster);
+    const target =
+      releaseLinks.find((x) => x.link.url === lead?.url) ??
+      [...releaseLinks].sort((a, b) => b.link.publishedAt.localeCompare(a.link.publishedAt))[0];
     if (!target) return fail("No release-feed link on this story.");
     const notes = await fetchReleaseNotesFor(target.feed!, target.link.url, cfg.ingest.feedTimeoutMs);
     if (!notes) return fail("The release notes are no longer in that feed.");

@@ -4,7 +4,7 @@ import { AdminXray } from "@/components/AdminXray";
 import { MentionLink } from "@/components/MentionLink";
 import { AgeStamp } from "@/components/AgeStamp";
 import type { Cluster, SponsoredPost } from "@/lib/types";
-import { leadLink } from "@/lib/rank";
+import { brokeAt, leadLink } from "@/lib/rank";
 import { siteIdentity, writersPublic } from "@/lib/site";
 import { sourceSlug } from "@/app/sources/shared";
 import { bylineNames, nameSlug, showableByline } from "@/lib/util";
@@ -106,11 +106,11 @@ export function ClusterCard({
   const lead = leadLink(cluster);
   const others = cluster.links.filter((l) => l !== lead);
   // displayed age = when the story BROKE (earliest coverage): a straggling
-  // late source must not make an old story read as breaking news
-  const broke = cluster.links.reduce(
-    (min, l) => (l.publishedAt < min ? l.publishedAt : min),
-    cluster.links[0]?.publishedAt ?? cluster.createdAt
-  );
+  // late source must not make an old story read as breaking news. A final
+  // release supersedes its own rc as the story's start (brokeAt), and any
+  // other lead a day or more newer than the break shows as an update
+  const broke = brokeAt(cluster);
+  const updated = new Date(lead.publishedAt).getTime() - new Date(broke).getTime() >= 24 * 3600000 ? lead.publishedAt : null;
   const freshest = cluster.links.reduce(
     (max, l) => (l.publishedAt > max ? l.publishedAt : max),
     cluster.links[0]?.publishedAt ?? cluster.updatedAt
@@ -154,6 +154,11 @@ export function ClusterCard({
           </span>
         ) : null}
         <AgeStamp iso={broke} />
+        {updated ? (
+          <span className="updated-stamp" title="The lead link is newer than the story's first report">
+            updated <AgeStamp iso={updated} />
+          </span>
+        ) : null}
         <Link
           href={`/story/${cluster.slug}`}
           title={`Permalink: story broke ${new Date(broke).toUTCString().replace("GMT", "UTC")}, newest coverage ${new Date(freshest).toUTCString().replace("GMT", "UTC")}`}

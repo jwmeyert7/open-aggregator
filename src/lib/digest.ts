@@ -1,7 +1,7 @@
 import { loadSiteConfig, siteUrl } from "./config";
 import { sendMail } from "./mail";
 import { siteIdentity } from "./site";
-import { leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
+import { brokeAt, leadLink, liveClusters, magnitude, scoreBreakdown } from "./rank";
 import { llmAvailable, periodInReview } from "./llm";
 import { loadDailyDigest, loadMonthlyDigest, loadWeeklyDigest } from "./state";
 import type { Cluster, DigestSubscriber, MediaItem, SiteConfig, SiteState } from "./types";
@@ -447,9 +447,7 @@ export async function weeklyTop(
     const endExclusive = new Date(
       new Date(`${days[days.length - 1]}T00:00:00Z`).getTime() + 24 * 60 * 60000
     ).toISOString();
-    const broke = (c: Cluster) =>
-      c.links.reduce((min, l) => (l.publishedAt < min ? l.publishedAt : min), c.links[0]?.publishedAt ?? c.createdAt);
-    pool = liveClusters(state).filter((c) => broke(c) >= start && broke(c) < endExclusive);
+    pool = liveClusters(state).filter((c) => brokeAt(c) >= start && brokeAt(c) < endExclusive);
   }
   if (pool.length === 0) return null;
   return {
