@@ -28,9 +28,25 @@ export default async function AdminDistributionPage() {
     }
   }
 
+  // signups per day over the same window, confirmed shading the honest number
+  const dayKeys = Array.from({ length: 14 }, (_, i) => new Date(Date.now() - i * 24 * 60 * 60000).toISOString().slice(0, 10)).reverse();
+  const subs = state.digestSubscribers ?? [];
+  const signups = dayKeys.map((date) => {
+    const joined = subs.filter((s) => s.addedAt.slice(0, 10) === date);
+    return { date, all: joined.length, confirmed: joined.filter((s) => s.confirmed !== false).length };
+  });
+  const confirmed = subs.filter((s) => s.confirmed !== false);
   const data: DistributionData = {
     days,
     stories,
+    email: {
+      signups,
+      total: confirmed.length,
+      unconfirmed: subs.length - confirmed.length,
+      daily: confirmed.filter((s) => s.daily).length,
+      weekly: confirmed.filter((s) => s.weekly).length,
+      monthly: confirmed.filter((s) => s.monthly).length,
+    },
     reddit: {
       configured: redditConfigured(),
       enabled: Boolean(cfg.bots.reddit?.dailyComment),

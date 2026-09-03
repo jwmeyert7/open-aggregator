@@ -403,8 +403,19 @@ export interface SiteState {
   feedOverrides?: {
     custom: FeedConfig[];
     disabled: string[];
-    /** Per-source overrides of tier/weight/category, applied over the config file. */
-    edits?: Record<string, { tier?: 1 | 2; weight?: number; category?: string; thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show" }>;
+    /** Per-source overrides (name, url, section hint, tier, weight, category, tile style), applied over the config file. */
+    edits?: Record<
+      string,
+      {
+        name?: string;
+        url?: string;
+        sectionHint?: SectionId;
+        tier?: 1 | 2;
+        weight?: number;
+        category?: string;
+        thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show";
+      }
+    >;
   };
   /** Admin-managed Polymarket market changes layered over config/sections.json. */
   marketOverrides?: {

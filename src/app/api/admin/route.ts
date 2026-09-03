@@ -1073,7 +1073,28 @@ async function handle(req: NextRequest) {
     }
     if (![...loadFeeds(), ...o.custom].some((f) => f.id === id)) return fail("Unknown source.");
     if (body.action === "editFeed") {
-      const edit: { tier?: 1 | 2; weight?: number; category?: string; thumbStyle?: "episode" | "frame" | "frame2" | "frame3" | "show" } = {};
+      const edit: NonNullable<NonNullable<SiteState["feedOverrides"]>["edits"]>[string] = {};
+      if (body.name !== undefined) {
+        const name = String(body.name).trim().slice(0, 60);
+        if (!name) return fail("Name cannot be empty.");
+        edit.name = name;
+      }
+      if (body.url !== undefined) {
+        const url = String(body.url).trim();
+        if (!/^https?:\/\/\S+$/.test(url)) return fail("URL must start with http:// or https://.");
+        edit.url = url;
+      }
+      if (body.sectionHint !== undefined) {
+        const hint = String(body.sectionHint);
+        if (hint && !cfg.sections.some((s) => s.id === hint)) return fail("Unknown section.");
+        // an empty hint clears the override so the config file's own hint (if any) shows through
+        if (hint) edit.sectionHint = hint as SectionId;
+        else {
+          const prev = { ...(o.edits?.[id] ?? {}) };
+          delete prev.sectionHint;
+          o.edits = { ...(o.edits ?? {}), [id]: prev };
+        }
+      }
       if (body.tier !== undefined) edit.tier = String(body.tier) === "2" ? 2 : 1;
       if (body.weight !== undefined) {
         const w = Number(body.weight);

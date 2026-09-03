@@ -100,7 +100,12 @@ function dayLabel(date: string): string {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
 }
 
-/** The comment body in Reddit markdown: the edition's top stories, each linking the site and the source. */
+/**
+ * The comment body in Reddit markdown: the edition's top stories, each
+ * headline linking its story page (which links the source), the source
+ * named in plain text. Every URL sits behind link text so the tracking
+ * tags never show, and there is no email ask: the day page has one.
+ */
 export function buildDailyComment(
   digest: { date: string; clusters: Cluster[] },
   cfg: SiteConfig["bots"],
@@ -112,13 +117,11 @@ export function buildDailyComment(
     const lead = leadLink(c);
     const permalink = withUtm(`${cfg.siteUrl}/story/${c.slug}`, "reddit", campaign);
     const explainer = c.explainer ? ` ${c.explainer.charAt(0).toUpperCase()}${c.explainer.slice(1)}` : "";
-    const via = lead ? ` (via [${lead.sourceName}](${lead.url}))` : "";
+    const via = lead ? ` (${lead.sourceName})` : "";
     lines.push(`${i + 1}. [${c.headline.replace(/[[\]]/g, "")}](${permalink})${via}.${truncate(explainer, 240)}`);
   });
   lines.push("");
-  lines.push(
-    `Full day on the site: ${withUtm(`${cfg.siteUrl}/day/${digest.date}`, "reddit", campaign)}. Daily email at ${withUtm(`${cfg.siteUrl}/subscribe`, "reddit", campaign)}.`
-  );
+  lines.push(`[Full day on the site](${withUtm(`${cfg.siteUrl}/day/${digest.date}`, "reddit", campaign)})`);
   return lines.join("\n");
 }
 

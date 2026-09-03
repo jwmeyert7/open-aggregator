@@ -197,28 +197,26 @@ function carryForwardSummary(
   newText: string,
   prevText: string | undefined,
   /**
-   * Line-level keep for the editor's routine pass: a new line about a story
-   * the previous box already covered keeps the OLD sentence verbatim unless
-   * that story gained coverage since the box was last written (updatedAt past
-   * prevAt). New stories arrive in the editor's words, dropped stories leave.
-   * Without this, one new item in a section let the editor re-phrase every
-   * line in it, and the box churned every few minutes saying the same thing.
+   * Line-level keep for the editor's routine pass. A new line about a story
+   * the previous box already covered keeps the OLD sentence verbatim, full
+   * stop: new coverage joining the story is not a reason to re-say it (that
+   * exception let two World stories get re-phrased five times in an
+   * afternoon). And when the editor swaps a section's story for a different
+   * one, the old line stays if its story still outranks the newcomer, so the
+   * box changes when something bigger happens, not whenever something newer
+   * does. New stories that earn their place arrive in the editor's words.
    * The stale-reconsider path passes nothing here: its prompt already keeps
    * accurate lines verbatim and is meant to fix wording.
    */
-  keep?: { state: SiteState; prevAt: string }
+  keep?: { state: SiteState; cfg: SiteConfig }
 ): string {
   if (!prevText) return newText;
   const newLines = parseSummaryLines(newText);
   const prevLines = parseSummaryLines(prevText);
   const asRaw = (l: (typeof newLines)[number]) => `[${l.section}${l.ref ? `@${l.ref}` : ""}] ${l.raw}`;
-  const keepOld = (nl: (typeof newLines)[number]): (typeof newLines)[number] | undefined => {
-    if (!keep || !nl.ref) return undefined;
-    const old = prevLines.find((p) => p.section === nl.section && p.ref === nl.ref);
-    if (!old) return undefined;
-    const story = keep.state.clusters[nl.ref];
-    const developed = story && story.updatedAt > keep.prevAt;
-    return developed ? undefined : old;
+  const rankOf = (ref: string | null): number => {
+    const c = ref && keep ? keep.state.clusters[ref] : undefined;
+    return c && !c.killed ? score(c, keep!.cfg.ranking) : -1;
   };
   // the stories a section's lines actually cite (line refs plus phrase refs)
   const refsFor = (lines: typeof newLines, section: string) => {
@@ -247,8 +245,27 @@ function carryForwardSummary(
       out.push(...prevLines.filter((l) => l.section === sec).map(asRaw));
       continue;
     }
-    // the set changed: still keep each individual line whose story did not move
-    out.push(...newLines.filter((l) => l.section === sec).map((l) => asRaw(keepOld(l) ?? l)));
+    // the set changed: keep each line whose story the box already had, and
+    // when the editor swapped in a different story, keep the old line
+    // unless the newcomer outranks it
+    const newSec = newLines.filter((l) => l.section === sec);
+    const prevSec = prevLines.filter((l) => l.section === sec);
+    const newRefs = new Set(newSec.map((l) => l.ref).filter(Boolean));
+    const dropped = keep ? prevSec.filter((l) => l.ref && !newRefs.has(l.ref)) : [];
+    for (const l of newSec) {
+      const same = keep && l.ref ? prevSec.find((p) => p.ref === l.ref) : undefined;
+      if (same) {
+        out.push(asRaw(same));
+        continue;
+      }
+      const i = l.ref ? dropped.findIndex((d) => rankOf(d.ref) > rankOf(l.ref)) : -1;
+      if (i >= 0) {
+        out.push(asRaw(dropped[i]));
+        dropped.splice(i, 1);
+        continue;
+      }
+      out.push(asRaw(l));
+    }
   }
   // sections the new summary skipped keep their old lines alive, as before
   out.push(...prevLines.filter((l) => l.section && !covered.has(l.section)).map(asRaw));
@@ -2114,7 +2131,7 @@ export async function runPipeline(): Promise<RunReport> {
         carryForwardSummary(
           summaryText,
           state.frontSummary?.text,
-          state.frontSummary ? { state, prevAt: state.frontSummary.at } : undefined
+          state.frontSummary ? { state, cfg } : undefined
         ),
         state,
         cfg

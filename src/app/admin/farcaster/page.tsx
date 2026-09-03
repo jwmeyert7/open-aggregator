@@ -1,6 +1,9 @@
-import Link from "next/link";
 import { FarcasterClient, type FcCast, type FcNotification } from "./FarcasterClient";
+import { buildChrome, NotLoggedIn } from "../server";
+import { AdminChrome } from "../shared";
 import { isAdmin } from "@/lib/auth";
+import { loadSiteConfig } from "@/lib/config";
+import { loadState } from "@/lib/state";
 
 export const dynamic = "force-dynamic";
 
@@ -23,20 +26,16 @@ async function neynarGet(path: string): Promise<Record<string, unknown> | null> 
 }
 
 export default async function FarcasterPage() {
-  if (!(await isAdmin())) {
-    return (
-      <main className="wrap page single admin">
-        <p className="status-line">
-          Not logged in. <Link href="/admin">Go to the admin</Link> first.
-        </p>
-      </main>
-    );
-  }
+  if (!(await isAdmin())) return <NotLoggedIn />;
+  const chrome = buildChrome(await loadState(), loadSiteConfig());
 
   if (!process.env.NEYNAR_API_KEY || !process.env.FARCASTER_SIGNER_UUID) {
     return (
       <main className="wrap page single admin">
-        <p className="status-line">Farcaster credentials are not configured in this environment.</p>
+        <div>
+          <AdminChrome chrome={chrome} />
+          <p className="status-line">Farcaster credentials are not configured in this environment.</p>
+        </div>
       </main>
     );
   }
@@ -80,7 +79,8 @@ export default async function FarcasterPage() {
   return (
     <main className="wrap page single admin">
       <div>
-        <h1>Farcaster{username ? ` · @${username}` : ""}</h1>
+        <AdminChrome chrome={chrome} />
+        <h2>Farcaster{username ? ` · @${username}` : ""}</h2>
         <p className="status-line">
           fid {fid ?? "?"}
           {username ? (
@@ -88,8 +88,7 @@ export default async function FarcasterPage() {
               {" · "}
               <a href={`https://farcaster.xyz/${username}`}>view profile</a>
             </>
-          ) : null}{" "}
-          · <Link href="/admin">back to admin</Link>
+          ) : null}
         </p>
         <FarcasterClient username={username} casts={casts} notifications={notifications} />
       </div>

@@ -46,15 +46,32 @@ function labeledSummary(text: string | undefined): Array<{ label?: string; text:
 }
 
 /**
+ * Every section gets at least one line: a section the editor skipped (or a
+ * failed model call left empty) takes the biggest story the pool has for it.
+ * Sections come out in the site's order.
+ */
+function fillSections(lines: Array<{ label?: string; text: string }>, pool: Cluster[]): Array<{ label?: string; text: string }> {
+  const out = [...lines];
+  const sections = loadSiteConfig().sections;
+  for (const { id, title: label } of sections) {
+    if (out.some((l) => l.label === label)) continue;
+    const biggest = pool.find((c) => c.section === id || c.alsoIn === id);
+    if (biggest) out.push({ label, text: biggest.headline });
+  }
+  const order = sections.map((s) => s.title);
+  return out.sort((a, b) => (a.label ? order.indexOf(a.label) : 99) - (b.label ? order.indexOf(b.label) : 99));
+}
+
+/**
  * Review lines for a rollup edition. Frozen editions carry them; one frozen
  * before the field existed gets them written on the fly for this email and
- * not stored, since its content hash is sealed.
+ * not stored, since its content hash is sealed. Either way every section
+ * ends up with a line.
  */
-async function rollupSummary(frozen: string | undefined, period: string, top: Cluster[]): Promise<Array<{ label?: string; text: string }>> {
-  if (frozen) return labeledSummary(frozen);
-  if (!llmAvailable()) return [];
-  const bullets = await periodInReview(period, top).catch(() => []);
-  return labeledSummary(bullets.map((b) => `[${b.section}] ${b.text}`).join("\n"));
+async function rollupSummary(frozen: string | undefined, period: string, top: Cluster[], pool: Cluster[]): Promise<Array<{ label?: string; text: string }>> {
+  if (frozen) return fillSections(labeledSummary(frozen), pool);
+  const bullets = llmAvailable() ? await periodInReview(period, top).catch(() => []) : [];
+  return fillSections(labeledSummary(bullets.map((b) => `[${b.section}] ${b.text}`).join("\n")), pool);
 }
 
 /** Summary lines gathered under their section, in first-seen order, so a section heads its bullets once. */
@@ -364,7 +381,7 @@ export function buildDailyEdition(
       archiveUrl: `${siteUrl()}/day/${digest.date}`,
       archiveLabel: "Read this day on the site",
       campaign: `daily-${digest.date}`,
-      summary: labeledSummary(digest.summary),
+      summary: fillSections(labeledSummary(digest.summary), digest.clusters),
       groups: groupStories(digest.clusters),
       episodes,
     }),
@@ -418,7 +435,7 @@ export function rankPool(pool: Cluster[], cfg: SiteConfig, limit: number): Clust
 export async function weeklyTop(
   state: SiteState,
   cfg: SiteConfig
-): Promise<{ top: Cluster[]; start: Date; end: Date } | null> {
+): Promise<{ top: Cluster[]; pool: Cluster[]; start: Date; end: Date } | null> {
   const daysSinceSat = (new Date().getUTCDay() + 1) % 7;
   const days: string[] = [];
   for (let i = daysSinceSat + 7; i >= daysSinceSat + 1; i--) {
@@ -437,6 +454,7 @@ export async function weeklyTop(
   if (pool.length === 0) return null;
   return {
     top: rankPool(pool, cfg, 10),
+    pool: rankPool(pool, cfg, pool.length),
     start: new Date(`${days[0]}T00:00:00Z`),
     end: new Date(`${days[days.length - 1]}T00:00:00Z`),
   };
@@ -452,11 +470,11 @@ export function monthLabel(month: string): string {
  * (the in-progress current day rides along when the month is the current
  * one, so the live preview covers today too). Capped at 12.
  */
-export async function monthlyTop(state: SiteState, cfg: SiteConfig, month: string): Promise<{ top: Cluster[] } | null> {
+export async function monthlyTop(state: SiteState, cfg: SiteConfig, month: string): Promise<{ top: Cluster[]; pool: Cluster[] } | null> {
   const days = (state.dailyDigestDates ?? []).filter((d) => d.startsWith(month));
   const pool = await poolFromDailies(days);
   if (pool.length === 0) return null;
-  return { top: rankPool(pool, cfg, 12) };
+  return { top: rankPool(pool, cfg, 12), pool: rankPool(pool, cfg, pool.length) };
 }
 
 /**
@@ -499,7 +517,7 @@ export async function buildMonthlyEdition(state: SiteState, cfg: SiteConfig, mon
       archiveUrl: `${siteUrl()}/month/${month}`,
       archiveLabel: "Read this month on the site",
       campaign: `monthly-${month}`,
-      summary: await rollupSummary(frozen && !frozen.inProgress ? frozen.summary : undefined, `the month ${month}`, m.top),
+      summary: await rollupSummary(frozen && !frozen.inProgress ? frozen.summary : undefined, `the month ${month}`, m.top, m.pool),
       groups: groupStories(m.top),
       episodes: recentEpisodes(state, 31 * 24, 6),
     }),
@@ -559,7 +577,7 @@ export async function buildWeeklyEdition(state: SiteState, cfg: SiteConfig, epis
       archiveUrl: `${siteUrl()}/week/${endDay}`,
       archiveLabel: "Read this week on the site",
       campaign: `weekly-${endDay}`,
-      summary: await rollupSummary(frozen && !frozen.inProgress ? frozen.summary : undefined, `the week of ${utcDay(start.toISOString())} to ${endDay}`, top),
+      summary: await rollupSummary(frozen && !frozen.inProgress ? frozen.summary : undefined, `the week of ${utcDay(start.toISOString())} to ${endDay}`, top, week.pool),
       groups: groupStories(top),
       episodes: episodes ?? recentEpisodes(state, 7 * 24, 5),
     }),

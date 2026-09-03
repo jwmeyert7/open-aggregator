@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { LeaderboardTable } from "./LeaderboardTable";
+import { buildChrome, NotLoggedIn } from "../server";
+import { AdminChrome } from "../shared";
 import { isAdmin } from "@/lib/auth";
 import { effectiveFeeds, loadSiteConfig } from "@/lib/config";
 import { leadLink, liveClusters, score } from "@/lib/rank";
@@ -17,15 +18,7 @@ const WINDOW_DAYS = 30;
  * to src/app/leaderboard/page.tsx and drop the isAdmin() gate.
  */
 export default async function LeaderboardPage() {
-  if (!(await isAdmin())) {
-    return (
-      <main className="wrap page single admin">
-        <p className="status-line">
-          Not logged in. <Link href="/admin">Go to the admin</Link> first.
-        </p>
-      </main>
-    );
-  }
+  if (!(await isAdmin())) return <NotLoggedIn />;
 
   const state = await loadState();
   const cfg = loadSiteConfig();
@@ -119,10 +112,9 @@ export default async function LeaderboardPage() {
   return (
     <main className="wrap page single admin">
       <div>
-        <h1>Source Leaderboard</h1>
-        <p className="status-line">
-          Last {WINDOW_DAYS} days · admin-only preview · <Link href="/admin">back to admin</Link>
-        </p>
+        <AdminChrome chrome={buildChrome(state, cfg)} />
+        <h2>Source Leaderboard</h2>
+        <p className="status-line">Last {WINDOW_DAYS} days · admin-only preview</p>
         <p className="status-line">🔒 columns expose internal scoring and must stay admin-only if this page ever goes public.</p>
         <p className="status-line">
           {gate.firstDay

@@ -1496,6 +1496,27 @@ body:has(.notfound) .main-nav {
   color: var(--fg);
   border-bottom-color: var(--fg);
 }
+.admin-nav.grouped {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.admin-nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.admin-nav-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 68px;
+}
+.admin-nav-spacer {
+  flex: 1;
+}
 .admin-nav-group {
   display: flex;
   align-items: center;
@@ -1626,6 +1647,25 @@ select.select {
 .subscriber-controls .danger-text {
   color: var(--bad);
   margin-left: 8px;
+}
+.day-bars {
+  flex-wrap: wrap;
+}
+.reddit-rendered {
+  white-space: normal;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.reddit-rendered p {
+  margin: 0 0 10px;
+}
+.reddit-rendered ol {
+  padding-left: 22px;
+  margin: 0 0 10px;
+}
+.reddit-rendered li {
+  margin: 4px 0;
 }
 .reddit-preview {
   white-space: pre-wrap;
@@ -1780,6 +1820,33 @@ select.select {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+}
+/* the admin sources table: rows open into an editor row beneath them */
+.sources-admin td:first-child {
+  color: var(--fg);
+}
+.sources-admin .source-row {
+  cursor: pointer;
+}
+.sources-admin .source-row:hover td {
+  background: var(--surface);
+}
+.sources-admin .source-row.disabled td:first-child {
+  color: var(--muted);
+}
+.sources-admin .source-row.open td {
+  border-bottom: none;
+}
+.sources-admin .source-url {
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+.sources-admin .source-editor td {
+  background: var(--surface);
+  padding: 10px 12px 12px;
+}
+.sources-admin .source-editor .form-row {
+  margin-bottom: 8px;
 }
 .leaderboard th.sortable:hover {
   color: var(--fg);

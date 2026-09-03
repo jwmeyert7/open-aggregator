@@ -88,20 +88,40 @@ export interface AdminChromeData {
   candidates: number;
 }
 
-const TOOLS: Array<{ href: string; label: string }> = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/stories", label: "Stories" },
-  { href: "/admin/sources", label: "Sources" },
-  { href: "/admin/markets", label: "Markets" },
-  { href: "/admin/podcasts", label: "Podcasts" },
-  { href: "/admin/runs", label: "Runs" },
-  { href: "/admin/layout", label: "Layout" },
-  { href: "/admin/email", label: "Email" },
-  { href: "/admin/announcement", label: "Announcement" },
-  { href: "/admin/sponsored", label: "Sponsored" },
-  { href: "/admin/leaderboard", label: "Leaderboard" },
-  { href: "/admin/farcaster", label: "Farcaster" },
-  { href: "/admin/distribution", label: "Distribution" },
+/** The admin pages in rows by what they are for, so a new page has an obvious home. */
+const TOOL_ROWS: Array<{ label: string; tools: Array<{ href: string; label: string }> }> = [
+  {
+    label: "Content",
+    tools: [
+      { href: "/admin/stories", label: "Stories" },
+      { href: "/admin/sources", label: "Sources" },
+      { href: "/admin/podcasts", label: "Podcasts" },
+      { href: "/admin/markets", label: "Markets" },
+      { href: "/admin/layout", label: "Layout" },
+    ],
+  },
+  {
+    label: "Audience",
+    tools: [
+      { href: "/admin/distribution", label: "Distribution" },
+      { href: "/admin/email", label: "Email" },
+      { href: "/admin/farcaster", label: "Farcaster" },
+    ],
+  },
+  {
+    label: "Revenue",
+    tools: [
+      { href: "/admin/sponsored", label: "Sponsored" },
+      { href: "/admin/announcement", label: "Announcement" },
+    ],
+  },
+  {
+    label: "Machine",
+    tools: [
+      { href: "/admin/runs", label: "Runs" },
+      { href: "/admin/leaderboard", label: "Leaderboard" },
+    ],
+  },
 ];
 
 export function AdminChrome({ chrome }: { chrome: AdminChromeData }) {
@@ -120,30 +140,41 @@ export function AdminChrome({ chrome }: { chrome: AdminChromeData }) {
     <>
       <div className="admin-head">
         <h1>Admin</h1>
-        <nav className="admin-nav">
-          {TOOLS.map((t) => {
-            const badge =
-              t.href === "/admin/stories" && chrome.submissions > 0
-                ? ` (${chrome.submissions})`
-                : t.href === "/admin/sources" && chrome.candidates > 0
-                  ? ` (${chrome.candidates})`
-                  : "";
-            const title =
-              t.href === "/admin/stories" && chrome.submissions > 0
-                ? `${chrome.submissions} pending reader submission(s)`
-                : t.href === "/admin/sources" && chrome.candidates > 0
-                  ? `${chrome.candidates} source candidate(s) awaiting a decision`
-                  : undefined;
-            return (
-              <Link key={t.href} href={t.href} className={pathname === t.href ? "active" : ""} title={title}>
-                {t.label}
-                {badge}
-              </Link>
-            );
-          })}
-          <button className="linklike" disabled={busy} onClick={() => act("logout")}>
-            Log out
-          </button>
+        <nav className="admin-nav grouped">
+          <div className="admin-nav-row">
+            <Link href="/admin" className={pathname === "/admin" ? "active" : ""}>
+              Overview
+            </Link>
+            <span className="admin-nav-spacer" />
+            <button className="linklike" disabled={busy} onClick={() => act("logout")}>
+              Log out
+            </button>
+          </div>
+          {TOOL_ROWS.map((row) => (
+            <div key={row.label} className="admin-nav-row">
+              <span className="admin-nav-label">{row.label}</span>
+              {row.tools.map((t) => {
+                const badge =
+                  t.href === "/admin/stories" && chrome.submissions > 0
+                    ? ` (${chrome.submissions})`
+                    : t.href === "/admin/sources" && chrome.candidates > 0
+                      ? ` (${chrome.candidates})`
+                      : "";
+                const title =
+                  t.href === "/admin/stories" && chrome.submissions > 0
+                    ? `${chrome.submissions} pending reader submission(s)`
+                    : t.href === "/admin/sources" && chrome.candidates > 0
+                      ? `${chrome.candidates} source candidate(s) awaiting a decision`
+                      : undefined;
+                return (
+                  <Link key={t.href} href={t.href} className={pathname === t.href ? "active" : ""} title={title}>
+                    {t.label}
+                    {badge}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </div>
       {/* global status (the stream/X/subs strip, the pipeline button, feed
