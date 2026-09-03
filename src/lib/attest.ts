@@ -17,7 +17,14 @@ import { base } from "viem/chains";
  */
 const EAS_ADDRESS = "0x4200000000000000000000000000000000000021" as const;
 const SCHEMA_REGISTRY_ADDRESS = "0x4200000000000000000000000000000000000020" as const;
-const SCHEMA = "string edition,bytes32 contentHash";
+/**
+ * v2 schema (2026-09-03): the attestation carries the edition file itself,
+ * so the record on Base is self-contained (no site needed to know what was
+ * sealed), and names the hash it supersedes, so corrections form a chain
+ * anyone can walk from the EAS index alone. Editions sealed under the v1
+ * schema (edition + hash only) stay valid; their files live on the site.
+ */
+const SCHEMA = "string edition,bytes32 contentHash,bytes32 supersedes,bytes content";
 
 /** Deterministic EAS schema UID: keccak256(schema ++ resolver ++ revocable). */
 const SCHEMA_UID = keccak256(encodePacked(["string", "address", "bool"], [SCHEMA, zeroAddress, false]));
@@ -113,7 +120,11 @@ function clients() {
  * attestation UID, viewable at https://base.easscan.org/attestation/view/UID.
  * Throws on failure; callers treat that as a retryable note, never a blocker.
  */
-export async function attestEdition(edition: string, contentHashHex: string): Promise<string> {
+export async function attestEdition(
+  edition: string,
+  contentHashHex: string,
+  opts: { content?: string; supersedesHex?: string; refUid?: string } = {}
+): Promise<string> {
   const { account, pub, wallet } = clients();
 
   const existing = await pub.readContract({
@@ -132,13 +143,18 @@ export async function attestEdition(edition: string, contentHashHex: string): Pr
     await pub.waitForTransactionReceipt({ hash });
   }
 
+  const supersedes = opts.supersedesHex ? (`0x${opts.supersedesHex.replace(/^0x/, "")}` as `0x${string}`) : zeroHash;
+  const content = `0x${Buffer.from(opts.content ?? "", "utf8").toString("hex")}` as `0x${string}`;
   const data = encodeAbiParameters(
     [
       { name: "edition", type: "string" },
       { name: "contentHash", type: "bytes32" },
+      { name: "supersedes", type: "bytes32" },
+      { name: "content", type: "bytes" },
     ],
-    [edition, `0x${contentHashHex}` as `0x${string}`]
+    [edition, `0x${contentHashHex}` as `0x${string}`, supersedes, content]
   );
+  const refUID = opts.refUid && /^0x[0-9a-fA-F]{64}$/.test(opts.refUid) ? (opts.refUid as `0x${string}`) : zeroHash;
   const txHash = await wallet.writeContract({
     address: EAS_ADDRESS,
     abi: EAS_ABI,
@@ -146,7 +162,7 @@ export async function attestEdition(edition: string, contentHashHex: string): Pr
     args: [
       {
         schema: SCHEMA_UID,
-        data: { recipient: zeroAddress, expirationTime: 0n, revocable: false, refUID: zeroHash, data, value: 0n },
+        data: { recipient: zeroAddress, expirationTime: 0n, revocable: false, refUID, data, value: 0n },
       },
     ],
     account,

@@ -115,6 +115,13 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
                 </>
               ) : null}
               sha256 hash of json file contents: <span className="edition-hash">{digest.contentHash}</span>
+              {(digest.version ?? 1) > 1 ? (
+                <>
+                  <br />
+                  version {digest.version} of this edition, corrected{" "}
+                  {digest.corrections?.[digest.corrections.length - 1]?.at.slice(0, 10)} (the corrections are listed below)
+                </>
+              ) : null}
               <br />
               <a
                 href={`/day/${date}/edition.json`}
@@ -131,6 +138,44 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
             </p>
           ) : null}
         </div>
+        {digest.corrections && digest.corrections.length > 0 ? (
+          <section className="corrections">
+            <h2>Corrections</h2>
+            <p className="status-line">
+              This edition was corrected after it froze. Nothing was edited in place: each version below is a separate
+              file with its own seal, and each seal names the one it replaced, so the whole history stays checkable.
+            </p>
+            <ul>
+              <li className="newest-item">
+                <strong>Version 1</strong>, the original freeze ·{" "}
+                <a href={`/day/${date}/edition.json?v=1`}>file</a>
+                {digest.corrections[0]?.supersedes ? (
+                  <span className="org"> · sha256 {digest.corrections[0].supersedes}</span>
+                ) : null}
+              </li>
+              {digest.corrections.map((c) => (
+                <li key={c.version} className="newest-item">
+                  <strong>Version {c.version}</strong>, {c.at.slice(0, 16).replace("T", " ")} UTC ·{" "}
+                  {c.version === (digest.version ?? 1) ? (
+                    <a href={`/day/${date}/edition.json`}>file</a>
+                  ) : (
+                    <a href={`/day/${date}/edition.json?v=${c.version}`}>file</a>
+                  )}
+                  {c.attestationUid ? (
+                    <>
+                      {" · "}
+                      <a href={`https://base.easscan.org/attestation/view/${c.attestationUid}`} rel="noopener">
+                        attestation
+                      </a>
+                    </>
+                  ) : null}
+                  <div className="org">{c.note}</div>
+                  <div className="org">sha256 {c.contentHash}</div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {digest.summary ? (
           <SummaryBlock
             sections={loadSiteConfig().sections.map((x) => ({ id: x.id, title: x.title }))}

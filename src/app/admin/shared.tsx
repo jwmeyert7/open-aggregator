@@ -122,6 +122,7 @@ const TOOL_ROWS: Array<{ label: string; tools: Array<{ href: string; label: stri
       { href: "/admin/podcasts", label: "Podcasts" },
       { href: "/admin/markets", label: "Markets" },
       { href: "/admin/layout", label: "Layout" },
+      { href: "/admin/editions", label: "Editions" },
     ],
   },
   {

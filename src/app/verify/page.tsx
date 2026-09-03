@@ -41,6 +41,18 @@ export default async function VerifyPage() {
           it against the public record.
         </p>
 
+        <h2>Corrections</h2>
+        <p>
+          Editions can be corrected, and a correction is never a quiet edit. Any change at all, a comma included, makes
+          a new version with its own file, its own sha256 hash, and its own attestation on Base that names the hash and
+          attestation it replaced. The earlier versions stay on the day page, downloadable and checkable, with the
+          editor&apos;s note on why the change was made.
+        </p>
+        <p>
+          The reasons a correction is made: a factual error in a headline or explainer, a story that was later killed
+          or merged, a wrong source or a dead link replaced with the canonical one, or a story filed to the wrong
+          section. Rewording and re-ranking are not corrections and are not made.
+        </p>
         <h2>The full check, without trusting this site</h2>
         <ol>
           <li>

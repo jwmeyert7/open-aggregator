@@ -346,8 +346,10 @@ export function parseSummaryLines(
  * existing attestation stops verifying, so never change it.
  */
 export function editionCore(digest: object): Record<string, unknown> {
-  const { castHash, tweetId, contentHash, attestationUid, inProgress, ...core } = digest as Record<string, unknown>;
-  void castHash; void tweetId; void contentHash; void attestationUid; void inProgress;
+  // corrections, supersedes, and supersedesUid are lineage bookkeeping added
+  // 2026-09-03: absent on every edition sealed before, so those hashes stand
+  const { castHash, tweetId, contentHash, attestationUid, inProgress, corrections, supersedes, supersedesUid, ...core } = digest as Record<string, unknown>;
+  void castHash; void tweetId; void contentHash; void attestationUid; void inProgress; void corrections; void supersedes; void supersedesUid;
   return core;
 }
 

@@ -11,7 +11,7 @@ import { siteIdentity } from "./site";
 import { castRaw, postToFarcaster, farcasterPostedToday } from "./social/farcaster";
 import { postTextToX, postToX, xAutoPostedToday, xMonthlyCount, XCapError } from "./social/x";
 import { buildDailyComment, postDailyComment, redditPostFor } from "./social/reddit";
-import { loadDailyDigest, loadMonthlyDigest, loadState, loadWeeklyDigest, saveDailyDigest, saveMonthlyDigest, saveSnapshot, saveState, saveWeeklyDigest, saveYearlyDigest } from "./state";
+import { loadDailyDigest, loadMonthlyDigest, loadState, loadWeeklyDigest, saveDailyDigest, saveDailyDigestVersion, saveMonthlyDigest, saveSnapshot, saveState, saveWeeklyDigest, saveYearlyDigest } from "./state";
 import { FRONT_SUMMARY_MAX_AGE_HOURS } from "./types";
 import type { CandidateItem, Cluster, DailyDigest, MediaItem, MonthlyDigest, SiteState, WeeklyDigest, YearlyDigest } from "./types";
 import { ogTruncate } from "./og";
@@ -104,17 +104,101 @@ function digestContentHash(digest: object): string {
  * waits on a chain.
  */
 async function attestFrozenEdition(
-  digest: { contentHash?: string; attestationUid?: string },
+  digest: { contentHash?: string; attestationUid?: string; version?: number; supersedes?: string; supersedesUid?: string },
   edition: string,
   notes: string[]
 ): Promise<void> {
   if (!attestAvailable() || !digest.contentHash || digest.attestationUid) return;
   try {
-    digest.attestationUid = await attestEdition(edition, digest.contentHash);
-    notes.push(`attested ${edition} on Base (${digest.attestationUid.slice(0, 10)}…)`);
+    // the sealed bytes ride inside the attestation, so the record on Base
+    // stands on its own; a correction names the version and the hash and
+    // attestation it replaces
+    const label = (digest.version ?? 1) > 1 ? `${edition}#v${digest.version}` : edition;
+    digest.attestationUid = await attestEdition(label, digest.contentHash, {
+      content: JSON.stringify(editionCore(digest)),
+      ...(digest.supersedes ? { supersedesHex: digest.supersedes } : {}),
+      ...(digest.supersedesUid ? { refUid: digest.supersedesUid } : {}),
+    });
+    notes.push(`attested ${label} on Base (${digest.attestationUid.slice(0, 10)}…)`);
   } catch (err) {
     notes.push(`attestation failed for ${edition}: ${truncate(err instanceof Error ? err.message : String(err), 160)}`);
   }
+}
+
+/**
+ * A correction to a frozen day. Nothing is edited in place: the version on
+ * file is kept whole under its number, the corrected edition becomes the
+ * next version with a fresh hash, and it is sealed with a link to the hash
+ * and attestation it replaces. The editor's note is part of the record.
+ * Any change at all is a correction, a comma included: the file's hash
+ * moves either way, so there is no quiet path.
+ */
+export async function correctDailyEdition(
+  date: string,
+  note: string,
+  edits: Array<{ id: string; headline?: string; explainer?: string; section?: SectionId; remove?: boolean }>
+): Promise<{ note: string; version: number; contentHash: string; attestationUid?: string }> {
+  const digest = await loadDailyDigest(date);
+  if (!digest || digest.inProgress || !digest.contentHash) throw new Error(`No frozen edition for ${date}.`);
+  const reason = note.trim();
+  if (reason.length < 8) throw new Error("A correction needs a note saying what changed and why.");
+  const previousVersion = digest.version ?? 1;
+  const previousHash = digest.contentHash;
+  const previousUid = digest.attestationUid;
+  // the version on file stays whole, bookkeeping included, under its number
+  await saveDailyDigestVersion(digest, previousVersion);
+
+  let changed = 0;
+  const removed = new Set(edits.filter((e) => e.remove).map((e) => e.id));
+  for (const e of edits) {
+    const c = digest.clusters.find((x) => x.id === e.id);
+    if (!c || e.remove) continue;
+    if (e.headline !== undefined && e.headline.trim() && e.headline.trim() !== c.headline) {
+      c.headline = truncate(stripEmDashes(e.headline.trim()), 300);
+      changed += 1;
+    }
+    if (e.explainer !== undefined && e.explainer.trim() !== (c.explainer ?? "")) {
+      c.explainer = truncate(stripEmDashes(e.explainer.trim()), 500);
+      changed += 1;
+    }
+    if (e.section && e.section !== c.section) {
+      c.section = e.section;
+      changed += 1;
+    }
+  }
+  if (removed.size > 0) {
+    digest.clusters = digest.clusters.filter((c) => !removed.has(c.id));
+    changed += removed.size;
+  }
+  if (changed === 0) throw new Error("Nothing changed, so there is nothing to correct.");
+
+  const version = previousVersion + 1;
+  digest.version = version;
+  digest.supersedes = previousHash;
+  if (previousUid) digest.supersedesUid = previousUid;
+  else delete digest.supersedesUid;
+  delete digest.attestationUid;
+  digest.contentHash = digestContentHash(digest);
+  const notes: string[] = [];
+  await attestFrozenEdition(digest, `day:${date}`, notes);
+  digest.corrections = [
+    ...(digest.corrections ?? []),
+    {
+      version,
+      at: new Date().toISOString(),
+      note: reason,
+      contentHash: digest.contentHash,
+      supersedes: previousHash,
+      ...(digest.attestationUid ? { attestationUid: digest.attestationUid } : {}),
+    },
+  ];
+  await saveDailyDigest(digest);
+  return {
+    note: `Correction published as version ${version} of ${date} (${changed} change${changed === 1 ? "" : "s"}). ${notes.join(" ") || "Not attested yet: the next run retries the seal."}`,
+    version,
+    contentHash: digest.contentHash,
+    ...(digest.attestationUid ? { attestationUid: digest.attestationUid } : {}),
+  };
 }
 
 /**
@@ -829,7 +913,11 @@ async function maybePostDayThread(state: SiteState, cfg: SiteConfig, report: Run
   if (digest && !digest.inProgress && hoursAgo(digest.takenAt) <= 36 && attestAvailable() && digest.contentHash && !digest.attestationUid) {
     const attNotes: string[] = [];
     await attestFrozenEdition(digest, `day:${digest.date}`, attNotes);
-    if (digest.attestationUid) await saveDailyDigest(digest);
+    if (digest.attestationUid) {
+      const last = digest.corrections?.[digest.corrections.length - 1];
+      if (last && last.version === (digest.version ?? 1) && !last.attestationUid) last.attestationUid = digest.attestationUid;
+      await saveDailyDigest(digest);
+    }
     report.notes.push(...attNotes);
   }
   // an inProgress digest means yesterday's freeze hasn't run (or failed):

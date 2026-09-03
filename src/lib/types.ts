@@ -588,6 +588,18 @@ export interface DailyDigest {
   episodes?: MediaItem[];
   /** Still the CURRENT day: refreshed every run, replaced by the freeze. */
   inProgress?: boolean;
+  /**
+   * Corrections. An edition is never edited in place: a correction writes a
+   * new version (this record), keeps the previous version's file under its
+   * number, and seals the new one with a link to the hash it replaces. Absent
+   * means version 1, the original freeze.
+   */
+  version?: number;
+  /** the hash and attestation this version replaced (version 2 and up) */
+  supersedes?: string;
+  supersedesUid?: string;
+  /** every correction made, oldest first: what version it produced, when, and the editor's stated reason */
+  corrections?: Array<{ version: number; at: string; note: string; contentHash: string; supersedes: string; attestationUid?: string }>;
 }
 
 /** One frozen calendar month, frozen on the 1st of the next month. */

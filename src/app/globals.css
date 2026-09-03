@@ -1703,6 +1703,20 @@ select.select {
 .updated-stamp {
   color: var(--muted);
 }
+.corrections {
+  margin-top: 18px;
+}
+.corrections ul {
+  list-style: none;
+  padding: 0;
+}
+.corrections .org {
+  word-break: break-all;
+}
+.edition-edit textarea {
+  width: 100%;
+  min-height: 56px;
+}
 .summary-log ul {
   margin: 4px 0 0;
   padding-left: 18px;

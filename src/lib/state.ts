@@ -218,6 +218,26 @@ export async function saveDailyDigest(digest: DailyDigest): Promise<void> {
   else localWrite(path.join("daily", `${digest.date}.json`), body);
 }
 
+/** A superseded version of a day, kept whole under its number so its file and seal stay checkable forever. */
+export async function saveDailyDigestVersion(digest: DailyDigest, version: number): Promise<void> {
+  const body = JSON.stringify(digest);
+  if (useBlob()) await blobWrite(`${DAILY_DIR}/${digest.date}.v${version}.json`, body);
+  else localWrite(path.join("daily", `${digest.date}.v${version}.json`), body);
+}
+
+export async function loadDailyDigestVersion(date: string, version: number): Promise<DailyDigest | null> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(version) || version < 1) return null;
+  const raw = useBlob()
+    ? await blobRead(`${DAILY_DIR}/${date}.v${version}.json`)
+    : localRead(path.join("daily", `${date}.v${version}.json`));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DailyDigest;
+  } catch {
+    return null;
+  }
+}
+
 const MONTHLY_DIR = "aggregator/monthly";
 
 export async function saveMonthlyDigest(digest: MonthlyDigest): Promise<void> {

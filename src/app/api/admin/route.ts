@@ -6,7 +6,7 @@ import { discoverFeed, fetchReleaseNotesFor, isMediaFeed, isReleaseFeed, userAge
 import { notifySubmitter } from "@/lib/mail";
 import { siteIdentity } from "@/lib/site";
 import { classifyAndCluster, heuristicFallback, llmAvailable, summarizeRelease } from "@/lib/llm";
-import { addMediaByUrl, applyEditorOutput, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeEpisode, rejudgeMedia, relabelMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
+import { addMediaByUrl, applyEditorOutput, correctDailyEdition, digestClusters, digestPostText, ingestMedia, knownSourceHosts, markSeen, reconsiderFrontSummary, reeditCluster, rejudgeEpisode, rejudgeMedia, relabelMedia, runPipeline, selectNewItems, takeSnapshot } from "@/lib/pipeline";
 import { leadLink } from "@/lib/rank";
 import { buildDailyComment, postDailyComment, redditPostFor } from "@/lib/social/reddit";
 import { postTextToX, postToX, XCapError } from "@/lib/social/x";
@@ -401,6 +401,29 @@ async function handle(req: NextRequest) {
   // fresh: admin actions save state, and saving a stale fallback would roll the site back
   const state = await loadState({ fresh: true });
   const cfg = applyBotOverrides(loadSiteConfig(), state);
+
+  if (body.action === "correctEdition") {
+    const date = String(body.date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail("Bad date.");
+    const edits = Array.isArray(body.edits) ? (body.edits as Array<Record<string, unknown>>) : [];
+    const clean = edits
+      .filter((e) => typeof e.id === "string")
+      .map((e) => ({
+        id: String(e.id),
+        ...(typeof e.headline === "string" ? { headline: e.headline } : {}),
+        ...(typeof e.explainer === "string" ? { explainer: e.explainer } : {}),
+        ...(typeof e.section === "string" && (e.section === "general" || cfg.sections.some((s) => s.id === e.section))
+          ? { section: e.section as SectionId }
+          : {}),
+        ...(e.remove === true ? { remove: true } : {}),
+      }));
+    try {
+      const r = await correctDailyEdition(date, String(body.note ?? ""), clean);
+      return ok(r.note, { version: r.version, contentHash: r.contentHash, attestationUid: r.attestationUid });
+    } catch (err) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   if (body.action === "setPosting") {
     if (body.reset) {
